@@ -74,6 +74,7 @@ uninstall, and the per-platform path table.
 | `docker.md` | docker, docker compose, podman |
 | `kubernetes.md` | `kubectl`, `helm`, `k9s` |
 | `agent-tools.md` | agent-native tools and their CLI equivalents |
+| `ollama.md` | `ollama` |
 
 New technologies get their own file automatically (`database.md`, `cloud.md`,
 `make.md`, ...). `_skipped.md` records anything the writer judged not worth

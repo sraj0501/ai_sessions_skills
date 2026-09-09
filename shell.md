@@ -101,6 +101,20 @@ find . -path ./.git -prune -o -type f -print
 - **Example:** `cd <repo> && find . -path ./.git -prune -o -type f -print | sort`
 - **Notes:** Keep the explicit `-o -type f -print` to avoid printing the `.git` directory itself on some `find` implementations.
 
+## Path and command availability
+
+### Check whether a command is installed on PATH
+<!-- sig: fda5841bd437 -->
+
+```bash
+which <command> 2>/dev/null
+```
+
+- **What it does:** Searches the directories in `$PATH` for the named executable and prints its absolute path, discarding the error message if the command is not found.
+- **Why:** A quick way to confirm that a CLI tool is installed before relying on it in a script or pipeline.
+- **Example:** `which ollama 2>/dev/null`.
+- **Notes:** Combine with `|| echo "not found"` to make the result explicit in non-interactive output.
+
 ## Searching
 
 ### Find which files contain a string
