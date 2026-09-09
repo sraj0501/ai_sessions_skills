@@ -14,6 +14,7 @@
 <!-- sig: 9c2fad1f9f73 -->
 <!-- sig: c0a3783dc9f5 -->
 <!-- sig: 9dbd253c14b2 -->
+<!-- sig: d48cabb14f27 -->
 
 ```bash
 git status --short --branch
@@ -30,6 +31,9 @@ git status --short --branch
 <!-- sig: a64f513debbc -->
 <!-- sig: 52ff68ce3d42 -->
 <!-- sig: 2b1f89ae1813 -->
+<!-- sig: c174fa97b1a5 -->
+<!-- sig: ebeca0666c22 -->
+<!-- sig: 79f56f70ae55 -->
 
 ```bash
 git --no-pager diff

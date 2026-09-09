@@ -194,6 +194,9 @@ where powershell.exe
 <!-- sig: 1f5a23e612a7 -->
 <!-- sig: 59f992bb3ca0 -->
 <!-- sig: aad1601858a3 -->
+<!-- sig: cb034de033fa -->
+<!-- sig: ec43ba54700b -->
+<!-- sig: 06b772db48c9 -->
 
 ```bash
 rg -l -e 'ENTRA_REFRESH_TOKEN'
