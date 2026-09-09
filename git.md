@@ -25,6 +25,7 @@ git status --short --branch
 <!-- sig: daece94a6ca9 -->
 <!-- sig: a64f513debbc -->
 <!-- sig: 52ff68ce3d42 -->
+<!-- sig: 2b1f89ae1813 -->
 
 ```bash
 git --no-pager diff
@@ -51,6 +52,18 @@ git log --oneline -10
 - **Example:** `git log --oneline -10 --author='Shashank'`.
 - **Notes:** `--oneline` implies no pager problems for small counts, but prefer `git --no-pager log` when scripting.
 - **Variants:** `git log --oneline -20` extends the same compact view to the last 20 commits.
+
+### Show the last few commits with full subject and body
+<!-- sig: 298ac3164189 -->
+
+```bash
+git log -3 --format='%s%n%b---'
+```
+
+- **What it does:** Prints the last 3 commits: each subject line, a blank line, the body, then a `---` separator.
+- **Why:** Reads the actual full messages when you need to check commit style or description, not just the one-line summary.
+- **Example:** `git log -5 --format='%s%n%b---'`.
+- **Notes:** The trailing `---` makes it easy to visually separate commits when a body is empty. Use `--no-pager` when scripting to avoid `less`.
 
 ### Find out which branch is checked out
 <!-- sig: 5f84b4c8c60a -->
@@ -186,8 +199,21 @@ git add -A
 - **Why:** `git add .` in older git missed deletions; `-A` is unambiguous.
 - **Notes:** Check `git status --short` first — `-A` happily stages generated artefacts, `.env` files and debug scratch files. Prefer `git add <path>` when the working tree is dirty with unrelated work.
 
+### Stage specific files, ending option parsing with `--`
+<!-- sig: 6dac3e4000bc -->
+
+```bash
+git add -- tool/bin/distill.py tool/tests/test_portable.py
+```
+
+- **What it does:** Stages only the named files and tells `git add` to stop parsing options after `--`, so paths that start with a dash are treated as filenames.
+- **Why:** Safe when you want to stage a precise set of files and avoid unrelated working-tree changes.
+- **Example:** `git add -- packages/backend/src/app.ts packages/backend/src/config.ts`.
+- **Notes:** `git add` normally accepts paths anywhere, but `--` is required if a path begins with `-`. It does not stage deletions unless the deleted path is named explicitly.
+
 ### Commit staged changes with a message
 <!-- sig: 69f49c02d2dc -->
+<!-- sig: ddbb44ba277f -->
 
 ```bash
 git commit -m "fix: populate howfound from Jira classification"
@@ -203,7 +229,7 @@ git commit -m "fix: populate howfound from Jira classification"
   Explains why, not what.
   EOF
   ```
-- **Notes:** If a pre-commit hook rewrites files the commit fails — re-stage the modified files and commit again.
+- **Notes:** If a pre-commit hook rewrites files the commit fails — re-stage the modified files and commit again. `-q` suppresses the normal commit summary, useful for quiet watcher or CI output.
 
 ### Fix the last commit without changing its message
 <!-- sig: b03be485e893 -->

@@ -41,6 +41,7 @@ cat config.json
 <!-- sig: d8b3b7013f13 -->
 <!-- sig: d9db06bd8076 -->
 <!-- sig: 0926e1fcbe08 -->
+<!-- sig: d64a43183ffe -->
 
 ```bash
 head -n 30 package.json
@@ -53,6 +54,8 @@ head -n 30 package.json
 ### Read the last N lines of a file or pipe
 <!-- sig: d85d1c71612e -->
 <!-- sig: 26c5fd808225 -->
+<!-- sig: ef6fda14f8fe -->
+<!-- sig: b41746160aa3 -->
 
 ```bash
 tail -n 25 .runtime/watcher.log
@@ -115,6 +118,7 @@ rg -l -e 'ENTRA_REFRESH_TOKEN'
 <!-- sig: fe6d68ce019c -->
 <!-- sig: d43fbdff6730 -->
 <!-- sig: c7fe5d5b1975 -->
+<!-- sig: 5767f3160945 -->
 
 ```bash
 rg -n -C 3 -e 'AppError'
@@ -122,7 +126,7 @@ rg -n -C 3 -e 'AppError'
 
 - **What it does:** Prints matching lines with line numbers (`-n`) and 3 lines of context either side (`-C`).
 - **Why:** Usually enough to understand a usage without opening the file.
-- **Variants:** `-B`/`-A` for context before/after only; `-w` for whole-word matches; `-F` for a literal (non-regex) pattern. Combine with `-g` to scope the search: `rg -C 2 -g '*.ts' -e AppError`.
+- **Variants:** `-B`/`-A` for context before/after only; `-w` for whole-word matches; `-F` for a literal (non-regex) pattern; `-i` for case-insensitive matches. Combine with `-g` to scope the search: `rg -C 2 -g '*.ts' -e AppError`.
 - **Notes:** Devin's `grep` tool is this command — same flags, size-capped output, no shell permission needed.
 
 ### Count occurrences per file
@@ -166,6 +170,18 @@ find . -name '*.sql'
 - **What it does:** Walks the tree and prints paths matching the name pattern.
 - **Why:** Available everywhere, and it *does* traverse gitignored directories, which is exactly what you need when hunting build artefacts.
 - **Notes:** Prefer `rg --files` in repos. Add `-maxdepth 2` to keep it shallow, `-type f` to skip directories.
+
+### Filter a stream of text case-insensitively
+<!-- sig: 5025ff9f1a46 -->
+
+```bash
+... 2>&1 | grep -i commitscope
+```
+
+- **What it does:** Searches each line of a piped input for a pattern, ignoring case (`-i`), and prints only the matching lines.
+- **Why:** Quick filter when the exact casing in logs or test output is unknown or varies, without the power-user flags of `rg`.
+- **Example:** `python3 tool/tests/test_portable.py 2>&1 | grep -i commitscope`.
+- **Notes:** Plain `grep` is not gitignore-aware and does not support `rg`'s rust-regex restrictions; use `grep -i` for one-off pipelines and `rg -i` for code searches.
 
 ## Editing and transforming text
 
@@ -214,6 +230,18 @@ jq -r '.agent.model' ~/.config/devin/config.json
 - **Example:** `find . -path ./.git -prune -o -type f -print | sort`
 
 ## Files, permissions, network
+
+### Show the last-modified time of files in a custom format
+<!-- sig: 7117043ba359 -->
+
+```bash
+stat -f '%Sm  %N' -t '%H:%M:%S' file1 file2
+```
+
+- **What it does:** Prints each file's modification time (`%Sm`) and name (`%N`) using the given display time format.
+- **Why:** A one-shot timestamp inventory before running a batch of scripts or checking which files changed recently.
+- **Example:** `stat -f '%Sm  %N' -t '%H:%M:%S' tool/bin/distill.py .runtime/distill.lock`.
+- **Notes:** This is the BSD/macOS `stat` syntax. GNU/Linux `stat` uses a different format string (`stat -c '%y %n' file`); the two are not portable.
 
 ### Create a directory tree
 <!-- sig: 36d37b3fd5c9 -->
