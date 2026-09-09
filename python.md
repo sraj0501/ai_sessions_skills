@@ -11,6 +11,9 @@
 <!-- sig: 31226dd4f217 -->
 <!-- sig: 8df41e0f3eef -->
 <!-- sig: e1e8fadba44a -->
+<!-- sig: f573d9da3283 -->
+<!-- sig: 9dc0c50246e8 -->
+<!-- sig: 237e38a8659e -->
 
 ```bash
 python3 -V
