@@ -24,6 +24,7 @@ detached agent process.
 | `python.md` | python, pip, venv, pytest, ruff, mypy |
 | `brew.md` | `brew` |
 | `docker.md` | docker, docker compose, podman |
+| `kubernetes.md` | `kubectl`, `helm`, `k9s` |
 | `agent-tools.md` | Devin's own tools and their CLI equivalents |
 
 New technologies get their own file automatically (`kubernetes.md`,
