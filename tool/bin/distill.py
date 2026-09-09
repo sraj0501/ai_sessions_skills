@@ -110,19 +110,68 @@ def git(kb: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=str(kb), capture_output=True, text=True)
 
 
-def commit(kb: Path, runtime: Path, count: int, backend_name: str) -> None:
+def dirty_paths(kb: Path) -> set[str]:
+    """Every path with uncommitted content, staged or not, tracked or not.
+
+    NUL-separated so paths with spaces or non-ASCII survive intact; gitignored
+    files (notably `.runtime/`) stay excluded.
+    """
+    done = git(kb, "status", "--porcelain", "-z", "--untracked-files=all")
+    if done.returncode != 0:
+        return set()
+    fields = (done.stdout or "").split("\0")
+    paths, i = set(), 0
+    while i < len(fields):
+        entry, i = fields[i], i + 1
+        if len(entry) < 4:
+            continue
+        status, path = entry[:2], entry[3:]
+        paths.add(path)
+        if "R" in status or "C" in status:   # rename/copy: source follows as its own field
+            if i < len(fields):
+                paths.add(fields[i])
+                i += 1
+    return paths
+
+
+def commit(kb: Path, runtime: Path, count: int, backend_name: str,
+           preexisting: set[str] | None = None) -> None:
+    """Commit only what the writer changed.
+
+    Anything already dirty before the writer ran is the user's work in progress
+    and is left alone. A path dirty on both sides is genuinely ambiguous — the
+    two edits are interleaved in one file — so it is reported and skipped rather
+    than guessed at.
+    """
     if cfg.get("auto_commit", True) is not True:
         return
     if git(kb, "rev-parse", "--git-dir").returncode != 0:
         return
-    if not (git(kb, "status", "--porcelain").stdout or "").strip():
+
+    preexisting = set() if preexisting is None else preexisting
+    now = dirty_paths(kb)
+    ours = sorted(now - preexisting)
+    entangled = sorted(now & preexisting)
+
+    if entangled:
+        shown = ", ".join(entangled[:5]) + (" ..." if len(entangled) > 5 else "")
+        log(runtime, "left %d pre-existing change(s) uncommitted: %s" % (len(entangled), shown))
+    if not ours:
+        log(runtime, "nothing of ours to commit")
         return
-    git(kb, "add", "-A")
-    done = git(kb, "commit", "-q",
+
+    git(kb, "add", "--", *ours)
+    # --only commits exactly these paths, so anything the user had staged stays staged.
+    done = git(kb, "commit", "-q", "--only",
                "-m", "docs: document %d captured action(s)" % count,
-               "-m", "Written automatically by the ai-session-skills writer (%s)." % backend_name)
-    if done.returncode == 0:
-        log(runtime, "committed %d action(s)" % count)
+               "-m", "Written automatically by the ai-session-skills writer (%s)." % backend_name,
+               "--", *ours)
+    if done.returncode != 0:
+        err = "\n".join((done.stderr or done.stdout or "").strip().splitlines()[-2:])
+        log(runtime, "commit failed: " + (err.replace("\n", " | ") or "unknown error"))
+        return
+    log(runtime, "committed %d action(s) across %d file(s)" % (count, len(ours)))
+
     if cfg.get("auto_push", False) is True and git(kb, "remote", "get-url", "origin").returncode == 0:
         if git(kb, "push", "-q").returncode == 0:
             log(runtime, "pushed to origin")
@@ -171,6 +220,7 @@ def main() -> int:
             % (len(records), attempt, backend["name"]))
 
         prompt = build_prompt(kb, runtime, len(records))
+        preexisting = dirty_paths(kb)   # the user's work in progress; not ours to commit
         status = run_backend(backend, prompt, kb, timeout, runtime)
 
         missing = undocumented(kb, records) if status == 0 else None
@@ -194,7 +244,7 @@ def main() -> int:
         attempts_file.unlink(missing_ok=True)
         subprocess.run(procs.python_argv(cfg.TOOL_ROOT / "bin" / "sync_seen.py"),
                        capture_output=True)
-        commit(kb, runtime, len(records), backend["name"])
+        commit(kb, runtime, len(records), backend["name"], preexisting)
         log(runtime, "done")
         return 0
     finally:

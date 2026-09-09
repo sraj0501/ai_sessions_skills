@@ -22,6 +22,7 @@ sys.path.insert(0, str(BIN))
 
 import capture     # noqa: E402
 import cfg         # noqa: E402
+import distill     # noqa: E402
 import json_merge  # noqa: E402
 import procs       # noqa: E402
 
@@ -351,6 +352,107 @@ class TestLiveness(unittest.TestCase):
             (runtime / "watcher.pid").write_text(str(os.getpid()))
             (runtime / "watcher.alive").touch()
             self.assertTrue(procs.watcher_alive(runtime))
+
+
+class TestCommitScope(unittest.TestCase):
+    """The writer commits its own output and never the user's work in progress."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.kb = Path(self.tmp.name)
+        self.runtime = self.kb / ".runtime"
+        self.runtime.mkdir()
+        for args in (("init", "-q", "-b", "main"),
+                     ("config", "user.email", "test@example.com"),
+                     ("config", "user.name", "Test"),
+                     ("config", "commit.gpgsign", "false")):
+            distill.git(self.kb, *args)
+        (self.kb / ".gitignore").write_text(".runtime/\n", encoding="utf-8")
+        (self.kb / "git.md").write_text("# git\n", encoding="utf-8")
+        distill.git(self.kb, "add", "-A")
+        distill.git(self.kb, "commit", "-q", "-m", "seed")
+
+        self.real_get = distill.cfg.get
+        distill.cfg.get = lambda key, default=None: {
+            "auto_commit": True, "auto_push": False}.get(key, default)
+
+    def tearDown(self):
+        distill.cfg.get = self.real_get
+        self.tmp.cleanup()
+
+    def head_files(self):
+        done = distill.git(self.kb, "diff-tree", "--no-commit-id",
+                           "--name-only", "-r", "-z", "HEAD")
+        return sorted(p for p in done.stdout.split("\0") if p)
+
+    def head_subject(self):
+        return distill.git(self.kb, "log", "-1", "--format=%s").stdout.strip()
+
+    def write(self, name, text):
+        (self.kb / name).write_text(text, encoding="utf-8")
+
+    def test_gitignored_runtime_is_never_dirty(self):
+        (self.runtime / "pending.jsonl").write_text("noise\n", encoding="utf-8")
+        self.assertEqual(distill.dirty_paths(self.kb), set())
+
+    def test_preexisting_work_is_left_uncommitted(self):
+        self.write("README.md", "user work in progress\n")     # user, before the writer
+        before = distill.dirty_paths(self.kb)
+        self.write("shell.md", "# shell\n")                    # writer's output
+        distill.commit(self.kb, self.runtime, 1, "test", before)
+        self.assertEqual(self.head_files(), ["shell.md"])
+        self.assertIn("README.md", distill.dirty_paths(self.kb))
+
+    def test_entangled_file_is_skipped_not_guessed(self):
+        self.write("git.md", "# git\nuser edit\n")
+        before = distill.dirty_paths(self.kb)
+        self.write("git.md", "# git\nuser edit\nwriter edit\n")
+        distill.commit(self.kb, self.runtime, 1, "test", before)
+        self.assertEqual(self.head_subject(), "seed")          # nothing committed
+        self.assertIn("git.md", distill.dirty_paths(self.kb))
+        self.assertIn("left 1 pre-existing change",
+                      (self.runtime / "distill.log").read_text(encoding="utf-8"))
+
+    def test_user_staged_work_stays_staged(self):
+        self.write("README.md", "staged user work\n")
+        distill.git(self.kb, "add", "README.md")
+        before = distill.dirty_paths(self.kb)
+        self.write("shell.md", "# shell\n")
+        distill.commit(self.kb, self.runtime, 1, "test", before)
+        self.assertEqual(self.head_files(), ["shell.md"])
+        staged = distill.git(self.kb, "diff", "--cached", "--name-only").stdout.split()
+        self.assertEqual(staged, ["README.md"])
+
+    def test_paths_with_spaces_survive(self):
+        before = distill.dirty_paths(self.kb)
+        self.write("my notes.md", "# notes\n")
+        distill.commit(self.kb, self.runtime, 1, "test", before)
+        self.assertEqual(self.head_files(), ["my notes.md"])
+
+    def test_deletion_by_writer_is_committed(self):
+        before = distill.dirty_paths(self.kb)
+        (self.kb / "git.md").unlink()
+        distill.commit(self.kb, self.runtime, 1, "test", before)
+        self.assertEqual(self.head_files(), ["git.md"])
+        self.assertEqual(distill.dirty_paths(self.kb), set())
+
+    def test_nothing_of_ours_makes_no_commit(self):
+        self.write("README.md", "only user work\n")
+        before = distill.dirty_paths(self.kb)
+        distill.commit(self.kb, self.runtime, 1, "test", before)
+        self.assertEqual(self.head_subject(), "seed")
+
+    def test_auto_commit_off_is_respected(self):
+        distill.cfg.get = lambda key, default=None: {
+            "auto_commit": False, "auto_push": False}.get(key, default)
+        before = distill.dirty_paths(self.kb)
+        self.write("shell.md", "# shell\n")
+        distill.commit(self.kb, self.runtime, 1, "test", before)
+        self.assertEqual(self.head_subject(), "seed")
+
+    def test_non_repo_is_a_no_op(self):
+        with tempfile.TemporaryDirectory() as plain:
+            distill.commit(Path(plain), self.runtime, 1, "test", set())
 
 
 if __name__ == "__main__":
