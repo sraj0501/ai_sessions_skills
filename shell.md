@@ -73,6 +73,7 @@ rg -l -e 'ENTRA_REFRESH_TOKEN'
 
 ### Read matches with surrounding context
 <!-- sig: fe6d68ce019c -->
+<!-- sig: d43fbdff6730 -->
 
 ```bash
 rg -n -C 3 -e 'AppError'
@@ -80,7 +81,8 @@ rg -n -C 3 -e 'AppError'
 
 - **What it does:** Prints matching lines with line numbers (`-n`) and 3 lines of context either side (`-C`).
 - **Why:** Usually enough to understand a usage without opening the file.
-- **Variants:** `-B`/`-A` for context before/after only; `-w` for whole-word matches; `-F` for a literal (non-regex) pattern.
+- **Variants:** `-B`/`-A` for context before/after only; `-w` for whole-word matches; `-F` for a literal (non-regex) pattern. Combine with `-g` to scope the search: `rg -C 2 -g '*.ts' -e AppError`.
+- **Notes:** Devin's `grep` tool is this command — same flags, size-capped output, no shell permission needed.
 
 ### Count occurrences per file
 <!-- sig: f67b2c5729f9 -->

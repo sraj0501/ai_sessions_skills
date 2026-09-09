@@ -14,18 +14,6 @@ combination is captured into `shell.md` as its `rg` equivalent (see the
 "Searching" section there). Prefer these tools over shelling out to `rg`: they
 are permission-pre-approved and their output is size-capped.
 
-### Run a code search with context and a file-type glob
-<!-- sig: d43fbdff6730 -->
-
-```bash
-rg -C 2 -g '*.ts' -e AppError
-```
-
-- **What it does:** Equivalent to the Devin `grep` tool: searches the repo for `AppError` in `.ts` files and prints two lines of context around each match.
-- **Why:** A permission-pre-approved, size-capped search when you want a result without running a shell.
-- **Example:** `rg -C 2 -g '*.ts' -e AppError` finds all TypeScript occurrences of `AppError` with context.
-- **Notes:** The Devin tool output is size-capped; use the shell `rg` command directly if you need more context or an uncapped search.
-
 ## Editing files
 
 ### Make a targeted change to an existing file

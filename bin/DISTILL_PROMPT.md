@@ -45,8 +45,13 @@ Append to the existing file for that technology, or create it if absent:
 | `psql`, `mysql`, `redis-cli`, `influx`, migrations | `database.md` |
 | `az`, `aws`, `gcloud`, `terraform` | `cloud.md` |
 | `rg`, `sed`, `awk`, `find`, `ls`, `cat`, `head`, `tail`, `jq`, `curl`, `xargs`, `chmod`, ... | `shell.md` |
-| `devin`, and every `kind: agent-tool` record | `agent-tools.md` |
+| `devin` | `agent-tools.md` |
 | anything else | `<binary>.md`, e.g. `brew.md`, `make.md` |
+
+Route `kind: agent-tool` records by their `binary`, exactly like shell records
+— a `grep`/`glob` record documents `rg`, so it belongs in `shell.md`, not in
+`agent-tools.md`. Only records whose action has no shell equivalent (`edit`,
+`write`, `apply_patch`, `notebook_edit`) belong in `agent-tools.md`.
 
 Never invent a file for a technology that already has one. If you create a new
 file, add a row for it to the table in `README.md`.
@@ -59,7 +64,9 @@ Before writing anything for a record:
    record entirely** — do not touch the file, do not reword the entry.
 2. `grep` the target file for the same binary + subcommand (e.g. `git merge`).
    If an entry already documents that same action, **do not add a second
-   entry**. Instead either:
+   entry**. A different mix of flags on the same binary is a *variant*, not a
+   new action — `rg -C 2 -g '*.ts' -e X` belongs on the existing
+   "search with context" entry, not on a new one. Instead either:
    - add the new `<!-- sig: ... -->` line under that entry's existing sig
      line(s), and if the new command shows a genuinely useful variant, add one
      extra bullet under `**Variants:**`; or
