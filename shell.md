@@ -194,3 +194,17 @@ curl -s https://api.github.com/rate_limit
 - **What it does:** Requests the URL and prints the body with the progress meter suppressed (`-s`).
 - **Why:** Clean output for piping into `jq`.
 - **Notes:** Add `-L` to follow redirects, `-f` to make HTTP errors a non-zero exit status, and `-o file` to save instead of print.
+
+## Archives and compression
+
+### Extract a gzipped archive into a specific directory
+<!-- sig: 0c09c5421475 -->
+
+```bash
+tar -xzf archive.tar.gz -C /tmp/out
+```
+
+- **What it does:** Extracts the contents of a gzip-compressed tar archive (`-x` extract, `-z` gunzip, `-f` archive file) to the path named by `-C`.
+- **Why:** Unpacks a `.tar.gz` to a chosen directory in one step without first `cd`-ing into it.
+- **Example:** `tar -xzf project.tar.gz -C /tmp/extract`
+- **Notes:** The destination directory must already exist; `-C` does not create it. Add `-v` to list each file as it is extracted.

@@ -1,0 +1,344 @@
+#!/usr/bin/env python3
+"""Portability and behaviour tests. No dependencies, no network, no agents.
+
+    python3 tool/tests/test_portable.py
+
+Path resolution and backend rendering are pure functions of (platform, env,
+home), so Windows and Linux layouts are verified from any machine — including
+macOS, where they cannot be exercised directly.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+BIN = Path(__file__).resolve().parent.parent / "bin"
+sys.path.insert(0, str(BIN))
+
+import capture     # noqa: E402
+import cfg         # noqa: E402
+import json_merge  # noqa: E402
+import procs       # noqa: E402
+
+
+class TestUserConfigDir(unittest.TestCase):
+    def test_windows_uses_appdata(self):
+        got = cfg.user_config_dir("win32", {"APPDATA": r"C:\Users\me\AppData\Roaming"},
+                                  Path(r"C:\Users\me"))
+        self.assertEqual(str(got), r"C:\Users\me\AppData\Roaming")
+
+    def test_windows_falls_back_to_home(self):
+        got = cfg.user_config_dir("win32", {}, Path("/home/me"))
+        self.assertEqual(got, Path("/home/me/AppData/Roaming"))
+
+    def test_linux_honours_xdg(self):
+        got = cfg.user_config_dir("linux", {"XDG_CONFIG_HOME": "/home/me/.xdg"},
+                                  Path("/home/me"))
+        self.assertEqual(got, Path("/home/me/.xdg"))
+
+    def test_linux_default_is_dot_config(self):
+        self.assertEqual(cfg.user_config_dir("linux", {}, Path("/home/me")),
+                         Path("/home/me/.config"))
+
+    def test_macos_default_is_dot_config(self):
+        self.assertEqual(cfg.user_config_dir("darwin", {}, Path("/Users/me")),
+                         Path("/Users/me/.config"))
+
+
+class TestHarnessLayout(unittest.TestCase):
+    """Devin follows the platform convention; the dot-dir harnesses do not."""
+
+    def layout(self, platform, env=None, home=None):
+        return cfg.harness_layout(platform, env or {}, home or Path("/home/me"),
+                                  exists=lambda p: False)
+
+    def test_linux_devin_under_xdg(self):
+        got = self.layout("linux")
+        self.assertEqual(got["devin"]["hooks"], Path("/home/me/.config/devin/config.json"))
+        self.assertEqual(got["opencode"]["plugin"],
+                         Path("/home/me/.config/opencode/plugin/ai-session-skills.js"))
+
+    def test_linux_respects_xdg_override(self):
+        got = self.layout("linux", {"XDG_CONFIG_HOME": "/home/me/.xdg"})
+        self.assertEqual(got["devin"]["hooks"], Path("/home/me/.xdg/devin/config.json"))
+
+    def test_windows_devin_under_appdata(self):
+        got = self.layout("win32", {"APPDATA": "/c/Users/me/AppData/Roaming"},
+                          Path("/c/Users/me"))
+        self.assertEqual(got["devin"]["hooks"],
+                         Path("/c/Users/me/AppData/Roaming/devin/config.json"))
+
+    def test_dot_dirs_are_home_relative_on_every_platform(self):
+        for platform in ("win32", "darwin", "linux"):
+            got = self.layout(platform, {"APPDATA": "/appdata"}, Path("/home/me"))
+            self.assertEqual(got["claude"]["hooks"], Path("/home/me/.claude/settings.json"),
+                             platform)
+            self.assertEqual(got["codex"]["hooks"], Path("/home/me/.codex/hooks.json"), platform)
+            self.assertEqual(got["copilot"]["hooks"],
+                             Path("/home/me/.copilot/hooks/ai-session-skills.json"), platform)
+            self.assertEqual(got["cursor"]["hooks"], Path("/home/me/.cursor/hooks.json"), platform)
+
+    def test_windows_prefers_existing_opencode_dir(self):
+        existing = Path("/home/me/.config/opencode")
+        got = cfg.harness_layout("win32", {"APPDATA": "/appdata"}, Path("/home/me"),
+                                 exists=lambda p: p == existing)
+        self.assertEqual(got["opencode"]["dir"], existing)
+
+    def test_every_harness_has_a_skill_destination(self):
+        got = self.layout("linux")
+        for harness, spec in got.items():
+            self.assertTrue(str(spec["skill"]).endswith(".md"), harness)
+            self.assertIn(spec["style"], ("devin", "claude", "plain"), harness)
+
+
+class TestHookLauncher(unittest.TestCase):
+    def test_launcher_extension_matches_platform(self):
+        suffix = ".cmd" if os.name == "nt" else ".sh"
+        for kind in ("capture", "session"):
+            launcher = cfg.hook_launcher(kind)
+            self.assertTrue(str(launcher).endswith(suffix))
+            self.assertTrue(launcher.is_file(), "%s missing" % launcher)
+
+    def test_both_platform_shims_are_shipped(self):
+        for name in ("hook-capture.sh", "hook-capture.cmd",
+                     "hook-session.sh", "hook-session.cmd"):
+            self.assertTrue((BIN / name).is_file(), name)
+
+
+class TestWriterBackend(unittest.TestCase):
+    def test_placeholders_are_rendered_and_empty_model_dropped(self):
+        spec = {
+            "prefer": ["fake"],
+            "backends": {"fake": {"bin": sys.executable, "model": "",
+                                  "args": ["-m", "{model}", "--cd", "{kb}", "{prompt_text}"],
+                                  "prompt": "arg"}},
+        }
+        original = cfg.load
+        cfg.load = lambda: {**original(), "writer": spec}
+        try:
+            got = cfg.writer_backend()
+        finally:
+            cfg.load = original
+        self.assertIsNotNone(got)
+        self.assertNotIn("{model}", got["args"])
+        self.assertNotIn("-m", got["args"])          # flag dropped with its empty value
+        self.assertIn(str(cfg.kb_dir()), got["args"])
+        self.assertIn("{prompt_text}", got["args"])  # substituted at run time
+
+    def test_no_backend_when_binary_missing(self):
+        spec = {"prefer": ["nope"],
+                "backends": {"nope": {"bin": "definitely-not-installed-xyz", "args": []}}}
+        original = cfg.load
+        cfg.load = lambda: {**original(), "writer": spec}
+        try:
+            self.assertIsNone(cfg.writer_backend())
+        finally:
+            cfg.load = original
+
+    def test_shipped_backends_declare_a_prompt_mode(self):
+        for name, spec in cfg.DEFAULTS["writer"]["backends"].items():
+            self.assertIn(spec.get("prompt"), ("file", "arg", "stdin"), name)
+            if spec["prompt"] == "arg":
+                self.assertIn("{prompt_text}", spec["args"], name)
+            if spec["prompt"] == "file":
+                self.assertIn("{prompt_file}", spec["args"], name)
+
+
+class TestSignatures(unittest.TestCase):
+    def sig(self, command):
+        return [s for s, _b, _sc, _seg in capture.sig_of_command(command)]
+
+    def test_same_action_different_values_collapses(self):
+        self.assertEqual(self.sig('git commit -m "fix a"'), self.sig('git commit -m "fix b"'))
+        self.assertEqual(self.sig("npm install lodash"), self.sig("npm install express"))
+        self.assertEqual(self.sig("brew services restart postgresql@16"),
+                         self.sig("brew services restart redis"))
+
+    def test_distinct_actions_stay_distinct(self):
+        self.assertNotEqual(self.sig("npm run test"), self.sig("npm run build"))
+        self.assertNotEqual(self.sig("git --no-pager diff"), self.sig("git --no-pager log"))
+        self.assertNotEqual(self.sig("git stash push"), self.sig("git stash pop"))
+
+    def test_pipelines_yield_one_signature_per_segment(self):
+        self.assertEqual(len(self.sig("cat f.json | python3 -m json.tool")), 2)
+        self.assertEqual(len(self.sig("git fetch upstream && git merge upstream/staging")), 2)
+
+    def test_quoted_separators_do_not_split(self):
+        self.assertEqual(len(self.sig('git commit -m "a; b && c"')), 1)
+
+    def test_trivial_commands_are_ignored(self):
+        self.assertEqual(self.sig("echo hello"), [])
+        self.assertEqual(self.sig("cd /tmp"), [])
+
+
+class TestPayloadNormalisation(unittest.TestCase):
+    """One code path must absorb every harness's payload shape."""
+
+    CASES = {
+        "devin": {"tool_name": "exec", "tool_input": {"command": "terraform apply"},
+                  "tool_response": {"success": True}},
+        "claude": {"hook_event_name": "PostToolUse", "tool_name": "Bash", "cwd": "/repo",
+                   "tool_input": {"command": "helm upgrade api ./chart"},
+                   "tool_response": {"stdout": "ok"}},
+        "codex": {"tool_name": "Bash", "tool_input": {"command": "cargo build --release"},
+                  "tool_response": {"success": True}},
+        "copilot-camel": {"sessionId": "x", "cwd": "/repo", "toolName": "bash",
+                          "toolArgs": {"command": "aws s3 ls s3://b"},
+                          "toolResult": {"resultType": "success"}},
+        "copilot-snake": {"tool_name": "bash", "tool_input": {"command": "gcloud auth login"},
+                          "tool_result": {"result_type": "success"}},
+        "opencode": {"tool_name": "bash", "tool_input": {"command": "bun test --coverage"},
+                     "tool_response": {"success": True}},
+        "cursor-shell": {"command": "pnpm dlx prisma migrate dev", "exit_code": 0},
+        "cursor-tool": {"tool_name": "Shell",
+                        "tool_input": {"command": "kubectl rollout restart deploy/api"}},
+    }
+
+    def test_every_shape_produces_a_shell_record(self):
+        for name, payload in self.CASES.items():
+            records = capture.records_from_payload(payload, name)
+            self.assertEqual(len(records), 1, name)
+            self.assertEqual(records[0]["kind"], "shell", name)
+            self.assertTrue(records[0]["sig"], name)
+            self.assertTrue(records[0]["ok"], name)
+
+    def test_string_encoded_arguments_are_parsed(self):
+        records = capture.records_from_payload(
+            {"toolName": "bash", "toolArgs": json.dumps({"command": "docker ps -a"})}, "copilot")
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["binary"], "docker")
+
+    def test_failure_shapes_are_detected(self):
+        for payload in (
+            {"tool_name": "Bash", "tool_input": {"command": "psql -c 'select 1'"},
+             "tool_response": {"is_error": True}},
+            {"hook_event_name": "PostToolUseFailure", "tool_name": "Bash",
+             "tool_input": {"command": "psql -c 'select 2'"}},
+            {"tool_name": "bash", "tool_input": {"command": "psql -c 'select 3'"},
+             "exit_code": 1},
+        ):
+            records = capture.records_from_payload(payload, "test")
+            self.assertEqual(len(records), 1)
+            self.assertFalse(records[0]["ok"], payload)
+
+    def test_search_tools_become_ripgrep(self):
+        claude = capture.records_from_payload(
+            {"tool_name": "Grep", "tool_input": {"pattern": "TODO", "glob": "*.go",
+                                                 "-i": True, "-C": 2}}, "claude")[0]
+        self.assertEqual(claude["binary"], "rg")
+        self.assertIn("-i", claude["command"])
+        self.assertIn("-C", claude["command"])
+        devin = capture.records_from_payload(
+            {"tool_name": "grep", "tool_input": {"pattern": "TODO", "glob_pattern": "*.go",
+                                                 "case_insensitive": True,
+                                                 "context_lines": 2}}, "devin")[0]
+        self.assertEqual(claude["sig"], devin["sig"],
+                         "same search in two harnesses must be one action")
+
+    def test_edit_tools_are_documented_once_per_kind(self):
+        a = capture.records_from_payload({"tool_name": "Write",
+                                          "tool_input": {"file_path": "/a"}}, "claude")[0]
+        b = capture.records_from_payload({"tool_name": "write",
+                                          "tool_input": {"file_path": "/b"}}, "devin")[0]
+        self.assertEqual(a["sig"], b["sig"])
+        self.assertEqual(a["kind"], "agent-tool")
+
+    def test_unknown_payload_is_ignored_not_crashed(self):
+        self.assertEqual(capture.records_from_payload({}, "x"), [])
+        self.assertEqual(capture.records_from_payload({"tool_name": "WebFetch",
+                                                       "tool_input": {"url": "http://x"}}, "x"), [])
+
+
+class TestJsonMerge(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.path = Path(self.dir) / "settings.json"
+
+    def test_merge_preserves_foreign_settings_and_is_idempotent(self):
+        self.path.write_text(json.dumps({
+            "theme": "dark",
+            "hooks": {"PostToolUse": [{"hooks": [{"command": "/other/tool/x.sh"}]}]},
+        }, indent=2) + "\n", encoding="utf-8")
+        patch = {"hooks": {"PostToolUse": [{"hooks": [{"command": "/my/tool/bin/c.sh"}]}]}}
+
+        self.assertEqual(json_merge.apply(self.path, patch, ["/my/tool"]), "updated")
+        first = self.path.read_text()
+        self.assertEqual(json_merge.apply(self.path, patch, ["/my/tool"]), "unchanged")
+        self.assertEqual(self.path.read_text(), first)
+
+        data = json.loads(first)
+        self.assertEqual(data["theme"], "dark")
+        commands = [h["command"] for group in data["hooks"]["PostToolUse"]
+                    for h in group["hooks"]]
+        self.assertIn("/other/tool/x.sh", commands)
+        self.assertEqual(sum(1 for c in commands if c.startswith("/my/tool")), 1)
+
+    def test_remove_is_pure_subtraction(self):
+        self.path.write_text(json.dumps({
+            "theme": "dark",
+            "hooks": {"PostToolUse": [{"hooks": [{"command": "/my/tool/bin/c.sh"}]}]},
+        }, indent=2) + "\n", encoding="utf-8")
+        self.assertEqual(json_merge.remove(self.path, ["/my/tool"]), "updated")
+        data = json.loads(self.path.read_text())
+        self.assertEqual(data, {"theme": "dark"})
+
+    def test_legacy_marker_purges_old_layout(self):
+        self.path.write_text(json.dumps({
+            "hooks": {"PostToolUse": [{"hooks": [{"command": "/repo/bin/old-hook.sh"}]}]},
+        }, indent=2) + "\n", encoding="utf-8")
+        patch = {"hooks": {"PostToolUse": [{"hooks": [{"command": "/repo/tool/bin/new.sh"}]}]}}
+        json_merge.apply(self.path, patch, ["/repo/tool", "/repo"])
+        commands = [h["command"] for group in
+                    json.loads(self.path.read_text())["hooks"]["PostToolUse"]
+                    for h in group["hooks"]]
+        self.assertEqual(commands, ["/repo/tool/bin/new.sh"])
+
+    def test_missing_file_reports_missing_on_remove(self):
+        self.assertEqual(json_merge.remove(Path(self.dir) / "nope.json", ["/x"]), "missing")
+
+
+class TestLocking(unittest.TestCase):
+    def test_lock_is_exclusive_and_releasable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "lock"
+            first, second = procs.DirLock(path), procs.DirLock(path)
+            self.assertTrue(first.acquire())
+            self.assertFalse(second.acquire())
+            first.release()
+            self.assertTrue(second.acquire())
+            second.release()
+
+    def test_stale_lock_is_reclaimed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "lock"
+            path.mkdir()
+            os.utime(path, (0, 0))                    # ancient
+            self.assertTrue(procs.DirLock(path, stale_after=60).acquire())
+
+
+class TestLiveness(unittest.TestCase):
+    def test_dead_pid_is_not_alive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            (runtime / "watcher.pid").write_text("999999")
+            self.assertFalse(procs.watcher_alive(runtime))
+
+    def test_missing_pidfile_is_not_alive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertFalse(procs.watcher_alive(Path(tmp)))
+
+    def test_own_pid_with_fresh_touch_is_alive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            (runtime / "watcher.pid").write_text(str(os.getpid()))
+            (runtime / "watcher.alive").touch()
+            self.assertTrue(procs.watcher_alive(runtime))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

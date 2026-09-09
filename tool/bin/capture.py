@@ -36,7 +36,8 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import cfg  # noqa: E402  (local module, resolved via sys.path above)
+import cfg    # noqa: E402  (local modules, resolved via sys.path above)
+import procs  # noqa: E402
 
 TOOL_ROOT = cfg.TOOL_ROOT
 
@@ -358,21 +359,11 @@ def append(path: Path, text: str) -> None:
 
 def ensure_watcher(runtime: Path) -> None:
     """Start the background watcher if it is not already running."""
-    pidfile = runtime / "watcher.pid"
-    try:
-        os.kill(int(pidfile.read_text().strip()), 0)
-        return  # alive
-    except Exception:
-        pass
-    try:
-        with (runtime / "watcher.log").open("a", encoding="utf-8") as log:
-            subprocess.Popen(
-                ["/bin/bash", str(TOOL_ROOT / "bin" / "watcher.sh")],
-                stdout=log, stderr=log, stdin=subprocess.DEVNULL,
-                start_new_session=True, cwd=str(cfg.kb_dir()),
-            )
-    except Exception:
-        pass
+    poll = int(cfg.get("watcher.poll_seconds", 45) or 45)
+    if procs.watcher_alive(runtime, poll):
+        return
+    procs.spawn_detached(procs.python_argv(TOOL_ROOT / "bin" / "watcher.py"),
+                         log=runtime / "watcher.log", cwd=cfg.kb_dir())
 
 
 def enqueue(records: list[dict]) -> int:
