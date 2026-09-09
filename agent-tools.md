@@ -49,3 +49,15 @@ apply_patch(patch)                        # CLI equivalent: git apply / patch -p
 
 - **What it does:** Applies a diff-style patch across one or more files in a single operation.
 - **Why:** Keeps related edits atomic — either the whole change lands or none of it does.
+
+## Binary
+
+### Run the AI assistant with a specific model and capture all output
+<!-- sig: 01b18f0377f0 -->
+
+```bash
+devin -p --model swe-1-7-medium '2>&1'
+```
+
+- **What it does:** Executes the `devin` binary in prompt mode (`-p`) using the specified `swe-1-7-medium` model, while redirecting standard error (2) into standard output (1).
+- **Why:** The `2>&1
