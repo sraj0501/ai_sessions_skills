@@ -490,6 +490,18 @@ done
 - **Example:** The loop above, used to verify the `session-skills` skill is in sync across Devin, Claude and Copilot.
 - **Notes:** `grep -q` keeps the output to the label; `2>/dev/null` stops missing files from breaking the loop.
 
+### Check if referenced links exist on disk
+<!-- sig: 09dc7e62265c -->
+
+```bash
+while read -r 'l;' do '[' -e '$l' ']'
+```
+
+- **What it does:** This loop reads potential file paths, stored in the variable l, and uses the test command '[' -e '$l' ']' to check for the existence of that file or directory.
+- **Why:** It processes a list of potential links found previously (via grep/sed) one by one, providing a clean, iterative check for file presence.
+- **Example:** while read -r 'l;' do '[' -e '$l' ']' done
+- **Notes:** The structure relies on the input stream providing one path per line. The 'read -r' prevents backslash interpretation.
+
 ## Running scripts
 
 ### Execute a smoke test script with specific environment settings
