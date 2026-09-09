@@ -233,3 +233,17 @@ git worktree add ../wt-feature feature/x
 - **Why:** Work on two branches side-by-side without stashing, committing half-finished work, or maintaining a second clone.
 - **Example:** `git worktree add ../wt-feature feature/x` creates a sibling `../wt-feature` directory checked out at `feature/x`.
 - **Notes:** The branch must already exist unless you create it with `-b <branch>`. Do not place the new worktree inside the current working tree.
+
+## Bisecting
+
+### Start a binary search to find the commit that introduced a bug
+<!-- sig: 425fcf7ee070 -->
+
+```bash
+git bisect start
+```
+
+- **What it does:** Enters bisect mode and sets up a binary search; after you mark one known-good and one known-bad commit, git checks out midpoint commits until it finds the first bad one.
+- **Why:** Much faster than manually checking each commit when a regression appeared between two known points.
+- **Example:** `git bisect start` on the current (buggy) HEAD, then `git bisect bad` and `git bisect good v1.2.0` to start the search.
+- **Notes:** `git bisect reset` exits bisect mode and returns you to the original commit if you need to abort.
