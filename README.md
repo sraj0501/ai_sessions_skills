@@ -29,6 +29,38 @@ ai_session_skills/
 
 ---
 
+## Install
+
+Needs Python 3 and git — nothing else. `install.py` detects every agent CLI on
+the machine and wires them all.
+
+```bash
+# macOS / Linux
+python3 tool/install.py
+python3 tool/bin/doctor.py
+```
+
+```powershell
+# Windows
+py -3 tool\install.py
+py -3 tool\bin\doctor.py
+```
+
+Then **restart any running agent session** — harnesses read hook config at
+startup. Codex also needs `/hooks` run once inside it to trust the new hooks.
+
+`tool/install.sh` and `tool\install.ps1` are equivalent launchers if you prefer
+them. Re-running is safe and never duplicates entries. See
+[`tool/README.md`](tool/README.md) for `--only`, `--kb`, `--dry-run`,
+uninstall, and the per-platform path table.
+
+> **Status:** verified end-to-end on macOS and Fedora 44 (38 unit tests + 42
+> smoke checks each). Windows is implemented with no POSIX-only calls and its
+> path layout is unit-tested, but it has not yet run on real Windows hardware —
+> run `doctor.py` after installing there.
+
+---
+
 ## Knowledge files
 
 | File | Covers |
@@ -46,6 +78,9 @@ ai_session_skills/
 New technologies get their own file automatically (`database.md`, `cloud.md`,
 `make.md`, ...). `_skipped.md` records anything the writer judged not worth
 documenting, with a reason.
+
+72 actions are documented so far; `python3 tool/bin/doctor.py` prints the
+current count along with anything still queued.
 
 ### Entry format
 

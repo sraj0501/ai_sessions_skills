@@ -7,6 +7,7 @@
 
 ### Check the current state of the project before doing anything
 <!-- sig: 07b5548da62f -->
+<!-- sig: 463a0795bd76 -->
 
 ```bash
 git status --short --branch
@@ -16,6 +17,7 @@ git status --short --branch
 - **Why:** The first thing to run in an unfamiliar checkout. `--short` keeps it to a few lines instead of git's verbose hint-filled output, so it is cheap to read.
 - **Example:** `git status --short --branch` → `## fix/kpi4...origin/fix/kpi4 [ahead 1]` then ` M packages/backend/src/app.ts`.
 - **Notes:** Add `--untracked-files=all` to list files inside untracked directories individually.
+- **Variants:** `git -C <repo> status --short` gives the same compact status from a different checkout, but omits the branch header.
 
 ### See exactly what changed before staging or committing
 <!-- sig: daece94a6ca9 -->
@@ -34,6 +36,7 @@ git --no-pager diff --staged
 
 ### Read recent history in a compact form
 <!-- sig: b7d90c2bc367 -->
+<!-- sig: a0ab6770605b -->
 
 ```bash
 git log --oneline -10
@@ -43,6 +46,7 @@ git log --oneline -10
 - **Why:** Fast way to see where HEAD is and to copy the existing commit-message style before writing a new one.
 - **Example:** `git log --oneline -10 --author='Shashank'`.
 - **Notes:** `--oneline` implies no pager problems for small counts, but prefer `git --no-pager log` when scripting.
+- **Variants:** `git log --oneline -20` extends the same compact view to the last 20 commits.
 
 ### Find out which branch is checked out
 <!-- sig: 5f84b4c8c60a -->

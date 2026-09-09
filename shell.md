@@ -58,6 +58,18 @@ wc -l pending.jsonl
 - **Why:** Cheapest way to size a queue/log file or count matches from a pipe (`rg -l foo | wc -l`).
 - **Notes:** `wc -l < file` omits the filename from the output, which is easier to use in a variable.
 
+### List all regular files in a tree, skipping .git
+<!-- sig: 4e45776fce36 -->
+
+```bash
+find . -path ./.git -prune -o -type f -print
+```
+
+- **What it does:** Walks the current directory and prints every regular file, while pruning the `.git` directory so it is not entered or printed.
+- **Why:** A quick inventory of the real files in a checkout before piping to `sort`, `wc`, or an archive command.
+- **Example:** `cd <repo> && find . -path ./.git -prune -o -type f -print | sort`
+- **Notes:** Keep the explicit `-o -type f -print` to avoid printing the `.git` directory itself on some `find` implementations.
+
 ## Searching
 
 ### Find which files contain a string
@@ -160,6 +172,17 @@ jq -r '.agent.model' ~/.config/devin/config.json
 - **What it does:** Parses JSON and prints the selected value; `-r` emits raw strings without quotes.
 - **Why:** Safe way to read config values in scripts instead of grepping JSON.
 - **Notes:** Not installed everywhere. `python3 -m json.tool` or a short `python3 -c` is a dependency-free fallback.
+
+### Sort lines from standard input
+<!-- sig: d50c3e910bfb -->
+
+```bash
+... | sort
+```
+
+- **What it does:** Reads text from stdin and prints it in ascending alphabetical order, one line at a time.
+- **Why:** The easiest way to turn an unsorted list of files or lines into a stable, readable list.
+- **Example:** `find . -path ./.git -prune -o -type f -print | sort`
 
 ## Files, permissions, network
 

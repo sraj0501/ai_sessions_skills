@@ -106,26 +106,34 @@ from one source, `tool/skill/BODY.md`, with harness-appropriate frontmatter.
 ## How it works
 
 ```
- any agent session, any harness
+ any agent session, any harness, any OS
         │
-        │  post-tool-use hook       ~60 ms, prints nothing, always exit 0
+        │  post-tool-use hook  ->  bin/hook-capture.sh   (POSIX)
+        │                          bin\hook-capture.cmd  (Windows)
+        │                      ~60 ms, prints nothing, always exit 0
         ▼
  bin/capture.py ──► <kb>/.runtime/pending.jsonl    (only never-seen signatures)
         │
-        │  session-start hook, or self-healed by capture.py
+        │  session-start hook -> bin/session.py, or self-healed by capture.py
         ▼
- bin/watcher.sh    detached daemon; decides when to write:
+ bin/watcher.py    detached daemon; decides when to write:
         │            - queue reached batch_max, or
         │            - the agent has been quiet for quiet_seconds, or
         │            - a session ended (session-end hook drops a flush marker)
         ▼
- bin/distill.sh    locks, batches, and runs the first available writer:
+ bin/distill.py    locks, batches, and runs the first available writer as an
+        │          argv list (never through a shell):
         │            devin -p / claude -p / codex exec / copilot -p /
         │            opencode run / cursor-agent -p
         │            prompt = prompts/DISTILL_PROMPT.md
         ▼
  <kb>/git.md, docker.md, ...   entries appended, verified, committed
 ```
+
+`bin/procs.py` holds the only platform-dependent logic: detached spawning
+(`start_new_session` on POSIX, `DETACHED_PROCESS` on Windows), process
+liveness (`os.kill(pid, 0)` vs `tasklist`) and locking (atomic `mkdir`, since
+`flock`/`fcntl` do not exist on Windows).
 
 ### One normaliser instead of six adapters
 
@@ -141,9 +149,12 @@ Search tools (`Grep`, `Glob`, `grep`, ...) are recorded as the equivalent
 `rg` command, so the knowledge transfers to the shell. File-editing tools are
 recorded once each as agent capabilities.
 
-Add a harness by pointing its post-tool hook at `bin/hook-capture.sh <name>`.
-If its payload uses different key names, add them to the `*_KEYS` tuples in
-`capture.py` — no other code changes.
+Add a harness by pointing its post-tool hook at `bin/hook-capture.sh <name>`
+(or `bin\hook-capture.cmd <name>` on Windows) and its session hooks at
+`bin/hook-session.sh start|end <name>`. If its payload uses different key
+names, add them to the `*_KEYS` tuples in `capture.py`; to have `install.py`
+wire it automatically, add an entry to `cfg.harness_layout()` and a patch
+function in `install.py`. No other code changes.
 
 ### Deduplication
 
@@ -181,10 +192,10 @@ them. Deleting a sig marker makes that action get documented again.
 
 ## Configuration
 
-`config.json` at the knowledge-base root (or
-`~/.config/ai-session-skills/config.json`). Resolution order:
-`$AI_SKILLS_CONFIG` → user config → `<tool>/../config.json` → built-in
-defaults in `bin/cfg.py`.
+`config.json` at the knowledge-base root (or the user config dir:
+`~/.config/ai-session-skills/config.json`, `%APPDATA%\ai-session-skills\config.json`
+on Windows). Resolution order: `$AI_SKILLS_CONFIG` → user config →
+`<tool>/../config.json` → built-in defaults in `bin/cfg.py`.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -199,12 +210,27 @@ defaults in `bin/cfg.py`.
 | `capture.max_pending_records` | `400` | Queue cap |
 | `capture.skip_binaries` | `[]` | Binaries to never document |
 | `writer.prefer` | devin, claude, codex, copilot, opencode, cursor-agent | Backend order |
-| `writer.backends.<name>` | see `bin/cfg.py` | `bin`, `model`, `command` template |
+| `writer.backends.<name>` | see `bin/cfg.py` | `bin`, `model`, `args`, `prompt` |
 
-Backend command templates take `{bin}`, `{model}`, `{kb}` and `{prompt_file}`.
-Defaults use the cheapest sensible model per harness (e.g. `swe-1-7-medium`
-for Devin, `haiku` for Claude) and fall back to the harness default where a
-cheap tier is not known.
+A backend is an **argv template**, not a shell string, so quoting behaves the
+same on every OS:
+
+```json
+"claude": {
+  "bin": "claude",
+  "model": "haiku",
+  "args": ["-p", "--model", "{model}", "--permission-mode", "acceptEdits",
+           "--allowedTools", "Read,Edit,Write,Grep,Glob", "--add-dir", "{kb}"],
+  "prompt": "stdin"
+}
+```
+
+Placeholders are `{model}`, `{kb}`, `{prompt_file}` and `{prompt_text}`. The
+`prompt` mode says how the prompt reaches the agent — `file` (its path is
+already in `args`), `arg` (`{prompt_text}` is substituted) or `stdin` (piped).
+An empty `model` drops the `--model` flag, so the harness default applies.
+Defaults use the cheapest sensible tier where one is known (`swe-1-7-medium`
+for Devin, `haiku` for Claude).
 
 Environment overrides:
 
@@ -263,7 +289,7 @@ docker run --rm -v "$PWD:/work:ro" fedora:latest sh -c \
   CLI reads `~/.claude/skills` and `~/.copilot/skills`), so `devin skills list`
   shows `session-skills` once per location. The copies are generated from the
   same body, so it is cosmetic. Install fewer copies with
-  `install.sh --only <harness>` if it bothers you.
+  `install.py --only <harness>` if it bothers you.
 - Codex skips untrusted hooks silently until you approve them in `/hooks`.
 - OpenCode's `tool.execute.after` is not fired in every version
   (anomalyco/opencode#25918), so the plugin listens on `before` as well.
