@@ -8,6 +8,7 @@
 ### List a directory with permissions, sizes and dotfiles
 <!-- sig: 8719517b7fea -->
 <!-- sig: 279ce10d71b6 -->
+<!-- sig: 5aa5b11fa86f -->
 
 ```bash
 ls -la /Users/sraj/git_apps/personal
@@ -470,6 +471,7 @@ tar -xzf archive.tar.gz -C /tmp/out
 <!-- sig: 6af0a85220ab -->
 <!-- sig: d7337bdf197d -->
 <!-- sig: 8bd29a142943 -->
+<!-- sig: 94d1a38878f6 -->
 
 ```bash
 for f in \
