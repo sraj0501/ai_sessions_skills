@@ -55,6 +55,8 @@ cat config.json
 <!-- sig: b2b7b01819ae -->
 <!-- sig: 2937dfcf0e4e -->
 <!-- sig: 2126ee85aacf -->
+<!-- sig: 6dc786901c5a -->
+<!-- sig: decbd66eacc6 -->
 
 ```bash
 head -n 30 package.json
