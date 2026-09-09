@@ -309,6 +309,54 @@ jq -r '.agent.model' ~/.config/devin/config.json
 - **Why:** The easiest way to turn an unsorted list of files or lines into a stable, readable list.
 - **Example:** `find . -path ./.git -prune -o -type f -print | sort`
 
+### Convert newlines to spaces for listing files
+<!-- sig: cc7e7ace2e72 -->
+
+```bash
+tr '\n' ' '
+```
+
+- **What it does:** The 'tr' command translates or deletes characters; here, it replaces every newline character ('\n') with a space (' ').
+- **Why:** When piping the output of 'ls *.md' (which lists files on separate lines), using 'tr' joins all filenames onto a single line separated by spaces, making them easier to process by subsequent commands.
+- **Example:** ls *.md | tr '\n' ' '
+- **Notes:** The backslashes around 'n' are necessary to ensure the shell passes the literal newline character to 'tr'.
+
+### Extract the second column from input
+<!-- sig: a79870422aec -->
+
+```bash
+awk '{print $2}'
+```
+
+- **What it does:** This command processes input line by line and prints only the second field, assuming fields are separated by whitespace.
+- **Why:** It is used here to isolate specific data points (like binary names) from the output of another command before further processing like sorting or counting.
+- **Example:** python3 tool/bin/kb.py routes | awk '{print $2}'
+- **Notes:** The input to awk must be piped from another command, and it relies on the default field separator (whitespace).
+
+### Count unique occurrences of items
+<!-- sig: c316e5c014c9 -->
+
+```bash
+uniq -c
+```
+
+- **What it does:** Reads lines from standard input and prepends the count of consecutive identical lines to each unique line.
+- **Why:** It is used here after piping the output of `awk` to count how many times each unique binary route appears in the list.
+- **Example:** python3 tool/bin/kb.py routes | awk '{print $2}' | sort | uniq -c
+- **Notes:** This command must be preceded by `sort` to group identical lines together, which is required for `uniq` to function correctly.
+
+### Count and sort unique items numerically
+<!-- sig: 7c95b0c9c705 -->
+
+```bash
+sort -rn
+```
+
+- **What it does:** Sorts the input lines numerically (-n) and in reverse order (-r), placing the highest counts at the top.
+- **Why:** This is used after counting unique items with 'uniq -c' to easily see which items appeared most frequently.
+- **Example:** python3 tool/bin/kb.py routes | awk '{print $2}' | sort | uniq -c | sort -rn
+- **Notes:** The '-n' flag ensures proper numeric sorting, and '-r' reverses the order so the largest numbers appear first.
+
 ## Files, permissions, network
 
 ### Show the last-modified time of files in a custom format
@@ -448,3 +496,29 @@ AI_SKILLS_CAPTURE_OFF=1 bash tool/tests/smoke.sh '2>&1'
 - **Why:** Used to run tests in a controlled environment, ensuring that internal logging or state capture mechanisms (like skills capture) are disabled for reliable testing.
 - **Example:** `AI_SKILLS_CAPTURE_OFF=1 bash tool/tests/smoke.sh '2>&1'`
 - **Notes:** The `AI_SKILLS_CAPTURE_OFF=1` prefix ensures the variable is only set for the execution of the command that follows it.
+
+### Execute a timed script and display its logs
+<!-- sig: 89f7e18558ad -->
+
+```bash
+AI_SKILLS_KB=/tmp/kbtest AI_SKILLS_CAPTURE_OFF=1 timeout 900 python3 tool/bin/distill.py; echo 'exit=$?;'; echo '=== distill.log ===;'; cat /tmp/kbtest/.runtime/distill.log
+```
+
+- **What it does:** Executes a Python script (`distill.py`) with specific environment variables and limits its runtime to 900 seconds. It then prints the script's exit status and the contents of a dedicated log file.
+- **Why:** Using `timeout` prevents the script from hanging indefinitely, while chaining `echo` and `cat` ensures the exit status and log output are captured in a single run.
+- **Example:** `AI_SKILLS_KB=/tmp/kbtest AI_SKILLS_CAPTURE_OFF=1 timeout 900 python3 tool/bin/distill.py; echo 'exit=$?;'; echo '=== distill.log ===;'; cat /tmp/kbtest/.runtime/distill.log`
+- **Notes:** The environment variables (`AI_SKILLS_KB`, `AI_SKILLS_CAPTURE_OFF`) are required for the script to function correctly.
+
+## Linting and validation
+
+### Check markdown files for embedded ANSI escape codes
+<!-- sig: 0621f81ac947 -->
+
+```bash
+(grep -lP '\x1b' '*.md' 2>/dev/null)
+```
+
+- **What it does:** Uses Perl-compatible regex (`-P`) to search all markdown files (`*.md`) for the literal ANSI escape character (`\x1b`). It suppresses errors and only lists the filenames that contain the pattern.
+- **Why:** To validate that markdown files are clean and do not contain raw terminal control characters that could break rendering or cause unexpected behavior.
+- **Example:** `(grep -lP '\x1b' '*.md' 2>/dev/null)`
+- **Notes:** The `-l` flag ensures only filenames are printed, not the matching lines. The `-P` flag is required to correctly interpret the hexadecimal escape sequence `\x1b`.

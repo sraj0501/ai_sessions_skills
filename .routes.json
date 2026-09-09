@@ -1,0 +1,9 @@
+{
+  "awk": "shell.md",
+  "psql": "postgresql.md",
+  "sort": "shell.md",
+  "systemctl": "systemd.md",
+  "timeout": "shell.md",
+  "tr": "shell.md",
+  "uniq": "shell.md"
+}

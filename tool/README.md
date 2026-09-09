@@ -302,6 +302,50 @@ Measured on this machine, local `gemma4` and cloud `swe-1-7-medium` both score
 touching `prompts/ENTRY_PROMPT.md` — prompt changes that read like
 improvements are not reliably improvements.
 
+### Routing: no list of known commands
+
+There is no table mapping binaries to files. A fixed list always lags what you
+actually run — `grep.md` and `timeout.md` existed in this repo because those
+binaries were captured before anyone added them to the list, and once a file
+exists the split is self-perpetuating.
+
+Instead a command finds its home in three steps, and only the last costs a
+model call:
+
+1. **The knowledge base is the routing table.** `kb.binary_index()` reads which
+   file already documents each binary from the entries themselves. Once
+   `git status` lives in `git.md`, every other git command follows it.
+2. **Remembered decisions.** `.routes.json` holds any binary decided earlier,
+   so it is classified at most once. It is committed, not gitignored.
+3. **Ask the model.** For a genuinely new binary, the classifier is shown the
+   existing files *and the commands each already documents*, and commits to a
+   category before choosing: `same-ecosystem`, `generic-plumbing` or
+   `new-technology`. Python then holds it to that answer — claiming a new
+   technology and then filing it in the general shell bucket is overridden,
+   because that is the mistake small models make.
+
+Python always sanitises the result, so a proposed filename can never traverse
+out of the knowledge base. If the model is unreachable, the command gets a
+file of its own rather than blocking documentation.
+
+**Correcting it is a one-liner, and it sticks:**
+
+```bash
+python3 tool/bin/kb.py routes                     # where each binary is filed
+python3 tool/bin/kb.py route dnf package-managers.md   # future entries
+python3 tool/bin/kb.py merge dnf.md package-managers.md  # move existing ones
+```
+
+`merge` carries the `sig` comments across, so nothing is re-documented and the
+routing table repoints itself.
+
+Measured on `gemma4` over 14 unseen binaries against a five-file base: 12
+filed as intended, including `pnpm`/`yarn` joining Node, `poetry`/`ruff`
+joining Python, `jq`/`xargs`/`chmod` joining the shell file, and `psql`,
+`systemctl`, `journalctl` and `terraform` each earning a family file. The two
+misses were `podman` (its own container file rather than joining Docker) and
+`dnf` (filed as shell). Both are one `kb.py route` away from fixed, forever.
+
 ### The output contract
 
 The model returns a **JSON object**, never markdown: `worth_documenting`,

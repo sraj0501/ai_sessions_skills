@@ -48,6 +48,9 @@ Everything is Python, so the same commands work on macOS, Linux and Windows
 | Recent activity | `tail -n 40 $KB/.runtime/watcher.log $KB/.runtime/distill.log` |
 | Signature of a command | `python3 $TOOL/bin/capture.py --sig '<command>'` |
 | Record an action manually | `python3 $TOOL/bin/capture.py --command '<command>' --harness manual` |
+| Where is each command filed? | `python3 $TOOL/bin/kb.py routes` |
+| Refile a command, permanently | `python3 $TOOL/bin/kb.py route <binary> <file.md>` |
+| Merge two files, sigs intact | `python3 $TOOL/bin/kb.py merge <from.md> <to.md>` |
 | Rebuild the dedupe cache | `python3 $TOOL/bin/sync_seen.py` |
 | Re-wire hooks after an upgrade | `python3 $TOOL/install.py` |
 | Failed batches | `ls $KB/.runtime/failed/` |
@@ -69,6 +72,20 @@ batch is retried, and parked in `.runtime/failed/` only after
 Changing `watcher.*` timings only affects the next watcher: it reads its
 config once at startup, so stop the running one first if you need new timings
 to take effect immediately.
+
+## Which file does a command go in?
+
+There is no list of known commands. A binary is filed by looking at what the
+knowledge base already documents (`git status` in `git.md` pulls every git
+command there), then at `.routes.json` for earlier decisions, and only then by
+asking the model — once, after which the answer is remembered.
+
+If something is filed badly, correct it and the correction sticks:
+
+```bash
+python3 $TOOL/bin/kb.py route psql databases.md      # future entries
+python3 $TOOL/bin/kb.py merge psql.md databases.md   # move existing ones too
+```
 
 ## Add or correct an entry by hand
 

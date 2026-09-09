@@ -155,6 +155,108 @@ ENTRY_SCHEMA = {
 }
 REQUIRED_PROSE = ("heading", "what", "why")
 
+# `kind` is answered before `file`, and under constrained decoding the model
+# must pick one of the three. Judging what a tool *is* turns out to be much
+# more reliable than picking a filename, where a small model just reaches for
+# the largest existing bucket -- so Python uses `kind` to police the choice.
+ROUTE_KINDS = ("same-ecosystem", "generic-plumbing", "new-technology")
+ROUTE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "kind": {"type": "string", "enum": list(ROUTE_KINDS)},
+        "file": {"type": "string"},
+        "title": {"type": "string"},
+    },
+    "required": ["kind", "file", "title"],
+}
+
+
+def route_prompt(record: dict, choices: list[tuple[str, str, list[str]]]) -> str:
+    """Ask which file a never-before-seen command belongs in.
+
+    Each candidate is shown with the commands it already documents: concrete
+    evidence beats a title, and it is what makes `pnpm` land beside `npm`.
+    """
+    listing = "\n".join(
+        "- `%s` — %s%s" % (name, title,
+                           (" (documents: %s)" % ", ".join(bins[:8])) if bins else "")
+        for name, title, bins in choices)
+    return (
+        "You organise a personal command reference. Each file covers one "
+        "technology or family of tools.\n\n"
+        "A command was run that the reference does not cover yet:\n\n"
+        "    binary:  %s\n    command: %s\n\n"
+        "%s\n\n"
+        "First decide what kind of tool this is:\n\n"
+        "- `same-ecosystem` — a listed file already covers this tool, or "
+        "another tool from the same language, runtime or platform. An "
+        "ecosystem includes its package managers, test runners, linters and "
+        "build tools, which belong with their language rather than with "
+        "similar tools from other ecosystems.\n"
+        "- `generic-plumbing` — general-purpose Unix work that is tied to no "
+        "particular technology: searching, editing, archiving, piping, "
+        "permissions, process and file management.\n"
+        "- `new-technology` — a specific technology the reference does not "
+        "cover yet. A database client, an operating-system package manager, "
+        "an init or service system, or an infrastructure tool is always this, "
+        "never `generic-plumbing`, even when no listed file fits.\n\n"
+        "Then choose `file`:\n\n"
+        "- `same-ecosystem` -> the existing file for that ecosystem.\n"
+        "- `generic-plumbing` -> the listed general shell/utilities file.\n"
+        "- `new-technology` -> a NEW filename, named for the family rather "
+        "than this one binary, so related tools can join it later.\n\n"
+        "Reply with JSON: {\"kind\": \"...\", \"file\": \"<name>.md\", "
+        "\"title\": \"<Heading>\"}. `file` is short and lowercase; `title` is "
+        "a human heading of one to three words, never a command line.\n"
+        % (record.get("binary", ""), record.get("command", ""),
+           ("Existing files:\n" + listing) if listing else "The reference is empty."))
+
+
+def classify(record: dict, kb_dir: Path, backend: dict, timeout: int,
+             runtime: Path) -> tuple[str, str] | None:
+    """Decide a home for an unknown binary. Returns None if the model cannot."""
+    by_file: dict[str, list[str]] = {}
+    for known_binary, filename in sorted(kb.binary_index(kb_dir).items()):
+        by_file.setdefault(filename, []).append(known_binary)
+    choices = sorted((name, kb.title_of(kb_dir, name), by_file.get(name, []))
+                     for name in (p.name for p in kb_dir.glob("*.md"))
+                     if name not in (kb.SKIPPED_FILE, "README.md"))
+    raw = run_text(backend, route_prompt(record, choices), timeout, runtime, ROUTE_SCHEMA)
+    if not raw:
+        return None
+    found = JSON_BLOCK.search(raw)
+    if not found:
+        return None
+    try:
+        reply = json.loads(found.group(0))
+    except Exception:
+        return None
+    # The model suggests; Python decides the actual path.
+    if not str(reply.get("file") or "").strip():
+        return None
+    filename = kb.safe_filename(reply["file"])
+    title = " ".join(str(reply.get("title") or "").split())
+
+    # Models sometimes echo the category name back as the filename.
+    if filename[:-3] in ROUTE_KINDS:
+        filename = kb.safe_filename(title or record.get("binary", ""))
+
+    # Hold it to its own judgement. Saying "this is a technology nothing here
+    # covers" and then filing it in the general shell bucket is the failure
+    # small models fall into, so that answer is overridden rather than trusted.
+    if reply.get("kind") == "new-technology" and (kb_dir / filename).exists():
+        derived = kb.safe_filename(title or record.get("binary", ""))
+        if not (kb_dir / derived).exists():
+            filename = derived
+
+    if (kb_dir / filename).exists():
+        # An existing file keeps its own heading: this is choosing a
+        # destination, not renaming one.
+        return filename, kb.title_of(kb_dir, filename)
+    if not title or len(title.split()) > 4 or title.startswith("-") or " -" in title:
+        title = kb.title_of(kb_dir, filename)   # a command line is not a title
+    return filename, title[:60]
+
 
 def run_http(backend: dict, prompt: str, timeout: int, runtime: Path,
              schema: dict | None = None) -> str | None:
@@ -281,10 +383,20 @@ def document_record(kb_dir: Path, runtime: Path, record: dict, backend: dict,
                     timeout: int) -> str:
     """Place one record into the knowledge base. Returns what happened."""
     sig = record.get("sig") or ""
-    binary = str(record.get("binary") or "")
+    binary = str(record.get("binary") or "").lower()
     subcmds = list(record.get("subcommands") or [])
 
-    filename, title = kb.route(record)
+    # Where does this belong? What the knowledge base already documents wins;
+    # only a genuinely new binary costs a classification call, and the answer
+    # is remembered so it is never asked twice.
+    target = kb.known_route(record, kb_dir)
+    if target is None:
+        target = classify(record, kb_dir, backend, timeout, runtime) \
+            or kb.fallback_route(record)
+        kb.remember_route(kb_dir, binary, target[0])
+        cfg.session_log("routed", sig, binary, "-> %s" % target[0], "writer")
+    filename, title = target
+
     path = kb_dir / filename
     is_new_file = not path.exists()
 

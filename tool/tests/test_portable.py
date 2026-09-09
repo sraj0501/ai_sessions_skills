@@ -467,43 +467,86 @@ class TestCommitScope(unittest.TestCase):
 
 
 class TestRouting(unittest.TestCase):
-    """Routing is a pure function in Python, not a table the model must obey."""
+    """The knowledge base is its own routing table; there is no fixed list."""
 
-    def route(self, binary, tool="exec"):
-        return kb.route({"binary": binary, "tool": tool})[0]
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.kb = Path(self.tmp.name)
 
-    def test_known_technologies(self):
-        for binary, expected in [("git", "git.md"), ("gh", "github-cli.md"),
-                                 ("docker", "docker.md"), ("kubectl", "kubernetes.md"),
-                                 ("npm", "node.md"), ("pytest", "python.md"),
-                                 ("psql", "database.md"), ("terraform", "cloud.md")]:
-            self.assertEqual(self.route(binary), expected, binary)
+    def tearDown(self):
+        self.tmp.cleanup()
 
-    def test_search_tools_go_to_shell_not_agent_tools(self):
-        """A grep record documents rg, so it is shell knowledge."""
-        self.assertEqual(self.route("rg", tool="grep"), "shell.md")
+    def document(self, filename, title, command, sig="aaaaaaaaaaaa"):
+        kb.insert_entry(self.kb / filename, title, "Group",
+                        kb.render_entry({"heading": "Do the thing",
+                                         "commands": [command], "what": "x",
+                                         "why": "y"}, sig))
 
-    def test_only_toolless_actions_are_agent_tools(self):
-        self.assertEqual(self.route("edit", tool="edit"), "agent-tools.md")
-        self.assertEqual(self.route("devin"), "agent-tools.md")
+    def test_an_existing_entry_routes_its_whole_binary(self):
+        """Once `git status` is filed, every git command follows it."""
+        self.document("git.md", "Git", "git status --short")
+        got = kb.known_route({"binary": "git"}, self.kb)
+        self.assertEqual(got, ("git.md", "Git"))
 
-    def test_unknown_binary_gets_its_own_file(self):
-        self.assertEqual(self.route("brew"), "brew.md")
-        self.assertEqual(self.route("cargo"), "cargo.md")
+    def test_a_binary_the_list_never_knew_still_routes(self):
+        """This is the case a hardcoded table cannot cover."""
+        self.document("package-managers.md", "Package managers", "dnf install -y ripgrep")
+        self.assertEqual(kb.known_route({"binary": "dnf"}, self.kb)[0],
+                         "package-managers.md")
 
-    def test_shell_interpreters_are_shell_knowledge(self):
-        """`bash script.sh` is a shell idiom, not its own technology."""
-        for binary in ("bash", "sh", "zsh"):
-            self.assertEqual(self.route(binary), "shell.md", binary)
+    def test_unknown_binary_has_no_route_yet(self):
+        self.assertIsNone(kb.known_route({"binary": "nixos-rebuild"}, self.kb))
+
+    def test_remembered_decisions_survive_before_any_entry_exists(self):
+        kb.remember_route(self.kb, "nixos-rebuild", "nix.md")
+        self.assertEqual(kb.known_route({"binary": "nixos-rebuild"}, self.kb)[0], "nix.md")
+
+    def test_entries_win_over_a_stale_remembered_route(self):
+        kb.remember_route(self.kb, "git", "wrong.md")
+        self.document("git.md", "Git", "git status --short")
+        self.assertEqual(kb.known_route({"binary": "git"}, self.kb)[0], "git.md")
+
+    def test_title_is_read_back_from_the_file(self):
+        self.document("kubernetes.md", "Kubernetes", "kubectl get pods")
+        self.assertEqual(kb.known_route({"binary": "kubectl"}, self.kb)[1], "Kubernetes")
+
+    def test_skipped_and_readme_never_become_routes(self):
+        kb.note_skipped(self.kb, "bbbbbbbbbbbb", "date", "trivial")
+        self.assertNotIn("date", kb.binary_index(self.kb))
 
     def test_filename_cannot_escape_the_knowledge_base(self):
-        """A binary name reaches routing unsanitised, so it must not traverse."""
-        for hostile in ("../../etc/passwd", "/etc/shadow", "a/b/c", ".."):
-            name = self.route(hostile)
+        """Model-proposed names are sanitised, so they cannot traverse."""
+        for hostile in ("../../etc/passwd", "/etc/shadow", "a/b/c", "..",
+                        "....//....//x.md"):
+            name = kb.safe_filename(hostile)
             self.assertNotIn("/", name, hostile)
             self.assertEqual(Path("/kb", name).resolve().parent, Path("/kb"), hostile)
-        self.assertEqual(self.route(""), "misc.md")
-        self.assertEqual(self.route("python3.11"), "python3.11.md")
+        self.assertEqual(kb.safe_filename(""), "misc.md")
+        self.assertEqual(kb.safe_filename("Shell.md"), "shell.md")
+        self.assertEqual(kb.safe_filename("package managers"), "package-managers.md")
+
+    def test_fallback_is_a_file_of_its_own(self):
+        self.assertEqual(kb.fallback_route({"binary": "cargo"})[0], "cargo.md")
+
+    def test_merge_moves_entries_and_repoints_routing(self):
+        """A wrong decision must be correctable after the fact."""
+        self.document("shell.md", "Shell", "rg -n foo", sig="111111111111")
+        self.document("grep.md", "Grep", "grep -rn foo .", sig="222222222222")
+        moved = kb.merge_file(self.kb, "grep.md", "shell.md")
+        self.assertEqual(moved, 1)
+        self.assertFalse((self.kb / "grep.md").exists())
+        text = (self.kb / "shell.md").read_text()
+        self.assertIn("222222222222", text, "signatures must survive the move")
+        self.assertIn("111111111111", text)
+        self.assertEqual(kb.known_route({"binary": "grep"}, self.kb)[0], "shell.md")
+
+    def test_merge_is_a_no_op_for_a_missing_file(self):
+        self.assertEqual(kb.merge_file(self.kb, "nope.md", "shell.md"), 0)
+
+    def test_a_correction_outlives_the_classifier(self):
+        kb.remember_route(self.kb, "dnf", "package-managers.md")
+        self.assertEqual(kb.known_route({"binary": "dnf"}, self.kb)[0],
+                         "package-managers.md")
 
 
 class TestEntryParsing(unittest.TestCase):
@@ -866,6 +909,10 @@ class TestTextModeDistillation(unittest.TestCase):
         self.runtime.mkdir()
         self.real_run = distill.run_text
         self.calls = []
+        # Routing is a separate concern with its own tests; pin it here so
+        # these tests count only the calls that write entries.
+        for binary, filename in (("git", "git.md"), ("date", "shell.md")):
+            kb.remember_route(self.dir, binary, filename)
 
     def tearDown(self):
         distill.run_text = self.real_run
@@ -955,6 +1002,59 @@ class TestTextModeDistillation(unittest.TestCase):
         distill.distill_text(self.dir, self.runtime, [rec],
                              {"name": "stub", "url": "http://x"}, 10)
         self.assertEqual(len(attempts), 1, "a verdict must not trigger a retry")
+
+    def test_unknown_binary_is_classified_once_then_remembered(self):
+        """The point of dropping the hardcoded table: ask, then never re-ask."""
+        prompts = []
+
+        def fake(_backend, prompt, _timeout, _runtime, _schema=None):
+            prompts.append(prompt)
+            if "organise a personal command reference" in prompt:
+                return json.dumps({"file": "package-managers.md",
+                                   "title": "Package managers"})
+            return self.RESPONSE
+        distill.run_text = fake
+
+        first = self.record("c0c0c0c0c0c0", "dnf", ["install"], "dnf install -y rg")
+        distill.distill_text(self.dir, self.runtime, [first], {"name": "stub"}, 10)
+        self.assertTrue((self.dir / "package-managers.md").exists(),
+                        "the model chose the file, not a hardcoded table")
+        routing = [p for p in prompts if "organise a personal" in p]
+        self.assertEqual(len(routing), 1)
+
+        second = self.record("d0d0d0d0d0d0", "dnf", ["remove"], "dnf remove -y rg")
+        distill.distill_text(self.dir, self.runtime, [second], {"name": "stub"}, 10)
+        routing = [p for p in prompts if "organise a personal" in p]
+        self.assertEqual(len(routing), 1, "a known binary must not be re-classified")
+        self.assertIn("d0d0d0d0d0d0", (self.dir / "package-managers.md").read_text())
+
+    def test_classifier_choice_is_sanitised(self):
+        """A proposed path must not escape the knowledge base."""
+        def fake(_backend, prompt, _timeout, _runtime, _schema=None):
+            if "organise a personal command reference" in prompt:
+                return json.dumps({"file": "../../etc/passwd", "title": "Nope"})
+            return self.RESPONSE
+        distill.run_text = fake
+
+        rec = self.record("e0e0e0e0e0e0", "weird", [], "weird --run")
+        distill.distill_text(self.dir, self.runtime, [rec], {"name": "stub"}, 10)
+        written = [p.name for p in self.dir.glob("*.md")]
+        self.assertTrue(written)
+        for name in written:
+            self.assertNotIn("/", name)
+        self.assertFalse((self.dir.parent / "etc").exists())
+
+    def test_unreachable_classifier_falls_back_to_its_own_file(self):
+        def fake(_backend, prompt, _timeout, _runtime, _schema=None):
+            if "organise a personal command reference" in prompt:
+                return None          # classifier unavailable
+            return self.RESPONSE
+        distill.run_text = fake
+
+        rec = self.record("f0f0f0f0f0f0", "cargo", ["build"], "cargo build --release")
+        distill.distill_text(self.dir, self.runtime, [rec], {"name": "stub"}, 10)
+        self.assertTrue((self.dir / "cargo.md").exists(),
+                        "routing must never block documentation")
 
     def test_existing_sections_are_offered_to_the_model(self):
         self.stub(self.RESPONSE)

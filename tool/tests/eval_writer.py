@@ -150,7 +150,8 @@ def main() -> int:
 
     for record in list(records())[:opts.limit]:
         outcome = distill.document_record(tmp, runtime, record, backend, 180)
-        path = tmp / kb.route(record)[0]
+        route = kb.known_route(record, tmp) or kb.fallback_route(record)
+        path = tmp / route[0]
         entry = next((e for e in kb.parse(path.read_text(encoding="utf-8"))
                       if record["sig"] in e.sigs), None) if path.exists() else None
         if entry is None:

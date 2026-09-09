@@ -10,8 +10,10 @@ That leaves the model one job: turn a single record into a few lines of prose.
 A small local model can do that; none of it requires tool use, file access or
 multi-step planning.
 
-    kb.py route '{"binary": "git", "subcommands": ["merge"]}'
-    kb.py sigs                     # every documented signature
+    kb.py routes                     # where each binary is filed, and why
+    kb.py route <binary> <file.md>   # correct a decision, permanently
+    kb.py merge <from.md> <to.md>    # move entries, signatures intact
+    kb.py sigs                       # every documented signature
 """
 
 from __future__ import annotations
@@ -37,48 +39,91 @@ SKIPPED_FILE = "_skipped.md"
 # --------------------------------------------------------------------------- #
 # routing: binary -> file
 # --------------------------------------------------------------------------- #
-SHELL_BINS = {
-    "rg", "grep", "sed", "awk", "find", "ls", "cat", "head", "tail", "jq", "yq",
-    "curl", "wget", "xargs", "chmod", "chown", "sort", "uniq", "wc", "cut", "tr",
-    "echo", "printf", "mkdir", "rm", "cp", "mv", "ln", "tar", "zip", "unzip",
-    "ssh", "scp", "rsync", "df", "du", "ps", "kill", "pkill", "stat", "touch",
-    "diff", "tee", "which", "env", "date", "sleep", "openssl", "base64", "shasum",
-    "md5sum", "seq", "basename", "dirname", "realpath", "readlink", "file",
-    "watch", "xxd", "column", "nl", "rev", "shuf", "split", "tree", "lsof",
-    "netstat", "ping", "dig", "host", "nc", "sudo", "open", "pbcopy", "pbpaste",
-    "bash", "sh", "zsh", "fish", "dash", "source", "time", "timeout",
-}
-AGENT_BINS = {"devin", "claude", "codex", "copilot", "opencode", "cursor-agent", "aider"}
-# Agent tools with no shell equivalent — these alone belong in agent-tools.md.
-AGENT_ONLY = {"edit", "write", "apply_patch", "notebook_edit", "multiedit", "str_replace"}
-
-ROUTES: list[tuple[set[str], str, str]] = [
-    ({"git", "jj", "hg", "svn"}, "git.md", "Git"),
-    ({"gh", "glab"}, "github-cli.md", "GitHub CLI"),
-    ({"docker", "docker-compose", "podman", "nerdctl"}, "docker.md", "Docker"),
-    ({"kubectl", "helm", "k9s", "kustomize", "minikube"}, "kubernetes.md", "Kubernetes"),
-    ({"npm", "npx", "yarn", "pnpm", "bun", "node", "tsc", "vitest", "jest",
-      "eslint", "prettier"}, "node.md", "Node"),
-    ({"python", "python3", "py", "pip", "pip3", "uv", "poetry", "pytest", "ruff",
-      "mypy", "black", "flake8"}, "python.md", "Python"),
-    ({"psql", "mysql", "sqlite3", "redis-cli", "influx", "mongosh"}, "database.md", "Databases"),
-    ({"az", "aws", "gcloud", "terraform", "pulumi"}, "cloud.md", "Cloud"),
-    (SHELL_BINS, "shell.md", "Shell"),
-    (AGENT_BINS, "agent-tools.md", "Agent tools"),
-]
+# There is no table of known commands. A fixed list always lags what is
+# actually run: `grep.md` and `timeout.md` exist in this repo because those
+# binaries were seen before anyone thought to add them to the list. Instead the
+# knowledge base is its own routing table, and anything genuinely new is
+# classified once by the model and remembered.
+ROUTES_FILE = ".routes.json"
+BINARY_RE = re.compile(r"^[a-z0-9][a-z0-9._+-]*$")
 
 
-def route(record: dict) -> tuple[str, str]:
-    """(filename, human title) for a record. Never guesses a new name twice."""
+def safe_filename(name: str) -> str:
+    """A markdown filename that cannot escape the knowledge base.
+
+    Applied to every route, including ones a model proposes, so a suggested
+    path can never traverse or land outside the directory.
+    """
+    stem = re.sub(r"[^a-z0-9._-]", "-", str(name or "").lower().strip())
+    stem = stem[:-3] if stem.endswith(".md") else stem
+    stem = stem.strip("-.") or "misc"
+    return "%s.md" % stem
+
+
+def title_of(kb: Path, filename: str) -> str:
+    """The `# Heading` of a knowledge-base file, for reuse and for prompts."""
+    path = kb / filename
+    if path.exists():
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.startswith("# "):
+                return line[2:].strip()
+    return filename[:-3].replace("-", " ").title()
+
+
+def binary_index(kb: Path) -> dict[str, str]:
+    """Which file already documents each binary, derived from the entries.
+
+    This is what makes routing self-correcting: once `git status` lives in
+    git.md, every other git command follows it without anyone maintaining a
+    list.
+    """
+    index: dict[str, str] = {}
+    for path in sorted(kb.glob("*.md")):
+        if path.name in (SKIPPED_FILE, "README.md"):
+            continue
+        for entry in parse(path.read_text(encoding="utf-8", errors="replace")):
+            action = action_of(entry)
+            # Command blocks contain prose fragments and placeholders too, so
+            # only plausible binary names are allowed to define a route.
+            if action and BINARY_RE.match(action[0]) and action[0] not in index:
+                index[action[0]] = path.name
+    return index
+
+
+def load_routes(kb: Path) -> dict[str, str]:
+    """Remembered decisions, so a binary is classified at most once."""
+    try:
+        data = json.loads((kb / ROUTES_FILE).read_text(encoding="utf-8"))
+        return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def remember_route(kb: Path, binary: str, filename: str) -> None:
+    if not binary or not BINARY_RE.match(binary):
+        return
+    routes = load_routes(kb)
+    if routes.get(binary) == filename:
+        return
+    routes[binary] = filename
+    (kb / ROUTES_FILE).write_text(json.dumps(dict(sorted(routes.items())), indent=2) + "\n",
+                                  encoding="utf-8")
+
+
+def known_route(record: dict, kb: Path) -> tuple[str, str] | None:
+    """Where this binary already belongs, or None if it has never been seen."""
     binary = str(record.get("binary") or "").lower()
-    tool = str(record.get("tool") or "").lower()
-    if binary in AGENT_ONLY or (not binary and tool in AGENT_ONLY):
-        return "agent-tools.md", "Agent tools"
-    for bins, filename, title in ROUTES:
-        if binary in bins:
-            return filename, title
-    safe = re.sub(r"[^a-z0-9._-]", "-", binary).strip("-") or "misc"
-    return "%s.md" % safe, binary or "Misc"
+    if not binary:
+        return None
+    filename = binary_index(kb).get(binary) or load_routes(kb).get(binary)
+    return (filename, title_of(kb, filename)) if filename else None
+
+
+def fallback_route(record: dict) -> tuple[str, str]:
+    """Last resort when no classifier is available: a file of its own."""
+    binary = str(record.get("binary") or "").lower()
+    filename = safe_filename(binary)
+    return filename, (binary or "Misc")
 
 
 # --------------------------------------------------------------------------- #
@@ -302,15 +347,62 @@ def ensure_readme_row(kb: Path, filename: str, title: str) -> None:
     readme.write_text("\n".join(lines).rstrip("\n") + "\n", encoding="utf-8")
 
 
+def merge_file(kb: Path, source: str, dest: str) -> int:
+    """Move every entry from one file into another, signatures intact.
+
+    Used to undo a bad routing decision after the fact: the entries move, the
+    `sig` comments come with them, so nothing is re-documented.
+    """
+    src, dst = kb / safe_filename(source), kb / safe_filename(dest)
+    if not src.exists() or src == dst:
+        return 0
+    lines = src.read_text(encoding="utf-8", errors="replace").splitlines()
+    entries = parse("\n".join(lines))
+    title = title_of(kb, dst.name)
+    for entry in entries:
+        insert_entry(dst, title, entry.section,
+                     "\n".join(lines[entry.start:entry.end]).strip())
+    src.unlink()
+    for binary, filename in load_routes(kb).items():
+        if filename == src.name:
+            remember_route(kb, binary, dst.name)
+    for entry in entries:
+        action = action_of(entry)
+        if action:
+            remember_route(kb, action[0], dst.name)
+    readme = kb / "README.md"
+    if readme.exists():
+        kept = [ln for ln in readme.read_text(encoding="utf-8").splitlines()
+                if src.name not in ln]
+        readme.write_text("\n".join(kept).rstrip("\n") + "\n", encoding="utf-8")
+    return len(entries)
+
+
 def main(argv: list[str]) -> int:
+    kb = cfg.kb_dir()
     if not argv:
         print(__doc__)
         return 0
-    if argv[0] == "route":
-        print("\t".join(route(json.loads(argv[1]))))
-    elif argv[0] == "sigs":
-        for sig in sorted(documented_sigs(cfg.kb_dir())):
+    verb = argv[0]
+    if verb == "routes":
+        index, saved = binary_index(kb), load_routes(kb)
+        for binary in sorted(set(index) | set(saved)):
+            where = index.get(binary) or saved[binary]
+            print("%-18s %-24s %s" % (binary, where,
+                                      "from entries" if binary in index else "remembered"))
+    elif verb == "route" and len(argv) >= 3:
+        remember_route(kb, argv[1].lower(), safe_filename(argv[2]))
+        print("%s -> %s (future entries; use `merge` to move existing ones)"
+              % (argv[1], safe_filename(argv[2])))
+    elif verb == "merge" and len(argv) >= 3:
+        moved = merge_file(kb, argv[1], argv[2])
+        print("moved %d entr%s: %s -> %s"
+              % (moved, "y" if moved == 1 else "ies", argv[1], argv[2]))
+    elif verb == "sigs":
+        for sig in sorted(documented_sigs(kb)):
             print(sig)
+    else:
+        print(__doc__)
     return 0
 
 
