@@ -236,6 +236,7 @@ find . -name '*.sql'
 <!-- sig: 516e536c28ad -->
 <!-- sig: 61a04308b48f -->
 <!-- sig: de50b9f33685 -->
+<!-- sig: ca175e357e0a -->
 
 ```bash
 grep -c <pattern> <queue-file> 2>/dev/null
@@ -412,6 +413,8 @@ tar -xzf archive.tar.gz -C /tmp/out
 
 ### Check that the same snippet is present in several installed files
 <!-- sig: 6af0a85220ab -->
+<!-- sig: d7337bdf197d -->
+<!-- sig: 8bd29a142943 -->
 
 ```bash
 for f in \
