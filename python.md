@@ -7,6 +7,7 @@
 
 ### Check which Python is on PATH
 <!-- sig: bec3ef4b11d4 -->
+<!-- sig: bf5b33915b7a -->
 
 ```bash
 python3 -V
@@ -106,3 +107,15 @@ PY
 - **What it does:** Parses a module and prints any function whose cognitive complexity exceeds 15.
 - **Why:** SonarQube's quality gate on new code fails above 15. Checking locally turns a post-push CI failure into a pre-push edit.
 - **Notes:** Needs `pip install cognitive-complexity`. The fix is extraction, not suppression: pull query-building, row-filter guard clauses and result-building into helpers so the caller is a flat sequence of calls. Re-run the tests afterwards — it must be behaviour-preserving.
+
+### Compile multiple Python files to bytecode
+<!-- sig: ac7876a38cfe -->
+
+```bash
+python3 -m py_compile tool/bin/kb.py tool/bin/distill.py tool/bin/cfg.py
+```
+
+- **What it does:** Executes the `py_compile` module to convert specified Python source files (`.py`) into bytecode files (`.pyc`).
+- **Why:** Pre-compiling scripts speeds up the loading and execution time of the Python modules by bypassing the initial parsing step.
+- **Example:** `python3 -m py_compile tool/bin/kb.py tool/bin/distill.py tool/bin/cfg.py`
+- **Notes:** The generated `.pyc` files are typically placed in `__pycache__` directories.

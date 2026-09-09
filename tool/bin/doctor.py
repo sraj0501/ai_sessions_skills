@@ -12,6 +12,8 @@ import os
 import re
 import shutil
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -21,6 +23,18 @@ import procs    # noqa: E402
 
 COLOUR = sys.stdout.isatty() and not cfg.IS_WINDOWS
 FAILURES = 0
+
+
+def _probe(url: str, timeout: float = 2.0) -> bool:
+    """Is a local model server answering? Any HTTP reply counts as alive."""
+    root = url.split("/api/", 1)[0]
+    try:
+        urllib.request.urlopen(root, timeout=timeout).close()
+        return True
+    except urllib.error.HTTPError:
+        return True
+    except Exception:
+        return False
 
 
 def _mark(label: str, colour: str, message: str) -> None:
@@ -106,15 +120,23 @@ def main() -> int:
             warn("%s: %s has stale paths (re-run install)" % (harness, short(skill)))
 
     print()
-    print("writer backend")
-    backend = cfg.writer_backend()
+    mode = "text" if str(cfg.get("writer.mode", "text")).lower() == "text" else "agent"
+    print("writer backend (mode: %s)" % mode)
+    backend = cfg.writer_backend(mode)
     if backend:
-        ok(backend["name"])
-        print("        %s %s" % (backend["bin"], " ".join(backend["args"])))
-        print("        prompt via: %s" % backend["prompt"])
+        ok(backend["name"] + ("  [local, offline]" if backend.get("url", "").startswith(
+            ("http://localhost", "http://127.0.0.1")) else ""))
+        if backend.get("url"):
+            print("        %s  model=%s" % (backend["url"], backend.get("model") or "?"))
+            reachable = _probe(backend["url"])
+            (ok if reachable else bad)("model server %s" %
+                                       ("reachable" if reachable else "NOT reachable"))
+        else:
+            print("        %s %s" % (backend["bin"], " ".join(backend["args"])))
+            print("        prompt via: %s" % backend["prompt"])
     else:
-        bad("no writer backend found "
-            "(need devin, claude, codex, copilot, opencode or cursor-agent)")
+        bad("no %s writer backend found (see writer.prefer%s in config.json)"
+            % (mode, "_text" if mode == "text" else ""))
 
     print()
     print("queue")

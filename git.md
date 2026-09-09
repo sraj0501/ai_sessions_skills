@@ -253,6 +253,18 @@ git restore --staged packages/backend/src/app.ts
 - **Why:** The safe way to undo an over-broad `git add -A`.
 - **Notes:** `git restore <path>` *without* `--staged` discards the working-tree changes instead — that is destructive and unrecoverable.
 
+### Set the user name for commits
+<!-- sig: b08bf8bdc6cf -->
+
+```bash
+git config user.name T
+```
+
+- **What it does:** Configures the Git identity name that will be attached to all future commits.
+- **Why:** Git requires a configured user name and email to correctly attribute commits, which is necessary before pushing to remote repositories.
+- **Example:** `git config --global user.name "Jane Doe"`
+- **Notes:** Use `--global` to set the name for all repositories on the machine; omitting it sets the name only for the current repository.
+
 ## Shelving work
 
 ### Park uncommitted work with a label
@@ -309,6 +321,7 @@ git bisect start
 
 ### Initialise a new git repository quietly
 <!-- sig: 147ac26aad8f -->
+<!-- sig: cb361c220904 -->
 
 ```bash
 git init -q 2>/dev/null
@@ -318,3 +331,15 @@ git init -q 2>/dev/null
 - **Why:** Useful in scripts and setup steps where you want a repo bootstrapped without verbose output or interactive prompts.
 - **Example:** `mkdir -p <repo> && cd <repo> && git init -q 2>/dev/null`.
 - **Notes:** `git init` without a path operates on the current directory; the trailing `2>/dev/null` makes the command idempotent in an already-initialised repo.
+
+### Set the user's email address for Git
+<!-- sig: 611f88289772 -->
+
+```bash
+git config user.email <user@example.com>
+```
+
+- **What it does:** Configures the email address that Git will stamp on all commits made in the repository.
+- **Why:** Ensures commits are correctly attributed to the user, which is necessary for collaboration and tracking.
+- **Example:** `git config user.email <user@example.com>`
+- **Notes:** By default, this sets the value for the current repository. Use `--global` to set it for all repositories on the machine.

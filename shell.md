@@ -7,6 +7,7 @@
 
 ### List a directory with permissions, sizes and dotfiles
 <!-- sig: 8719517b7fea -->
+<!-- sig: 279ce10d71b6 -->
 
 ```bash
 ls -la /Users/sraj/git_apps/personal
@@ -29,6 +30,8 @@ ls -d ~/.claude/skills/session-skills ~/.config/devin/skills/session-skills ~/.c
 
 ### Read a whole small file
 <!-- sig: fc88421c4fee -->
+<!-- sig: 68a00ed3e5a3 -->
+<!-- sig: 9f27bb8f3e50 -->
 
 ```bash
 cat config.json
@@ -43,6 +46,9 @@ cat config.json
 <!-- sig: 0926e1fcbe08 -->
 <!-- sig: d64a43183ffe -->
 <!-- sig: 0f8ca7ee894b -->
+<!-- sig: e09cd363fa1a -->
+<!-- sig: 309ee9159a20 -->
+<!-- sig: c7facca824ba -->
 
 ```bash
 head -n 30 package.json
@@ -57,6 +63,8 @@ head -n 30 package.json
 <!-- sig: 26c5fd808225 -->
 <!-- sig: ef6fda14f8fe -->
 <!-- sig: b41746160aa3 -->
+<!-- sig: cbdc7f775b86 -->
+<!-- sig: 8428bada3465 -->
 
 ```bash
 tail -n 25 .runtime/watcher.log
@@ -201,6 +209,9 @@ find . -name '*.sql'
 ### Count matching lines in a queue and pretty-print the most recent record
 <!-- sig: ed504be81133 -->
 <!-- sig: ae5ce0e27d7a -->
+<!-- sig: be439772421c -->
+<!-- sig: c653bf5c9b23 -->
+<!-- sig: c9c6bf7b6c87 -->
 
 ```bash
 grep -c <pattern> <queue-file> 2>/dev/null
@@ -229,6 +240,7 @@ grep -B 2 -A 2 'pattern' <file>
 
 ### Print a specific line range of a file
 <!-- sig: 1a0e82d71c4c -->
+<!-- sig: ad370f088bbe -->
 
 ```bash
 sed -n '10,40p' packages/backend/src/app.ts
@@ -308,6 +320,7 @@ chmod +x bin/watcher.sh
 
 ### Fetch a URL quietly
 <!-- sig: 4d94586ad6ee -->
+<!-- sig: 237f2f607f73 -->
 
 ```bash
 curl -s https://api.github.com/rate_limit
@@ -328,6 +341,18 @@ rm -rf <directory>
 - **Why:** Fast cleanup of temporary checkouts, build artefacts or generated trees.
 - **Example:** `rm -rf /tmp/brand-new-codebase`.
 - **Notes:** This is destructive and not recoverable. Double-check the path, especially with globs or relative paths; `rm -rf .` will wipe the current directory.
+
+### Copy a file from a temporary location to the runtime directory
+<!-- sig: e9014db66cd0 -->
+
+```bash
+cp /tmp/recs.jsonl .runtime/pending.jsonl
+```
+
+- **What it does:** Copies the contents of the `recs.jsonl` file from the system temporary directory (`/tmp`) into the `.runtime` subdirectory of the current working directory.
+- **Why:** Used to move generated or temporary data into a structured, persistent location where the application expects to find it.
+- **Example:** `cp /tmp/recs.jsonl .runtime/pending.jsonl`
+- **Notes:** If `.runtime` does not exist, the command will fail unless `mkdir -p` was run beforehand.
 
 ## Processes
 
