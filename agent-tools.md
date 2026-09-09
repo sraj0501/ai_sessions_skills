@@ -1,18 +1,20 @@
-# Agent tools (Devin CLI)
+# Agent tools
 
 > Auto-maintained by the ai_session_skills background writer. One `###` entry
 > per distinct action. `sig` comments are dedupe keys — never delete them.
 
-Devin's native tools replace some shell commands. This file records what each
-tool does and the CLI command it stands in for, so the knowledge transfers
-whether the work is done by an agent or by hand.
+Coding agents (Devin, Claude Code, Codex, Copilot, OpenCode, Cursor) expose
+native tools that replace some shell commands. This file records what each tool
+does and the CLI command it stands in for, so the knowledge transfers whether
+the work is done by an agent or by hand. Tool names differ per harness —
+`exec`/`Bash`/`bash`/`Shell` are the same action.
 
 ## Searching
 
-The `grep` and `glob` tools are ripgrep under the hood; each distinct flag
-combination is captured into `shell.md` as its `rg` equivalent (see the
-"Searching" section there). Prefer these tools over shelling out to `rg`: they
-are permission-pre-approved and their output is size-capped.
+Search tools (`grep`/`Grep`, `glob`/`Glob`) are ripgrep under the hood; each
+distinct flag combination is captured into `shell.md` as its `rg` equivalent
+(see the "Searching" section there). Prefer these tools over shelling out to
+`rg`: they are permission-pre-approved and their output is size-capped.
 
 ## Editing files
 

@@ -1,21 +1,28 @@
 {
-  "model": "swe-1-7-medium",
-  "permission_mode": "accept-edits",
+  "kb_dir": ".",
+
   "auto_commit": true,
   "auto_push": false,
+
   "watcher": {
     "poll_seconds": 45,
     "quiet_seconds": 120,
     "batch_max": 20,
     "idle_exit_seconds": 900
   },
+
   "distill": {
     "timeout_seconds": 900,
     "max_attempts": 3,
     "max_batch_records": 40
   },
+
   "capture": {
-    "tools": ["exec", "grep", "glob", "edit", "write", "apply_patch"],
-    "max_pending_records": 400
+    "max_pending_records": 400,
+    "skip_binaries": []
+  },
+
+  "writer": {
+    "prefer": ["devin", "claude", "codex", "copilot", "opencode", "cursor-agent"]
   }
 }
