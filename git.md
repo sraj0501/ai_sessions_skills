@@ -8,6 +8,8 @@
 ### Check the current state of the project before doing anything
 <!-- sig: 07b5548da62f -->
 <!-- sig: 463a0795bd76 -->
+<!-- sig: dc4ea1a2dd9d -->
+<!-- sig: e88b8ecde8eb -->
 
 ```bash
 git status --short --branch
@@ -17,11 +19,12 @@ git status --short --branch
 - **Why:** The first thing to run in an unfamiliar checkout. `--short` keeps it to a few lines instead of git's verbose hint-filled output, so it is cheap to read.
 - **Example:** `git status --short --branch` → `## fix/kpi4...origin/fix/kpi4 [ahead 1]` then ` M packages/backend/src/app.ts`.
 - **Notes:** Add `--untracked-files=all` to list files inside untracked directories individually.
-- **Variants:** `git -C <repo> status --short` gives the same compact status from a different checkout, but omits the branch header.
+- **Variants:** `git -C <repo> status --short` gives the same compact status from a different checkout, but omits the branch header. `git status -sb` is the short-flag equivalent of `git status --short --branch`.
 
 ### See exactly what changed before staging or committing
 <!-- sig: daece94a6ca9 -->
 <!-- sig: a64f513debbc -->
+<!-- sig: 52ff68ce3d42 -->
 
 ```bash
 git --no-pager diff
@@ -31,12 +34,13 @@ git --no-pager diff --staged
 - **What it does:** `diff` shows unstaged changes (working tree vs index); `--staged` (alias `--cached`) shows what is already staged, i.e. exactly what the next commit will contain.
 - **Why:** Reviewing the real diff catches accidental edits, debug prints and stray files before they land in a commit.
 - **Example:** `git --no-pager diff --staged -- packages/backend` limits the review to one package.
-- **Variants:** `git --no-pager diff main...HEAD` shows everything the branch adds relative to where it forked from `main` — the right diff to review before opening a PR.
+- **Variants:** `git --no-pager diff main...HEAD` shows everything the branch adds relative to where it forked from `main` — the right diff to review before opening a PR. `git --no-pager diff --stat` (or `git -C <repo> diff --stat`) prints a compact per-file summary instead of the full patch.
 - **Notes:** `--no-pager` is required in automation: without it git opens `less`, which hangs a non-interactive shell.
 
 ### Read recent history in a compact form
 <!-- sig: b7d90c2bc367 -->
 <!-- sig: a0ab6770605b -->
+<!-- sig: fbfc5faa6794 -->
 
 ```bash
 git log --oneline -10
@@ -70,6 +74,17 @@ git remote -v
 - **What it does:** Shows each remote name with its fetch and push URLs.
 - **Why:** Confirms whether `origin` is your fork and `upstream` is the shared repo before you push anywhere — the single most important check in a fork-based workflow.
 - **Example:** `origin  git@github.com:me/repo.git (push)` / `upstream  git@github.com:org/repo.git (push)`.
+
+### Show what changed in a specific commit
+<!-- sig: 6a4bd45661c0 -->
+
+```bash
+git show --stat <commit>
+```
+
+- **What it does:** Prints the commit metadata plus a list of changed files with insertion/deletion counts, but not the full diff.
+- **Why:** A quick sanity check on what a commit touched before cherry-picking, reverting, or discussing it.
+- **Example:** `git show --stat e51dabe` to see the file impact of that commit.
 
 ## Remotes and syncing
 
@@ -145,6 +160,18 @@ git switch staging
 - **What it does:** Checks out an existing branch. Purpose-built subset of `git checkout`, which also does file restores.
 - **Why:** `switch` cannot silently overwrite a file when you fat-finger a branch name, unlike `git checkout <path>`.
 - **Variants:** `git switch -c <new-branch>` creates and switches, like `checkout -b`; `git switch -` returns to the previous branch.
+
+### Find which remote branches contain a given commit
+<!-- sig: 8b1a34ce60ee -->
+
+```bash
+git branch -r --contains <commit>
+```
+
+- **What it does:** Lists all remote-tracking branches that include the given commit (or one of its descendants).
+- **Why:** Tells you whether a fix or PR commit has already been merged or published somewhere before you force-push or rebase.
+- **Example:** `git branch -r --contains e51dabe` to see which remote branches include that commit.
+- **Notes:** Returns nothing if no remote branch contains the commit. Use `2>/dev/null` to suppress errors from missing remote refs in scripts.
 
 ## Staging and committing
 

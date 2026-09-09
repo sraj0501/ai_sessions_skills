@@ -16,6 +16,17 @@ ls -la /Users/sraj/git_apps/personal
 - **Why:** Confirms a parent directory exists and is the intended location *before* creating files in it, and reveals dotfiles like `.git`, `.env`, `.devin`.
 - **Notes:** On macOS add `-h` for human-readable sizes; `-lt` sorts newest first, which is handy for finding the most recent log or download.
 
+### List only specific directories, not their contents
+<!-- sig: 145f07a1464a -->
+
+```bash
+ls -d ~/.claude/skills/session-skills ~/.config/devin/skills/session-skills ~/.copilot/skills/session-skills 2>/dev/null
+```
+
+- **What it does:** Given one or more directory paths, prints each path itself if it exists; without `-d`, `ls` would list the files inside it.
+- **Why:** A quick existence check for directories you expect to be present, such as installed agent skill paths.
+- **Notes:** Add `2>/dev/null` to keep missing directories from producing an error message. `ls -d */` lists only the directories in the current one.
+
 ### Read a whole small file
 <!-- sig: fc88421c4fee -->
 
@@ -28,6 +39,8 @@ cat config.json
 
 ### Read only the first N lines
 <!-- sig: d8b3b7013f13 -->
+<!-- sig: d9db06bd8076 -->
+<!-- sig: 0926e1fcbe08 -->
 
 ```bash
 head -n 30 package.json
@@ -35,6 +48,21 @@ head -n 30 package.json
 
 - **What it does:** Prints the first 30 lines and stops.
 - **Why:** Caps output when piping something long (`... | head -30`), which keeps command output readable and cheap.
+- **Variants:** `head -1` (or `head -n 1`) keeps a single line, handy for extracting a branch name or one value from a pipe such as `git status -sb | head -1`.
+
+### Read the last N lines of a file or pipe
+<!-- sig: d85d1c71612e -->
+<!-- sig: 26c5fd808225 -->
+
+```bash
+tail -n 25 .runtime/watcher.log
+```
+
+- **What it does:** Prints the final 25 lines of a file (or the last N lines from a pipeline).
+- **Why:** The non-blocking way to inspect recent output from a log or a long command result.
+- **Example:** `tail -n 25 .runtime/watcher.log`.
+- **Notes:** `tail -25` is equivalent to `tail -n 25`. `tail -f` follows a log live.
+- **Variants:** `tail -30` at the end of a pipeline limits output to the last 30 lines.
 
 ### Follow a log as it is written
 <!-- sig: e379155eba32 -->
@@ -86,6 +114,7 @@ rg -l -e 'ENTRA_REFRESH_TOKEN'
 ### Read matches with surrounding context
 <!-- sig: fe6d68ce019c -->
 <!-- sig: d43fbdff6730 -->
+<!-- sig: c7fe5d5b1975 -->
 
 ```bash
 rg -n -C 3 -e 'AppError'
@@ -217,6 +246,20 @@ curl -s https://api.github.com/rate_limit
 - **What it does:** Requests the URL and prints the body with the progress meter suppressed (`-s`).
 - **Why:** Clean output for piping into `jq`.
 - **Notes:** Add `-L` to follow redirects, `-f` to make HTTP errors a non-zero exit status, and `-o file` to save instead of print.
+
+## Processes
+
+### Check whether a specific process is still running
+<!-- sig: 5fd25623617a -->
+
+```bash
+ps -p <pid> -o pid,etime,command 2>/dev/null
+```
+
+- **What it does:** Queries one process by PID and prints its ID, elapsed wall-clock time, and command line, suppressing the error if it no longer exists.
+- **Why:** A quick health check for a long-running background watcher or daemon without parsing a full `ps aux` list.
+- **Example:** `ps -p 32594 -o pid,etime,command 2>/dev/null`.
+- **Notes:** `etime` shows elapsed time as `[[DD-]HH:]MM:SS`. Use `comm` or `%cpu` instead of `command` if you only need the executable name or CPU usage.
 
 ## Archives and compression
 
