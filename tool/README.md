@@ -237,6 +237,36 @@ python3 tool/bin/doctor.py         # confirms "ollama [local, offline]"
 
 Point it at a different model by setting `writer.text_backends.ollama.model`.
 
+### Measuring output quality
+
+`tool/tests/eval_writer.py` runs a fixed set of representative commands
+through the real pipeline and grades each entry on checks that need no judge
+model: does it parse, does the heading name the task rather than the command,
+are the bullets within budget, does every flag it mentions actually appear in
+the captured command (`grounded`), does it name the concrete file/branch/
+namespace (`specific`), and are personal paths and tokens absent.
+
+```bash
+python3 tool/tests/eval_writer.py                  # local model
+python3 tool/tests/eval_writer.py --backend devin  # cloud comparison
+python3 tool/tests/eval_writer.py --verbose        # show every entry
+```
+
+Measured on this machine, local `gemma4` and cloud `swe-1-7-medium` both score
+48/48; the local run takes 26s against the cloud run's 95s. Re-run it after
+touching `prompts/ENTRY_PROMPT.md` — prompt changes that read like
+improvements are not reliably improvements.
+
+Three settings matter more than prompt wording:
+
+- **`temperature: 0`.** A reference manual wants the most likely description,
+  not a creative one, and it makes runs reproducible.
+- **No `num_predict`.** The cap counts reasoning tokens, so a thinking model
+  can spend the entire budget before emitting a visible character and return
+  an empty string. `run_http` now detects this and says so.
+- **`think: false`.** Filling a fixed template needs no chain of thought.
+  Removing it cut the run from 90s to 26s *and* made headings more specific.
+
 **`agent` — the original behaviour.** A tool-using CLI edits the knowledge base
 itself, following `prompts/DISTILL_PROMPT.md`. Higher quality on a strong
 cloud model, but it depends on the model obeying the dedupe rules, and the

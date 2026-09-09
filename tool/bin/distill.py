@@ -141,30 +141,51 @@ def run_http(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | N
     which re-wraps long lines with cursor-movement escapes, so piped output
     cannot be reconstructed reliably. The API returns the text verbatim.
     """
-    body = json.dumps({
+    payload = {
         "model": backend.get("model") or "",
         "prompt": prompt,
         "stream": False,
         "options": backend.get("options") or {},
-    }).encode("utf-8")
+    }
+    if backend.get("think") is not None:
+        # Reasoning models otherwise spend most of their tokens (and time)
+        # thinking. Filling a fixed template does not need it.
+        payload["think"] = backend["think"]
+    body = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(backend["url"], data=body,
                                      headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8")).get("response") or ""
+            reply = json.loads(response.read().decode("utf-8"))
     except Exception as exc:
         log(runtime, "model request failed (%s): %s" % (backend["url"], exc))
         return None
+
+    text = reply.get("response") or ""
+    if reply.get("done_reason") == "length" and not text.strip():
+        # A reasoning model can burn the whole token budget thinking and emit
+        # nothing visible; that is a configuration fault, not a bad record.
+        log(runtime, "model hit its token limit before answering "
+                     "(raise or remove options.num_predict, or set think=false)")
+        return None
+    return text
 
 
 def run_text(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | None:
     """One text-in/text-out generation. No tools, no file access, no cwd needs."""
     if backend.get("url"):
         return run_http(backend, prompt, timeout, runtime)
-    argv = [backend["bin"]] + [a.replace("{prompt_text}", prompt) for a in backend["args"]]
+
+    mode = backend.get("prompt", "stdin")
+    prompt_file = runtime / "entry-prompt.md"
+    if mode == "file":                       # some CLIs refuse a prompt on stdin
+        prompt_file.write_text(prompt, encoding="utf-8")
+    argv = [backend["bin"]] + [a.replace("{prompt_text}", prompt)
+                                .replace("{prompt_file}", str(prompt_file))
+                               for a in backend["args"]]
     env = dict(os.environ)
     env.update({"AI_SKILLS_DISTILLER": "1", "AI_SKILLS_CAPTURE_OFF": "1"})
-    stdin_data = prompt if backend.get("prompt") == "stdin" else None
+    stdin_data = prompt if mode == "stdin" else None
     try:
         done = subprocess.run(argv, env=env, timeout=timeout, input=stdin_data,
                               capture_output=True, text=True)

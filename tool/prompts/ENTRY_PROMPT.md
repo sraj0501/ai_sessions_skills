@@ -20,19 +20,37 @@ SECTION: <two or three word group name, e.g. Inspecting state, Branching, Contai
 
 ## Rules
 
-- Describe only flags that are actually in the command. Never invent flags.
-- If you are unsure what a flag does, leave it out rather than guess.
-- The heading is the *task*, not the command: "Check what changed before
-  committing", not "git diff".
-- Replace tokens, passwords, API keys and connection strings with `<TOKEN>`.
-  Replace absolute personal paths with `<repo>/...` or `~/...`.
-- Keep the whole entry under 12 lines.
-- Do not write `<!-- sig: ... -->` comments. They are added for you.
-- If the command is trivial or not worth remembering (`ls`, `cd`, `echo`,
-  `pwd`, `date`, `clear`), output exactly one line instead:
-  `SKIP: <short reason>`
+**1. Only flags that are in the command.** Mention no other flag anywhere in
+the entry — not in **Notes**, not as a suggestion, not as a "you could also".
+If the command has no `--all`, the word `--all` must not appear. When unsure
+what a flag does, say less rather than guessing.
 
-## Example
+**2. Be concrete.** Name the actual thing operated on — the file, branch,
+namespace, glob or count taken from the command. Vague entries are useless in
+a reference manual:
+
+| Vague | Concrete |
+|---|---|
+| Install a package | Install `ripgrep` without a confirmation prompt |
+| Copy files to a server | Mirror `build/` to the deploy host, deleting stale files |
+| Show recent log output | Follow the last 200 lines of the `nginx` unit log |
+
+**3. The heading is the task, not the command.** "Check what changed before
+committing", never "git diff" and never the raw command line. At least three
+words, no flags, no backticks.
+
+**4. Length.** One or two sentences per bullet. The whole entry under 12 lines.
+
+**5. Secrets.** Replace tokens, passwords, API keys and connection strings with
+`<TOKEN>`; replace absolute personal paths with `<repo>/...` or `~/...`.
+
+**6.** Do not write `<!-- sig: ... -->` comments. They are added for you.
+
+**7.** If the command is trivial or not worth remembering (`ls`, `cd`, `echo`,
+`pwd`, `date`, `clear`), output exactly one line instead:
+`SKIP: <short reason>`
+
+## Example 1
 
 Input command: `git fetch upstream && git merge upstream/staging`
 
@@ -46,7 +64,29 @@ git fetch upstream
 git merge upstream/staging
 ```
 
-- **What it does:** Downloads new commits from the `upstream` remote without touching the working tree, then merges the `staging` branch into the checked-out branch.
+- **What it does:** Downloads new commits from the `upstream` remote without touching the working tree, then merges its `staging` branch into the checked-out branch.
 - **Why:** Keeps a fork current. Splitting fetch from merge lets you inspect what arrived before integrating it.
 - **Example:** `git fetch upstream && git merge upstream/staging` on a feature branch before opening a PR.
-- **Notes:** Merging creates a merge commit; use `git rebase upstream/staging` instead if the project requires linear history.
+- **Notes:** Creates a merge commit, so the branch history keeps a record of when the fork was synced.
+
+## Example 2
+
+Note how the heading and bullets name `dist/` and `release.tar.gz` — details
+taken from the command — and mention no flag the command does not use.
+
+Input command: `tar -czf release.tar.gz dist/`
+
+Output:
+
+SECTION: Archives
+
+### Package a build directory into a compressed archive
+
+```bash
+tar -czf release.tar.gz dist/
+```
+
+- **What it does:** Creates (`-c`) the archive `release.tar.gz` from the `dist/` directory, gzip-compressing it (`-z`) and writing to the named file (`-f`) rather than to stdout.
+- **Why:** One step to produce a single portable artefact from a build output directory, ready to upload or attach to a release.
+- **Example:** `tar -czf release.tar.gz dist/` after a production build.
+- **Notes:** `-f` must come last in a bundled group, because the next argument is read as the archive filename.

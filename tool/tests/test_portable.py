@@ -631,6 +631,67 @@ class TestModelResponseParsing(unittest.TestCase):
             self.assertTrue(reason)
 
 
+class TestHttpBackend(unittest.TestCase):
+    """Regressions from wiring up local models."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.runtime = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def reply(self, payload):
+        class FakeResponse:
+            def read(inner):
+                return json.dumps(payload).encode()
+
+            def __enter__(inner):
+                return inner
+
+            def __exit__(inner, *a):
+                return False
+        return FakeResponse()
+
+    def run_with(self, payload):
+        real = distill.urllib.request.urlopen
+        distill.urllib.request.urlopen = lambda *a, **k: self.reply(payload)
+        try:
+            return distill.run_http({"url": "http://x/api/generate", "model": "m"},
+                                    "prompt", 5, self.runtime)
+        finally:
+            distill.urllib.request.urlopen = real
+
+    def test_normal_reply_is_returned(self):
+        self.assertEqual(self.run_with({"response": "hello", "done_reason": "stop"}), "hello")
+
+    def test_token_limit_with_no_output_is_a_failure_not_a_verdict(self):
+        """A thinking model can burn the whole budget and emit nothing."""
+        got = self.run_with({"response": "", "done_reason": "length"})
+        self.assertIsNone(got)
+        self.assertIn("token limit", (self.runtime / "distill.log").read_text())
+
+    def test_shipped_ollama_backend_has_no_output_cap(self):
+        spec = cfg.DEFAULTS["writer"]["text_backends"]["ollama"]
+        self.assertNotIn("num_predict", spec["options"],
+                         "a token cap truncates reasoning models before they answer")
+        self.assertEqual(spec["options"]["temperature"], 0)
+
+    def test_text_backend_defers_prompt_file_substitution(self):
+        """Each call writes its own prompt, so cfg must not bake in one path."""
+        spec = {"prefer_text": ["fake"],
+                "text_backends": {"fake": {"bin": sys.executable, "model": "m",
+                                           "args": ["--prompt-file", "{prompt_file}"],
+                                           "prompt": "file"}}}
+        original = cfg.load
+        cfg.load = lambda: {**original(), "writer": spec}
+        try:
+            got = cfg.writer_backend("text")
+        finally:
+            cfg.load = original
+        self.assertIn("{prompt_file}", got["args"])
+
+
 class TestTextModeDistillation(unittest.TestCase):
     """The whole text-mode loop, with a stub model instead of a real one."""
 

@@ -73,7 +73,12 @@ DEFAULTS: dict = {
                 "url": "http://localhost:11434/api/generate",
                 "model": "gemma4:latest",
                 "args": [],
-                "options": {"temperature": 0.2, "num_ctx": 8192},
+                # temperature 0: a reference manual wants the most likely
+                # description, not a creative one, and it makes runs repeatable.
+                # No num_predict cap: thinking models spend the budget reasoning
+                # and a cap truncates them before any visible output appears.
+                "options": {"temperature": 0, "num_ctx": 8192},
+                "think": False,
                 "prompt": "http",
             },
             "claude": {
@@ -82,11 +87,13 @@ DEFAULTS: dict = {
                 "args": ["-p", "--model", "{model}"],
                 "prompt": "stdin",
             },
+            # `devin -p` rejects a prompt on stdin; it needs --prompt-file.
             "devin": {
                 "bin": "devin",
                 "model": "swe-1-7-medium",
-                "args": ["-p", "--model", "{model}"],
-                "prompt": "stdin",
+                "args": ["-p", "--model", "{model}", "--respect-workspace-trust", "false",
+                         "--prompt-file", "{prompt_file}"],
+                "prompt": "file",
             },
             "codex": {
                 "bin": "codex",
@@ -349,13 +356,14 @@ def writer_backend(kind: str = "agent") -> dict | None:
                 if args and args[-1] in ("--model", "-m"):
                     args.pop()          # drop the flag with its empty value
                 continue
-            args.append(token.replace("{model}", model)
-                             .replace("{kb}", str(kb_dir()))
-                             .replace("{prompt_file}", str(prompt_file)))
+            token = token.replace("{model}", model).replace("{kb}", str(kb_dir()))
+            # Text backends fill {prompt_file} themselves, per call, so that a
+            # run against a different knowledge base writes its own prompt.
+            args.append(token if text else token.replace("{prompt_file}", str(prompt_file)))
         resolved = {"name": name, "bin": binary, "args": args, "model": model,
                     "prompt": spec.get("prompt", "stdin")}
-        for extra in ("url", "options"):     # HTTP backends carry these
-            if spec.get(extra):
+        for extra in ("url", "options", "think"):   # HTTP backends carry these
+            if spec.get(extra) is not None:
                 resolved[extra] = spec[extra]
         return resolved
     return None
