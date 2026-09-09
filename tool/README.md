@@ -121,13 +121,17 @@ from one source, `tool/skill/BODY.md`, with harness-appropriate frontmatter.
         │            - the agent has been quiet for quiet_seconds, or
         │            - a session ended (session-end hook drops a flush marker)
         ▼
- bin/distill.py    locks, batches, and runs the first available writer as an
-        │          argv list (never through a shell):
-        │            devin -p / claude -p / codex exec / copilot -p /
-        │            opencode run / cursor-agent -p
-        │            prompt = prompts/DISTILL_PROMPT.md
+ bin/distill.py    locks and batches, then per record (writer.mode: text):
+        │            1. bin/kb.py routes it -- from what the KB already
+        │               documents, then .routes.json, then the model, once
+        │            2. already documented? merge the signature, no model call
+        │            3. otherwise ask the model to describe the one command
+        │               (prompts/ENTRY_PROMPT.md, JSON in / JSON out)
+        │            4. bin/kb.py renders and inserts the entry
+        │          Default backend is a local Ollama model over HTTP; the
+        │          cloud CLIs are alternatives, not requirements.
         ▼
- <kb>/git.md, docker.md, ...   entries appended, verified, committed
+ <kb>/git.md, docker.md, ...   entries inserted, verified, committed
 ```
 
 `bin/procs.py` holds the only platform-dependent logic: detached spawning
@@ -303,7 +307,9 @@ python3 tool/tests/eval_writer.py --verbose        # show every entry
 ```
 
 Measured on this machine, local `gemma4` and cloud `swe-1-7-medium` both score
-48/48; the local run takes 26s against the cloud run's 95s. Re-run it after
+48/48; the local run takes ~50s against the cloud run's ~95s (the local number
+includes classifying every unseen binary in a throwaway knowledge base, which a
+real run does once per binary and then remembers). Re-run it after
 touching `prompts/ENTRY_PROMPT.md` — prompt changes that read like
 improvements are not reliably improvements.
 
@@ -430,9 +436,12 @@ Environment overrides:
 
 ```bash
 python3 tool/bin/doctor.py                 # platform, wiring, backend, queue, live test
-cat <kb>/.runtime/pending.jsonl            # captured, not yet documented
+python3 tool/bin/log.py                    # what was captured, and what was skipped
+python3 tool/bin/session.py status         # running? how much is queued?
+python3 tool/bin/session.py stop | start | restart
+python3 tool/bin/kb.py routes              # where each binary is filed, and why
 python3 tool/bin/distill.py                # write the queue now
-python3 tool/bin/session.py start          # start the watcher by hand
+cat <kb>/.runtime/pending.jsonl            # captured, not yet documented
 python3 tool/bin/capture.py --command 'git rebase -i main'   # record by hand
 python3 tool/bin/sync_seen.py              # rebuild the dedupe cache
 ls <kb>/.runtime/failed/                   # batches that never completed
@@ -447,11 +456,14 @@ the next watcher — stop the running one if you need them immediately.
 ## Tests
 
 ```bash
-python3 tool/tests/test_portable.py   # 38 unit tests, <1s, no side effects
-sh tool/tests/smoke.sh                # 42 checks: full install/capture/write/uninstall
+python3 tool/tests/test_portable.py   # 117 unit tests, ~2s, no side effects
+sh tool/tests/smoke.sh                # 55 checks: install/capture/write/stop/uninstall
+python3 tool/tests/eval_writer.py     # writer output quality, needs a model
 ```
 
-`test_portable.py` verifies the Windows, macOS and Linux path layouts from any
+`eval_writer.py` grades real entries on format, heading, concision, grounding,
+specificity and cleanliness, so prompt and model changes are measured rather
+than guessed at. `test_portable.py` verifies the Windows, macOS and Linux path layouts from any
 machine, because path resolution and backend rendering are pure functions of
 (platform, environment, home). `smoke.sh` runs the whole pipeline in a
 throwaway `HOME` with a stub writer, so it needs no agent CLI, no network and
@@ -483,8 +495,8 @@ Be aware of what has actually been exercised:
 
 | | Status |
 |---|---|
-| **macOS** (darwin, Python 3.14) | Verified: 38 unit tests + 42 smoke checks, plus real captures and real writer runs |
-| **Linux** (Fedora 44, Python 3.14) | Verified: same 38 unit tests + 42 smoke checks, including the detached watcher and git commit |
+| **macOS** (darwin, Python 3.14) | Verified: 117 unit tests + 55 smoke checks, plus real captures, local-model writer runs and the quality eval |
+| **Linux** (Fedora 44, Python 3.14) | Verified: same unit and smoke suites, including the detached watcher and git commit |
 | **Windows** | **Untested.** Implemented with no POSIX-only calls: `DETACHED_PROCESS` spawning, `tasklist`/`taskkill` liveness, mkdir locks, `%APPDATA%` paths, CRLF `.cmd` shims. The path layout is unit-tested; nothing has run on a real Windows box |
 | Capture for all six harness payload shapes | Verified (unit tests + live hooks) |
 | Writer: **devin**, **opencode** | Verified end-to-end |

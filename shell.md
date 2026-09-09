@@ -83,6 +83,7 @@ head -n 30 package.json
 <!-- sig: 89f020049314 -->
 <!-- sig: 36bf7ee75ee3 -->
 <!-- sig: 0a298316cc55 -->
+<!-- sig: d41804041dae -->
 
 ```bash
 tail -n 25 .runtime/watcher.log
@@ -239,6 +240,9 @@ find . -name '*.sql'
 <!-- sig: 61a04308b48f -->
 <!-- sig: de50b9f33685 -->
 <!-- sig: ca175e357e0a -->
+<!-- sig: 643d24ee4f22 -->
+<!-- sig: 7d0e7e4d0be9 -->
+<!-- sig: c84d74f33425 -->
 
 ```bash
 grep -c <pattern> <queue-file> 2>/dev/null
@@ -349,6 +353,7 @@ uniq -c
 
 ### Count and sort unique items numerically
 <!-- sig: 7c95b0c9c705 -->
+<!-- sig: d15534cee302 -->
 
 ```bash
 sort -rn

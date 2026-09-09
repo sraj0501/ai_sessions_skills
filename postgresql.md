@@ -1,4 +1,4 @@
-# Database Client
+# PostgreSQL
 
 > Auto-maintained by the ai_session_skills background writer. One `###` entry
 > per distinct action. `sig` comments are dedupe keys — never delete them.

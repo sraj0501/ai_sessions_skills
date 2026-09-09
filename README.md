@@ -9,22 +9,24 @@ technology.
 
 Capture works across **Devin CLI, Claude Code, Codex CLI, Copilot CLI, OpenCode
 and Cursor**, on **Windows, macOS and Linux**, all feeding this one knowledge
-base. The engine that does it lives in [`tool/`](tool/README.md): pure Python 3
-standard library, no dependencies.
+base. By default the writing is done by a **local Ollama model**, so captured
+commands never leave the machine. The engine lives in
+[`tool/`](tool/README.md): pure Python 3 standard library, no dependencies.
 
 ```
 ai_session_skills/
-├── git.md, docker.md, node.md, ...   # the knowledge (this is the point)
-├── config.json                       # knobs: model, timing, writer order
+├── git.md, shell.md, docker.md, ...  # the knowledge (this is the point)
+├── config.json                       # knobs: model, mode, timing, writer order
+├── .routes.json                      # learned binary -> file decisions
 ├── .runtime/                         # queue, dedupe cache, logs (gitignored)
 └── tool/                             # portable engine — see tool/README.md
     ├── install.py   + .sh / .ps1 shims
     ├── uninstall.py + .sh / .ps1 shims
-    ├── bin/         capture · watcher · distill · doctor · hook shims
+    ├── bin/         capture · watcher · distill · kb · log · session · doctor
     ├── adapters/    opencode plugin
     ├── prompts/     writer instructions
     ├── skill/       shared skill body
-    └── tests/       unit + smoke tests
+    └── tests/       unit · smoke · writer-quality eval
 ```
 
 ---
@@ -49,15 +51,76 @@ py -3 tool\bin\doctor.py
 Then **restart any running agent session** — harnesses read hook config at
 startup. Codex also needs `/hooks` run once inside it to trust the new hooks.
 
-`tool/install.sh` and `tool\install.ps1` are equivalent launchers if you prefer
-them. Re-running is safe and never duplicates entries. See
+For local, offline writing, pull any instruct model; `doctor.py` will report
+`ollama [local, offline]` once it can reach the server:
+
+```bash
+ollama pull qwen2.5-coder     # or keep whatever you already have
+```
+
+Re-running the installer is safe and never duplicates entries. See
 [`tool/README.md`](tool/README.md) for `--only`, `--kb`, `--dry-run`,
 uninstall, and the per-platform path table.
 
-> **Status:** verified end-to-end on macOS and Fedora 44 (38 unit tests + 42
-> smoke checks each). Windows is implemented with no POSIX-only calls and its
-> path layout is unit-tested, but it has not yet run on real Windows hardware —
-> run `doctor.py` after installing there.
+> **Status:** verified end-to-end on macOS and Fedora 44 (117 unit tests + 55
+> smoke checks). Windows is implemented with no POSIX-only calls and its path
+> layout is unit-tested, but it has not yet run on real Windows hardware — run
+> `doctor.py` after installing there.
+
+---
+
+## Daily use
+
+Ask any installed agent a CLI question and the `session-skills` skill points it
+here, so you get *your* verified workflow back rather than generic advice.
+Nothing needs to be recorded by hand.
+
+```bash
+python3 tool/bin/log.py            # what was captured, and what was skipped
+python3 tool/bin/session.py status # running? how much is queued?
+python3 tool/bin/doctor.py         # is everything wired and healthy?
+```
+
+On Windows use `py -3` in place of `python3`.
+
+### Is it actually working?
+
+`log.py` prints one line per decision:
+
+```
+2026-09-09 19:18:10  manual   known      07b5548da62f git          git status --short --branch
+2026-09-09 19:18:10  manual   new        181660d9b102 terraform    terraform apply -auto-approve
+
+  captured 14 action(s):  new 1  known 13
+  dedupe   13/14 already known (93%)
+```
+
+| Decision | Meaning |
+|---|---|
+| `new` | A distinct action, queued for documentation |
+| `known` | Already documented — dropped by the dedupe |
+| `repeat` | The same action twice in one command line |
+| `ignored` | Nothing documentable parsed out |
+| `documented` / `merged` | The writer added an entry, or folded it onto one |
+| `not-useful` | Judged not worth an entry (see `_skipped.md`) |
+| `write-fail` | Model unreachable; the batch retries |
+
+A high `known` count means the dedupe is working, not that capture is broken.
+`--follow` tails it live, `--today` and `--stats` narrow it down.
+
+### Starting and stopping
+
+```bash
+python3 tool/bin/session.py stop "reviewing a client repo"
+python3 tool/bin/session.py start
+python3 tool/bin/session.py restart      # bounce the watcher after a config edit
+```
+
+`stop` is persistent, shared by every harness, and stops capture, the writer
+and the background watcher. Queued actions are kept and written once you start
+again. For a single command instead, prefix `AI_SKILLS_CAPTURE_OFF=1`. To
+remove the hooks entirely, `python3 tool/uninstall.py` — the knowledge is never
+touched.
 
 ---
 
@@ -65,31 +128,44 @@ uninstall, and the per-platform path table.
 
 | File | Covers |
 |---|---|
-| `git.md` | git, jj |
-| `github-cli.md` | `gh`, `glab` |
-| `shell.md` | `rg`, `sed`, `find`, `ls`, `cat`, `head`, `tail`, `jq`, `curl`, `chmod`, ... |
-| `node.md` | npm, npx, yarn, pnpm, node, tsc, vitest, eslint |
-| `python.md` | python, pip, venv, pytest, ruff, mypy |
-| `brew.md` | `brew` |
-| `docker.md` | docker, docker compose, podman |
-| `kubernetes.md` | `kubectl`, `helm`, `k9s` |
-| `agent-tools.md` | agent-native tools and their CLI equivalents |
-| `ollama.md` | `ollama` |
-| [`postgresql.md`](postgresql.md) | Database Client |
-| [`systemd.md`](systemd.md) | System Services |
+| [`git.md`](git.md) | Git |
+| [`github-cli.md`](github-cli.md) | GitHub CLI (`gh`) |
+| [`shell.md`](shell.md) | Shell and file tools |
+| [`node.md`](node.md) | Node, npm and TypeScript |
+| [`python.md`](python.md) | Python |
+| [`docker.md`](docker.md) | Docker |
+| [`kubernetes.md`](kubernetes.md) | Kubernetes |
+| [`postgresql.md`](postgresql.md) | PostgreSQL |
+| [`systemd.md`](systemd.md) | System services |
+| [`brew.md`](brew.md) | Homebrew |
+| [`ollama.md`](ollama.md) | Ollama |
+| [`agent-tools.md`](agent-tools.md) | Agent-native tools and their CLI equivalents |
 
-New technologies get their own file automatically (`database.md`, `cloud.md`,
-`make.md`, ...). `_skipped.md` records anything the writer judged not worth
-documenting, with a reason.
+191 actions documented so far. `_skipped.md` records anything the writer judged
+not worth documenting, with a reason. `python3 tool/bin/doctor.py` prints the
+current counts.
 
-72 actions are documented so far; `python3 tool/bin/doctor.py` prints the
-current count along with anything still queued.
+**There is no list of known commands.** A binary is filed by looking at what
+the knowledge base already documents — once `git status` lives in `git.md`,
+every git command follows it — then at `.routes.json` for earlier decisions,
+and only then by asking the model, once. A fixed table always lags what you
+actually run: `grep.md` and `timeout.md` used to exist here for exactly that
+reason.
+
+If something lands in the wrong place, the correction sticks:
+
+```bash
+python3 tool/bin/kb.py routes                      # where each binary is filed
+python3 tool/bin/kb.py route psql postgresql.md    # fix future entries
+python3 tool/bin/kb.py merge psql.md postgresql.md # move existing ones, sigs intact
+```
 
 ### Entry format
 
-Every entry is one `###` heading naming the *task*, a command block, and four
-bullets. The `<!-- sig: ... -->` comment is the dedupe key — **never delete
-one** unless you want that action documented again.
+Every entry is one `###` heading naming the *task*, a command block, and up to
+four bullets. The `<!-- sig: ... -->` comment is the dedupe key — **never
+delete one** unless you want that action documented again. Several signatures
+on one entry means several variants of the same action share it.
 
 ```markdown
 ### Pull the latest upstream staging and merge it into the current branch
@@ -107,23 +183,33 @@ git merge upstream/staging
 - **Notes:** ...
 ```
 
+The model never writes that markdown. It returns a JSON object of fields and
+Python renders the entry, so layout, ordering and the signature cannot drift.
+
 ---
 
-## Daily use
+## How it writes
 
-Ask any installed agent a CLI question and the `session-skills` skill points it
-here, so you get *your* verified workflow back rather than generic advice.
-Nothing needs to be recorded by hand.
+Capture is a `PostToolUse` hook: it reduces a command to a **signature** —
+binary plus subcommands plus flag *names*, with values and paths dropped — and
+queues it only if that signature is new. A detached watcher waits for the agent
+to go quiet, then documents the batch and commits locally (it never pushes).
+
+Two writer modes, set by `writer.mode`:
+
+- **`text` (default).** Python owns routing, dedupe and file editing; the model
+  is asked to describe one command at a time. No tool use required, so a small
+  local model is enough. Measured at parity with a cloud model on the entry
+  quality eval — 48/48 for both — in about half the wall time.
+- **`agent`.** A tool-using CLI edits the knowledge base itself. Needs a strong
+  cloud model.
+
+Prompt or model changes can be measured rather than guessed at:
 
 ```bash
-python3 tool/bin/doctor.py       # is everything wired and healthy?
-python3 tool/bin/distill.py      # document the queue now instead of waiting
-cat .runtime/pending.jsonl       # what has been captured but not written up
+python3 tool/tests/eval_writer.py                  # local model
+python3 tool/tests/eval_writer.py --backend devin  # cloud comparison
 ```
 
-On Windows use `py -3` in place of `python3`. Pause capture for one command
-with `AI_SKILLS_CAPTURE_OFF=1 <command>`, or everywhere with
-`python3 tool/uninstall.py` (the knowledge is never touched).
-
-Full engine documentation, configuration reference and the harness matrix:
-**[`tool/README.md`](tool/README.md)**.
+Full engine documentation, configuration reference, writer modes, routing and
+the harness matrix: **[`tool/README.md`](tool/README.md)**.
