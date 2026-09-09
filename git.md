@@ -304,3 +304,17 @@ git bisect start
 - **Why:** Much faster than manually checking each commit when a regression appeared between two known points.
 - **Example:** `git bisect start` on the current (buggy) HEAD, then `git bisect bad` and `git bisect good v1.2.0` to start the search.
 - **Notes:** `git bisect reset` exits bisect mode and returns you to the original commit if you need to abort.
+
+## Creating and initialising repositories
+
+### Initialise a new git repository quietly
+<!-- sig: 147ac26aad8f -->
+
+```bash
+git init -q 2>/dev/null
+```
+
+- **What it does:** Creates a new `.git` directory in the current directory, suppressing normal output with `-q` and discarding the "already initialised" error with `2>/dev/null`.
+- **Why:** Useful in scripts and setup steps where you want a repo bootstrapped without verbose output or interactive prompts.
+- **Example:** `mkdir -p <repo> && cd <repo> && git init -q 2>/dev/null`.
+- **Notes:** `git init` without a path operates on the current directory; the trailing `2>/dev/null` makes the command idempotent in an already-initialised repo.

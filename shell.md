@@ -183,6 +183,19 @@ find . -name '*.sql'
 - **Example:** `python3 tool/tests/test_portable.py 2>&1 | grep -i commitscope`.
 - **Notes:** Plain `grep` is not gitignore-aware and does not support `rg`'s rust-regex restrictions; use `grep -i` for one-off pipelines and `rg -i` for code searches.
 
+### Count matching lines in a queue and pretty-print the most recent record
+<!-- sig: ed504be81133 -->
+
+```bash
+grep -c <pattern> <queue-file> 2>/dev/null
+tail -n 1 <queue-file> | python3 -m json.tool
+```
+
+- **What it does:** `grep -c` returns the number of lines matching `<pattern>` in the queue file; `tail -n 1` extracts the last queued record and `python3 -m json.tool` formats it as readable JSON.
+- **Why:** A quick sanity check when verifying a captured event landed in the queue and inspecting the latest entry.
+- **Example:** `grep -c cargo .runtime/pending.jsonl 2>/dev/null; tail -n 1 .runtime/pending.jsonl | python3 -m json.tool`.
+- **Notes:** `2>/dev/null` on the first command keeps a missing queue file from producing an error; `python3 -m json.tool` fails if the last line is not valid JSON.
+
 ## Editing and transforming text
 
 ### Print a specific line range of a file
@@ -275,6 +288,18 @@ curl -s https://api.github.com/rate_limit
 - **Why:** Clean output for piping into `jq`.
 - **Notes:** Add `-L` to follow redirects, `-f` to make HTTP errors a non-zero exit status, and `-o file` to save instead of print.
 
+### Recursively remove a directory tree
+<!-- sig: ee37b30a68f0 -->
+
+```bash
+rm -rf <directory>
+```
+
+- **What it does:** Deletes `<directory>` and everything inside it, without prompting and regardless of permissions (within the caller's rights).
+- **Why:** Fast cleanup of temporary checkouts, build artefacts or generated trees.
+- **Example:** `rm -rf /tmp/brand-new-codebase`.
+- **Notes:** This is destructive and not recoverable. Double-check the path, especially with globs or relative paths; `rm -rf .` will wipe the current directory.
+
 ## Processes
 
 ### Check whether a specific process is still running
@@ -302,3 +327,27 @@ tar -xzf archive.tar.gz -C /tmp/out
 - **Why:** Unpacks a `.tar.gz` to a chosen directory in one step without first `cd`-ing into it.
 - **Example:** `tar -xzf project.tar.gz -C /tmp/extract`
 - **Notes:** The destination directory must already exist; `-C` does not create it. Add `-v` to list each file as it is extracted.
+
+## Loops and bulk checks
+
+### Check that the same snippet is present in several installed files
+<!-- sig: 6af0a85220ab -->
+
+```bash
+for f in \
+    ~/.config/devin/skills/session-skills/SKILL.md \
+    ~/.claude/skills/session-skills/SKILL.md \
+    ~/.copilot/skills/session-skills/SKILL.md; do
+  printf '%-58s ' "$(echo "$f" | sed "s|$HOME|~|")"
+  if grep -q "$(tail -n 5 tool/skill/BODY.md | head -1 | cut -c1-40)" "$f" 2>/dev/null; then
+    echo "in sync"
+  else
+    echo "STALE"
+  fi
+done
+```
+
+- **What it does:** Loops over a list of installed skill files, prints a left-padded path with `~` substituted for `$HOME`, and reports whether each file still contains a known marker snippet.
+- **Why:** A quick health check when the same skill is installed for multiple agent CLIs; catches stale or overwritten copies.
+- **Example:** The loop above, used to verify the `session-skills` skill is in sync across Devin, Claude and Copilot.
+- **Notes:** `grep -q` keeps the output to the label; `2>/dev/null` stops missing files from breaking the loop.
