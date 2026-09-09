@@ -37,14 +37,13 @@ Everything is Python, so the same commands work on macOS, Linux and Windows
 | **Is it working? what was captured?** | `python3 $TOOL/bin/log.py` |
 | Live view while working | `python3 $TOOL/bin/log.py --follow` |
 | Today only / summary only | `python3 $TOOL/bin/log.py --today` / `--stats` |
-| **Turn capture off** | `python3 $TOOL/bin/session.py pause [reason]` |
-| **Turn it back on** | `python3 $TOOL/bin/session.py resume` |
-| On or off right now? | `python3 $TOOL/bin/session.py status` |
+| **Stop it** | `python3 $TOOL/bin/session.py stop [reason]` |
+| **Start it** | `python3 $TOOL/bin/session.py start` |
+| Running or not? | `python3 $TOOL/bin/session.py status` |
 | Health check of the whole setup | `python3 $TOOL/bin/doctor.py` |
 | What is captured but not yet documented | `cat $KB/.runtime/pending.jsonl` |
 | Write the queue up now (don't wait) | `python3 $TOOL/bin/distill.py` |
 | Watcher status | `python3 $TOOL/bin/doctor.py` (queue section) |
-| Start the watcher | `python3 $TOOL/bin/session.py start` |
 | Recent activity | `tail -n 40 $KB/.runtime/watcher.log $KB/.runtime/distill.log` |
 | Signature of a command | `python3 $TOOL/bin/capture.py --sig '<command>'` |
 | Record an action manually | `python3 $TOOL/bin/capture.py --command '<command>' --harness manual` |
@@ -130,10 +129,12 @@ Three scopes, smallest first:
 
 - **One command or one shell:** prefix `AI_SKILLS_CAPTURE_OFF=1` (PowerShell:
   `$env:AI_SKILLS_CAPTURE_OFF=1`). Affects only that process tree.
-- **Everywhere, reversibly:** `python3 $TOOL/bin/session.py pause "reason"`.
-  Persistent across restarts and shared by every harness: it stops capture,
-  stops the writer and shuts the watcher down. Undo with `session.py resume`.
-  Anything already queued stays queued and is written after resuming.
+- **Everywhere, reversibly:** `python3 $TOOL/bin/session.py stop "reason"`
+  (aliases `pause`, `off`). Persistent across restarts and shared by every
+  harness: it stops capture, stops the writer and shuts the watcher down.
+  Undo with `session.py start` (aliases `resume`, `on`). Anything already
+  queued stays queued and is written once it starts again.
+  `session.py restart` bounces just the watcher, e.g. after a config edit.
 - **Everywhere, permanently:** `python3 $TOOL/uninstall.py` removes the hooks
   and keeps the knowledge.
 

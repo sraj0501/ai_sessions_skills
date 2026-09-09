@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-"""Session-lifecycle hook entry point (all harnesses, all platforms).
+"""Start, stop and inspect the capture pipeline.
 
-    session.py start [harness]   -> make sure the background watcher runs
-    session.py end   [harness]   -> flush the queue and let it wind down
+For people:
 
-    session.py pause [reason]    -> stop capturing and writing, everywhere
-    session.py resume            -> start again
+    session.py start             -> turn capture on (alias: resume, on)
+    session.py stop [reason]     -> turn it off everywhere (alias: pause, off)
+    session.py restart           -> bounce the watcher, e.g. after a config edit
     session.py status            -> on/off, queue depth, watcher state
 
-The hook actions return immediately and print nothing, so no agent is delayed
-and no tokens are spent. Pausing is persistent and shared by every harness:
-it survives restarts until `resume`.
+For harness hooks, via hook-session.sh/.cmd:
+
+    session.py hook-start [harness]  -> make sure the background watcher runs
+    session.py hook-end   [harness]  -> flush the queue and let it wind down
+
+Hook actions return immediately, print nothing and never fail a session.
+Stopping is persistent and shared by every harness: it survives restarts until
+`start`. Anything already queued stays queued and is written once you start
+again.
 """
 
 from __future__ import annotations
@@ -49,39 +55,69 @@ def status(runtime: Path, poll: int) -> int:
     return 0
 
 
+STOP_WORDS = ("stop", "pause", "off")
+START_WORDS = ("start", "resume", "on")
+HOOK_WORDS = ("hook-start", "hook-end")
+USAGE = ("usage: session.py start|stop [reason]|restart|status\n"
+         "       (hooks use hook-start / hook-end)")
+
+
+def spawn_watcher(runtime: Path, poll: int) -> None:
+    if not procs.watcher_alive(runtime, poll):
+        procs.spawn_detached(procs.python_argv(cfg.TOOL_ROOT / "bin" / "watcher.py"),
+                             log=runtime / "watcher.log", cwd=cfg.kb_dir())
+
+
 def main() -> int:
-    action = (sys.argv[1] if len(sys.argv) > 1 else "start").lower()
+    argv = sys.argv[1:]
+    action = (argv[0] if argv else "status").lower()
     runtime = cfg.runtime_dir()
     runtime.mkdir(parents=True, exist_ok=True)
     poll = int(cfg.get("watcher.poll_seconds", 45) or 45)
 
+    # Legacy shims called the hook verbs `start`/`end`, always with a harness
+    # argument. Keep honouring that, so an old shim cannot silently un-stop.
+    if action in ("start", "end") and len(argv) > 1:
+        action = "hook-" + ("end" if action == "end" else "start")
+
     # Control verbs are for the user and must work regardless of environment.
-    if action in ("pause", "off"):
-        cfg.set_paused(True, " ".join(sys.argv[2:]))
+    if action in STOP_WORDS:
+        reason = " ".join(argv[1:])
+        cfg.set_paused(True, reason)
         stop_watcher(runtime)
-        cfg.session_log("paused", detail=" ".join(sys.argv[2:]) or "by request")
-        print("ai-session-skills paused. Resume with: session.py resume")
+        cfg.session_log("paused", detail=reason or "by request")
+        print("ai-session-skills stopped. Start again with: session.py start")
         return 0
-    if action in ("resume", "on"):
+    if action in START_WORDS:
+        was_paused = cfg.is_paused()
         cfg.set_paused(False)
         cfg.session_log("resumed")
-        print("ai-session-skills resumed.")
+        spawn_watcher(runtime, poll)
+        print("ai-session-skills started." if was_paused else
+              "ai-session-skills is already running.")
+        return 0
+    if action == "restart":
+        stop_watcher(runtime)
+        cfg.set_paused(False)
+        spawn_watcher(runtime, poll)
+        print("watcher restarted.")
         return 0
     if action == "status":
         return status(runtime, poll)
+    if action not in HOOK_WORDS:
+        print("unknown action: %s\n%s" % (action, USAGE), file=sys.stderr)
+        return 2
 
     # The writer is itself an agent session; never recurse into it.
     if os.environ.get("AI_SKILLS_DISTILLER") or cfg.capture_off():
         return 0
 
-    if action == "start":
+    if action == "hook-start":
         (runtime / "heartbeat").touch()
-        if not procs.watcher_alive(runtime, poll):
-            procs.spawn_detached(procs.python_argv(cfg.TOOL_ROOT / "bin" / "watcher.py"),
-                                 log=runtime / "watcher.log", cwd=cfg.kb_dir())
+        spawn_watcher(runtime, poll)
         return 0
 
-    if action == "end":
+    if action == "hook-end":
         (runtime / "flush").touch()
         if procs.watcher_alive(runtime, poll):
             return 0                       # the watcher will see the flush marker
@@ -94,11 +130,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    verb = sys.argv[1].lower() if len(sys.argv) > 1 else "status"
     try:
         sys.exit(main())
-    except Exception as exc:   # a lifecycle hook must never fail a session
-        if len(sys.argv) > 1 and sys.argv[1].lower() in ("pause", "resume", "on",
-                                                         "off", "status"):
-            print("session control failed: %s" % exc, file=sys.stderr)
-            sys.exit(1)
-        sys.exit(0)
+    except Exception as exc:
+        if verb in HOOK_WORDS or (verb in ("start", "end") and len(sys.argv) > 2):
+            sys.exit(0)        # a lifecycle hook must never fail a session
+        print("session control failed: %s" % exc, file=sys.stderr)
+        sys.exit(1)

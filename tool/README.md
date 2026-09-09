@@ -224,8 +224,9 @@ python3 tool/bin/log.py --follow     # live, while you work
 python3 tool/bin/log.py --today --stats
 
 python3 tool/bin/session.py status   # on/off, queue depth, watcher
-python3 tool/bin/session.py pause "reviewing a client repo"
-python3 tool/bin/session.py resume
+python3 tool/bin/session.py stop "reviewing a client repo"
+python3 tool/bin/session.py start
+python3 tool/bin/session.py restart  # bounce the watcher after a config edit
 ```
 
 `.runtime/session.log` gets one line per decision:
@@ -254,12 +255,16 @@ The log is trimmed to the last 4000 lines automatically.
 | Scope | How | Reversible |
 |---|---|---|
 | One command or shell | `AI_SKILLS_CAPTURE_OFF=1 <cmd>` | ends with the process |
-| Everywhere | `session.py pause [reason]` | `session.py resume` |
+| Everywhere | `session.py stop [reason]` | `session.py start` |
 | Permanently | `uninstall.py` | re-run `install.py` |
 
-`pause` writes `.runtime/paused`, so it survives restarts and applies to every
+`stop` writes `.runtime/paused`, so it survives restarts and applies to every
 harness at once. It stops capture, refuses to run the writer, and shuts the
-watcher down. Records already queued stay queued and are written after resume.
+watcher down. Records already queued stay queued and are written after start.
+
+`stop`/`pause`/`off` and `start`/`resume`/`on` are aliases. Harness hooks use
+the separate `hook-start` / `hook-end` verbs, so a hook firing can never
+undo a `stop`. An unrecognised verb exits non-zero rather than doing nothing.
 
 ## Writer modes
 

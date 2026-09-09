@@ -204,19 +204,21 @@ has "$SANDBOX/log.out" "captured" && pass "log viewer summarises" \
 
 # ------------------------------------------------------- pause / resume ---- #
 echo
-echo "pause switch"
-"$PY" "$TOOL/bin/session.py" pause "smoke" >/dev/null 2>&1
+echo "start / stop"
+"$PY" "$TOOL/bin/session.py" stop "smoke" >/dev/null 2>&1
 "$PY" "$TOOL/bin/session.py" status 2>&1 | grep -q PAUSED \
-  && pass "status reports paused" || fail "status reports paused"
+  && pass "status reports stopped" || fail "status reports stopped"
 feed devin '{"tool_name":"exec","tool_input":{"command":"lsblk --json"},"tool_response":{"success":true}}'
 [ "$(queued)" = 0 ] && pass "capture is off while paused" \
                     || fail "capture is off while paused (got $(queued))"
 "$PY" "$TOOL/bin/distill.py" >/dev/null 2>&1
 has "$KB/.runtime/distill.log" "paused" && pass "writer refuses to run while paused" \
                                         || fail "writer refuses to run while paused"
-"$PY" "$TOOL/bin/session.py" resume >/dev/null 2>&1
+"$PY" "$TOOL/bin/session.py" start >/dev/null 2>&1
 "$PY" "$TOOL/bin/session.py" status 2>&1 | grep -q "capture   on" \
-  && pass "status reports resumed" || fail "status reports resumed"
+  && pass "status reports started" || fail "status reports started"
+"$PY" "$TOOL/bin/session.py" nonsense >/dev/null 2>&1 \
+  && fail "an unknown verb is rejected" || pass "an unknown verb is rejected"
 feed devin '{"tool_name":"exec","tool_input":{"command":"lsblk --json"},"tool_response":{"success":true}}'
 [ "$(queued)" = 1 ] && pass "capture resumes" || fail "capture resumes (got $(queued))"
 

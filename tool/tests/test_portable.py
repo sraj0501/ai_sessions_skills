@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -829,6 +830,70 @@ class TestPauseSwitchAndLog(unittest.TestCase):
                   "harness": "devin", "kind": "shell", "tool": "exec"}
         capture.enqueue([dict(record), dict(record)])
         self.assertIn("repeat", self.log_text())
+
+
+class TestSessionVerbs(unittest.TestCase):
+    """The start/stop surface, driven exactly as a person or a hook would."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.kb = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_session(self, *args):
+        env = dict(os.environ, AI_SKILLS_KB=str(self.kb))
+        env.pop("AI_SKILLS_CAPTURE_OFF", None)
+        return subprocess.run([sys.executable, str(BIN / "session.py"), *args],
+                              capture_output=True, text=True, env=env)
+
+    def paused(self):
+        return (self.kb / ".runtime" / "paused").exists()
+
+    def test_stop_and_start_round_trip(self):
+        self.assertEqual(self.run_session("stop", "testing").returncode, 0)
+        self.assertTrue(self.paused())
+        self.run_session("start")
+        self.assertFalse(self.paused())
+
+    def test_aliases_all_work(self):
+        for stop_word in ("stop", "pause", "off"):
+            self.run_session(stop_word)
+            self.assertTrue(self.paused(), stop_word)
+            self.run_session("start")
+        for start_word in ("start", "resume", "on"):
+            self.run_session("stop")
+            self.run_session(start_word)
+            self.assertFalse(self.paused(), start_word)
+
+    def test_a_typo_is_loud_rather_than_a_silent_no_op(self):
+        """`stop` used to do nothing at all and still exit 0."""
+        done = self.run_session("nonsense")
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("unknown action", done.stderr)
+
+    def test_stop_records_its_reason(self):
+        self.run_session("stop", "reviewing", "a", "client", "repo")
+        self.assertIn("reviewing a client repo",
+                      (self.kb / ".runtime" / "paused").read_text())
+
+    def test_hook_verbs_are_silent_and_never_fail(self):
+        for verb in ("hook-start", "hook-end"):
+            done = self.run_session(verb, "devin")
+            self.assertEqual(done.returncode, 0, verb)
+            self.assertEqual(done.stdout.strip(), "", verb)
+
+    def test_a_legacy_shim_cannot_silently_restart_capture(self):
+        """Old shims call `start <harness>`; that must stay a hook verb."""
+        self.run_session("stop")
+        self.run_session("start", "devin")
+        self.assertTrue(self.paused())
+
+    def test_status_reports_both_states(self):
+        self.assertIn("on", self.run_session("status").stdout)
+        self.run_session("stop")
+        self.assertIn("PAUSED", self.run_session("status").stdout)
 
 
 class TestHttpBackend(unittest.TestCase):
