@@ -54,6 +54,7 @@ cat config.json
 <!-- sig: a6067e6acb07 -->
 <!-- sig: b2b7b01819ae -->
 <!-- sig: 2937dfcf0e4e -->
+<!-- sig: 2126ee85aacf -->
 
 ```bash
 head -n 30 package.json
@@ -78,6 +79,8 @@ head -n 30 package.json
 <!-- sig: 028257f1f5ee -->
 <!-- sig: a0fd7e60bd9b -->
 <!-- sig: 89f020049314 -->
+<!-- sig: 36bf7ee75ee3 -->
+<!-- sig: 0a298316cc55 -->
 
 ```bash
 tail -n 25 .runtime/watcher.log
@@ -232,6 +235,7 @@ find . -name '*.sql'
 <!-- sig: 48da5d02a343 -->
 <!-- sig: 516e536c28ad -->
 <!-- sig: 61a04308b48f -->
+<!-- sig: de50b9f33685 -->
 
 ```bash
 grep -c <pattern> <queue-file> 2>/dev/null
