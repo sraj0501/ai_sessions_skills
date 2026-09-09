@@ -42,21 +42,23 @@ unset AI_SKILLS_CONFIG AI_SKILLS_KB 2>/dev/null || true
 printf '{\n  "theme": "dark",\n  "enabledPlugins": {"x": true}\n}\n' >"$HOME/.claude/settings.json"
 printf 'model = "gpt-5.5"\n\n[features]\nmulti_agent = true\n' >"$HOME/.codex/config.toml"
 
-# Stub writer: pretends to be an agent CLI, documents every batch signature.
+# Stub model: text in, one entry out. Writes no files and needs no network --
+# in text mode the model only produces prose; Python does the file handling.
 cat >"$SANDBOX/bin/claude" <<'STUB'
 #!/bin/sh
-cat >/dev/null 2>&1 || true      # consume the prompt on stdin
 exec python3 -c '
-import json, pathlib
-kb = pathlib.Path.cwd()
-batch = [json.loads(l) for l in (kb / ".runtime/batch.jsonl").read_text().splitlines() if l.strip()]
-out = kb / "shell.md"
-text = out.read_text() if out.exists() else "# Shell\n"
-for r in batch:
-    text += "\n### Stub entry for %s\n<!-- sig: %s -->\n\n```bash\n%s\n```\n\n- **What it does:** stub\n" % (
-        r["binary"], r["sig"], r["command"])
-out.write_text(text)
-print("distilled: %d new entries, 0 merged, 0 skipped" % len(batch))
+import re, sys
+prompt = sys.stdin.read()
+found = re.search(r"^Command: `(.+)`$", prompt, re.M)
+command = found.group(1) if found else "true"
+print("SECTION: Smoke")
+print("### Stub entry for %s" % command.split()[0])
+print("")
+print("```bash")
+print(command)
+print("```")
+print("")
+print("- **What it does:** stub")
 '
 STUB
 chmod +x "$SANDBOX/bin/claude"
@@ -133,8 +135,12 @@ echo
 echo "write"
 "$PY" "$TOOL/bin/distill.py" >/dev/null 2>&1
 check $? "distill exits cleanly"
-[ -f "$KB/shell.md" ] && pass "knowledge file created" || fail "knowledge file created"
-entries=$(grep -c '<!-- sig:' "$KB/shell.md" 2>/dev/null || echo 0)
+ls "$KB"/*.md >/dev/null 2>&1 && pass "knowledge file created" || fail "knowledge file created"
+# Routing is deterministic now, so each unknown binary earns its own file.
+for f in dnf systemctl firewall-cmd nmcli; do
+  [ -f "$KB/$f.md" ] && pass "routed to $f.md" || fail "routed to $f.md"
+done
+entries=$(cat "$KB"/*.md 2>/dev/null | grep -c '<!-- sig:' || echo 0)
 [ "$entries" = 4 ] && pass "every captured signature documented" \
                    || fail "every captured signature documented (got $entries)"
 [ "$(queued)" = 0 ] && pass "queue drained" || fail "queue drained (got $(queued))"
@@ -177,7 +183,7 @@ fi
 sleep 6
 has "$KB/.runtime/watcher.log" "distilling" \
   && pass "watcher reacted to the session-end flush" || fail "watcher reacted to the session-end flush"
-has "$KB/shell.md" "journalctl" \
+has "$KB/journalctl.md" "journalctl" \
   && pass "watcher documented the action unattended" || fail "watcher documented the action unattended"
 
 sleep 6
@@ -217,7 +223,8 @@ has "$HOME/.claude/settings.json" "$TOOL" && fail "claude hooks removed" \
 has "$HOME/.claude/settings.json" '"theme": "dark"' \
   && pass "foreign settings survived uninstall" || fail "foreign settings survived uninstall"
 [ -f "$HOME/.claude/skills/session-skills/SKILL.md" ] && fail "skills removed" || pass "skills removed"
-[ -f "$KB/shell.md" ] && pass "knowledge base left intact" || fail "knowledge base left intact"
+ls "$KB"/*.md >/dev/null 2>&1 && pass "knowledge base left intact" \
+                              || fail "knowledge base left intact"
 
 # ---------------------------------------------------------------- done ----- #
 echo

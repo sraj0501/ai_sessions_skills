@@ -21,10 +21,12 @@ import re
 import subprocess
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cfg      # noqa: E402
+import kb       # noqa: E402
 import procs    # noqa: E402
 
 SIG_RE = re.compile(r"<!--\s*sig:\s*([0-9a-f]{6,40})\s*-->")
@@ -108,10 +110,14 @@ SKIP_RE = re.compile(r"^\s*SKIP\s*:\s*(.+)$", re.MULTILINE)
 SECTION_LINE = re.compile(r"^\s*SECTION\s*:\s*(.+)$", re.MULTILINE)
 
 
-def entry_prompt(record: dict) -> str:
+def entry_prompt(record: dict, existing_sections: list[str] | None = None) -> str:
     template = (cfg.TOOL_ROOT / "prompts" / "ENTRY_PROMPT.md").read_text(encoding="utf-8")
     lines = [template, "\n## Now document this command\n",
              "Command: `%s`" % record.get("command", "")]
+    if existing_sections:
+        lines.append("\nThe file already has these sections. Reuse one of them "
+                     "**exactly** if the command fits; only invent a new name if none do:\n"
+                     + "\n".join("- %s" % s for s in existing_sections))
     subcmds = record.get("subcommands") or []
     lines.append("Binary: `%s`%s" % (record.get("binary", ""),
                                      (", subcommands: `%s`" % " ".join(subcmds)) if subcmds else ""))
@@ -125,8 +131,36 @@ def entry_prompt(record: dict) -> str:
     return "\n".join(lines)
 
 
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def run_http(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | None:
+    """Generate over Ollama's HTTP API.
+
+    Deliberately not `ollama run`: that streams through a terminal renderer
+    which re-wraps long lines with cursor-movement escapes, so piped output
+    cannot be reconstructed reliably. The API returns the text verbatim.
+    """
+    body = json.dumps({
+        "model": backend.get("model") or "",
+        "prompt": prompt,
+        "stream": False,
+        "options": backend.get("options") or {},
+    }).encode("utf-8")
+    request = urllib.request.Request(backend["url"], data=body,
+                                     headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8")).get("response") or ""
+    except Exception as exc:
+        log(runtime, "model request failed (%s): %s" % (backend["url"], exc))
+        return None
+
+
 def run_text(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | None:
     """One text-in/text-out generation. No tools, no file access, no cwd needs."""
+    if backend.get("url"):
+        return run_http(backend, prompt, timeout, runtime)
     argv = [backend["bin"]] + [a.replace("{prompt_text}", prompt) for a in backend["args"]]
     env = dict(os.environ)
     env.update({"AI_SKILLS_DISTILLER": "1", "AI_SKILLS_CAPTURE_OFF": "1"})
@@ -144,7 +178,7 @@ def run_text(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | N
         err = "\n".join((done.stderr or "").strip().splitlines()[-2:])
         log(runtime, "model exited %d: %s" % (done.returncode, err.replace("\n", " | ")))
         return None
-    return done.stdout
+    return ANSI.sub("", done.stdout or "")
 
 
 def parse_entry(text: str) -> tuple[str, str] | tuple[None, str]:
@@ -192,14 +226,22 @@ def document_record(kb_dir: Path, runtime: Path, record: dict, backend: dict,
     path = kb_dir / filename
     is_new_file = not path.exists()
 
+    known_sections: list[str] = []
     if not is_new_file:
-        existing = kb.parse(path.read_text(encoding="utf-8", errors="replace"))
-        match = kb.find_match(existing, binary, subcmds)
+        text = path.read_text(encoding="utf-8", errors="replace")
+        match = kb.find_match(kb.parse(text), binary, subcmds)
         if match:
             kb.add_sig(path, sig, match.heading)
             return "merged"
+        known_sections = kb.sections(text)
 
-    section, entry = parse_entry(run_text(backend, entry_prompt(record), timeout, runtime))
+    raw = run_text(backend, entry_prompt(record, known_sections), timeout, runtime)
+    if raw is None:
+        # The model was unreachable or errored. That is not a verdict about the
+        # record, so leave it undocumented and let the batch retry.
+        return "failed"
+
+    section, entry = parse_entry(raw)
     if section is None:
         kb.note_skipped(kb_dir, sig, record.get("command", ""), entry)
         return "skipped"
@@ -215,7 +257,7 @@ def distill_text(kb_dir: Path, runtime: Path, records: list[dict], backend: dict
                  timeout: int) -> tuple[int, list[dict]]:
     """Document every record. Returns (documented count, records still missing)."""
     done_sigs = kb.documented_sigs(kb_dir)
-    tally = {"new": 0, "merged": 0, "skipped": 0, "duplicate": 0}
+    tally = {"new": 0, "merged": 0, "skipped": 0, "duplicate": 0, "failed": 0}
     failed = []
     for record in records:
         if record.get("sig") in done_sigs:
@@ -224,33 +266,36 @@ def distill_text(kb_dir: Path, runtime: Path, records: list[dict], backend: dict
         try:
             outcome = document_record(kb_dir, runtime, record, backend, timeout)
         except Exception as exc:                      # never lose the batch to one bad record
-            log(runtime, "record %s failed: %s" % (record.get("sig"), exc))
-            failed.append(record)
-            continue
+            log(runtime, "record %s errored: %s" % (record.get("sig"), exc))
+            outcome = "failed"
         tally[outcome] += 1
-        done_sigs.add(record.get("sig"))
+        if outcome == "failed":
+            failed.append(record)
+        else:
+            done_sigs.add(record.get("sig"))
     log(runtime, "distilled: %(new)d new, %(merged)d merged, %(skipped)d skipped, "
-                 "%(duplicate)d already known" % tally)
-    return sum(tally.values()), failed
+                 "%(duplicate)d already known, %(failed)d failed" % tally)
+    return sum(tally.values()) - tally["failed"], failed
 
 
-def undocumented(kb: Path, records: list[dict]) -> int:
-    docs = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in kb.glob("*.md"))
+def undocumented(kb_dir: Path, records: list[dict]) -> int:
+    docs = "\n".join(p.read_text(encoding="utf-8", errors="replace")
+                     for p in kb_dir.glob("*.md"))
     have = set(SIG_RE.findall(docs))
     return sum(1 for r in records if r.get("sig") not in have)
 
 
-def git(kb: Path, *args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=str(kb), capture_output=True, text=True)
+def git(repo: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True)
 
 
-def dirty_paths(kb: Path) -> set[str]:
+def dirty_paths(repo: Path) -> set[str]:
     """Every path with uncommitted content, staged or not, tracked or not.
 
     NUL-separated so paths with spaces or non-ASCII survive intact; gitignored
     files (notably `.runtime/`) stay excluded.
     """
-    done = git(kb, "status", "--porcelain", "-z", "--untracked-files=all")
+    done = git(repo, "status", "--porcelain", "-z", "--untracked-files=all")
     if done.returncode != 0:
         return set()
     fields = (done.stdout or "").split("\0")
@@ -268,7 +313,7 @@ def dirty_paths(kb: Path) -> set[str]:
     return paths
 
 
-def commit(kb: Path, runtime: Path, count: int, backend_name: str,
+def commit(repo: Path, runtime: Path, count: int, backend_name: str,
            preexisting: set[str] | None = None) -> None:
     """Commit only what the writer changed.
 
@@ -279,11 +324,11 @@ def commit(kb: Path, runtime: Path, count: int, backend_name: str,
     """
     if cfg.get("auto_commit", True) is not True:
         return
-    if git(kb, "rev-parse", "--git-dir").returncode != 0:
+    if git(repo, "rev-parse", "--git-dir").returncode != 0:
         return
 
     preexisting = set() if preexisting is None else preexisting
-    now = dirty_paths(kb)
+    now = dirty_paths(repo)
     ours = sorted(now - preexisting)
     entangled = sorted(now & preexisting)
 
@@ -294,9 +339,9 @@ def commit(kb: Path, runtime: Path, count: int, backend_name: str,
         log(runtime, "nothing of ours to commit")
         return
 
-    git(kb, "add", "--", *ours)
+    git(repo, "add", "--", *ours)
     # --only commits exactly these paths, so anything the user had staged stays staged.
-    done = git(kb, "commit", "-q", "--only",
+    done = git(repo, "commit", "-q", "--only",
                "-m", "docs: document %d captured action(s)" % count,
                "-m", "Written automatically by the ai-session-skills writer (%s)." % backend_name,
                "--", *ours)
@@ -306,13 +351,13 @@ def commit(kb: Path, runtime: Path, count: int, backend_name: str,
         return
     log(runtime, "committed %d action(s) across %d file(s)" % (count, len(ours)))
 
-    if cfg.get("auto_push", False) is True and git(kb, "remote", "get-url", "origin").returncode == 0:
-        if git(kb, "push", "-q").returncode == 0:
+    if cfg.get("auto_push", False) is True and git(repo, "remote", "get-url", "origin").returncode == 0:
+        if git(repo, "push", "-q").returncode == 0:
             log(runtime, "pushed to origin")
 
 
 def main() -> int:
-    kb, runtime = cfg.kb_dir(), cfg.runtime_dir()
+    kb_dir, runtime = cfg.kb_dir(), cfg.runtime_dir()
     runtime.mkdir(parents=True, exist_ok=True)
     (runtime / "failed").mkdir(exist_ok=True)
 
@@ -322,10 +367,11 @@ def main() -> int:
     max_attempts = int(cfg.get("distill.max_attempts", 3) or 3)
     max_records = int(cfg.get("distill.max_batch_records", 40) or 40)
 
-    backend = cfg.writer_backend()
+    mode = "text" if str(cfg.get("writer.mode", "text")).lower() == "text" else "agent"
+    backend = cfg.writer_backend(mode)
     if not backend:
-        log(runtime, "no writer backend available "
-                     "(install devin, claude, codex, copilot, opencode or cursor-agent)")
+        log(runtime, "no %s writer backend available (checked writer.prefer%s)"
+            % (mode, "_text" if mode == "text" else ""))
         return 0
 
     lock = procs.DirLock(runtime / "distill.lock", stale_after=timeout * 2)
@@ -353,11 +399,18 @@ def main() -> int:
         log(runtime, "distilling %d record(s), attempt %d, backend %s"
             % (len(records), attempt, backend["name"]))
 
-        prompt = build_prompt(kb, runtime, len(records))
-        preexisting = dirty_paths(kb)   # the user's work in progress; not ours to commit
-        status = run_backend(backend, prompt, kb, timeout, runtime)
+        preexisting = dirty_paths(kb_dir)   # the user's work in progress; not ours to commit
 
-        missing = undocumented(kb, records) if status == 0 else None
+        if mode == "text":
+            per_record = int(cfg.get("distill.model_timeout_seconds", 180) or 180)
+            distill_text(kb_dir, runtime, records, backend, per_record)
+            status = 0
+        else:
+            prompt = build_prompt(kb_dir, runtime, len(records))
+            status = run_backend(backend, prompt, kb_dir, timeout, runtime)
+
+        # Same safety net in both modes: every sig must have landed in some .md.
+        missing = undocumented(kb_dir, records) if status == 0 else None
         if status == 0:
             log(runtime, "writer finished; undocumented signatures: %d" % missing)
 
@@ -378,7 +431,7 @@ def main() -> int:
         attempts_file.unlink(missing_ok=True)
         subprocess.run(procs.python_argv(cfg.TOOL_ROOT / "bin" / "sync_seen.py"),
                        capture_output=True)
-        commit(kb, runtime, len(records), backend["name"], preexisting)
+        commit(kb_dir, runtime, len(records), backend["name"], preexisting)
         log(runtime, "done")
         return 0
     finally:

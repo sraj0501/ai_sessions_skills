@@ -47,6 +47,7 @@ DEFAULTS: dict = {
     },
     "distill": {
         "timeout_seconds": 900,
+        "model_timeout_seconds": 180,   # per record in text mode
         "max_attempts": 3,
         "max_batch_records": 40,
     },
@@ -55,8 +56,57 @@ DEFAULTS: dict = {
         "skip_binaries": [],
     },
     "writer": {
+        # "text"  -> Python owns all file I/O and dedupe; the model only writes
+        #            prose for one record at a time. Works with local models.
+        # "agent" -> the model edits the knowledge base itself (needs tool use).
+        "mode": "text",
         # Tried in order; the first backend whose binary exists is used.
         "prefer": ["devin", "claude", "codex", "copilot", "opencode", "cursor-agent"],
+        # Plain text-in/text-out backends for mode "text". No tools required, so
+        # a local model is enough. Placeholders: {model} {prompt_text}
+        "prefer_text": ["ollama", "claude", "devin", "codex", "copilot", "cursor-agent"],
+        "text_backends": {
+            # Uses the HTTP API, not `ollama run`: the CLI streams through a
+            # terminal renderer that re-wraps lines with cursor escapes.
+            "ollama": {
+                "bin": "ollama",
+                "url": "http://localhost:11434/api/generate",
+                "model": "gemma4:latest",
+                "args": [],
+                "options": {"temperature": 0.2, "num_ctx": 8192},
+                "prompt": "http",
+            },
+            "claude": {
+                "bin": "claude",
+                "model": "haiku",
+                "args": ["-p", "--model", "{model}"],
+                "prompt": "stdin",
+            },
+            "devin": {
+                "bin": "devin",
+                "model": "swe-1-7-medium",
+                "args": ["-p", "--model", "{model}"],
+                "prompt": "stdin",
+            },
+            "codex": {
+                "bin": "codex",
+                "model": "",
+                "args": ["exec", "--sandbox", "read-only", "{prompt_text}"],
+                "prompt": "arg",
+            },
+            "copilot": {
+                "bin": "copilot",
+                "model": "",
+                "args": ["-p", "{prompt_text}"],
+                "prompt": "arg",
+            },
+            "cursor-agent": {
+                "bin": "cursor-agent",
+                "model": "",
+                "args": ["-p", "{prompt_text}"],
+                "prompt": "arg",
+            },
+        },
         # argv templates, so no shell is involved on any platform.
         # Placeholders: {model} {kb} {prompt_file} {prompt_text}
         # prompt: "file" (path already in args) | "arg" ({prompt_text} in args) | "stdin"
@@ -271,12 +321,17 @@ def get(dotted: str, default=None):
     return node
 
 
-def writer_backend() -> dict | None:
-    """Resolve the first available writer backend to a concrete argv."""
+def writer_backend(kind: str = "agent") -> dict | None:
+    """Resolve the first available writer backend to a concrete argv.
+
+    kind "agent" picks a tool-using CLI that edits the knowledge base itself;
+    kind "text" picks a plain text-in/text-out model, which may be local.
+    """
     cfg = load()["writer"]
-    backends = cfg.get("backends", {})
+    text = kind == "text"
+    backends = cfg.get("text_backends" if text else "backends", {})
     forced = os.environ.get("AI_SKILLS_WRITER")
-    order = [forced] if forced else list(cfg.get("prefer", []))
+    order = [forced] if forced else list(cfg.get("prefer_text" if text else "prefer", []))
     prompt_file = runtime_dir() / "prompt.md"
 
     for name in order:
@@ -297,8 +352,12 @@ def writer_backend() -> dict | None:
             args.append(token.replace("{model}", model)
                              .replace("{kb}", str(kb_dir()))
                              .replace("{prompt_file}", str(prompt_file)))
-        return {"name": name, "bin": binary, "args": args,
-                "prompt": spec.get("prompt", "stdin")}
+        resolved = {"name": name, "bin": binary, "args": args, "model": model,
+                    "prompt": spec.get("prompt", "stdin")}
+        for extra in ("url", "options"):     # HTTP backends carry these
+            if spec.get(extra):
+                resolved[extra] = spec[extra]
+        return resolved
     return None
 
 

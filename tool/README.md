@@ -206,11 +206,41 @@ on Windows). Resolution order: `$AI_SKILLS_CONFIG` → user config →
 | `watcher.batch_max` | `20` | Queue size that triggers an immediate write |
 | `watcher.idle_exit_seconds` | `900` | Daemon self-shutdown after inactivity |
 | `distill.timeout_seconds` | `900` | Hard kill for a writer run |
+| `distill.model_timeout_seconds` | `180` | Per-record model timeout in text mode |
 | `distill.max_attempts` | `3` | Retries before a batch is parked |
 | `capture.max_pending_records` | `400` | Queue cap |
 | `capture.skip_binaries` | `[]` | Binaries to never document |
-| `writer.prefer` | devin, claude, codex, copilot, opencode, cursor-agent | Backend order |
+| `writer.mode` | `text` | `text` (Python writes, model drafts) or `agent` |
+| `writer.prefer_text` | ollama, claude, devin, codex, copilot, cursor-agent | Text backend order |
+| `writer.text_backends.<name>` | see `bin/cfg.py` | `bin`, `url`, `model`, `args`, `options` |
+| `writer.prefer` | devin, claude, codex, copilot, opencode, cursor-agent | Agent backend order |
 | `writer.backends.<name>` | see `bin/cfg.py` | `bin`, `model`, `args`, `prompt` |
+
+## Writer modes
+
+**`text` (default) — works with a local model.** Python owns the knowledge
+base: `bin/kb.py` routes each record to a file, decides whether the action is
+already documented, merges variants onto the existing entry and inserts the
+`sig` comments. The model is asked one question at a time — "describe this
+command" — and its answer is validated before it is written. It needs no tool
+use, no file access and no multi-step planning, so a small local model is
+enough and captured commands never leave the machine.
+
+Ollama is used over its **HTTP API**, not `ollama run`: the CLI streams through
+a terminal renderer that re-wraps long lines with cursor-movement escapes
+(`ESC[3D`), which cannot be reconstructed reliably from piped output.
+
+```bash
+ollama pull qwen2.5-coder          # any instruct model works
+python3 tool/bin/doctor.py         # confirms "ollama [local, offline]"
+```
+
+Point it at a different model by setting `writer.text_backends.ollama.model`.
+
+**`agent` — the original behaviour.** A tool-using CLI edits the knowledge base
+itself, following `prompts/DISTILL_PROMPT.md`. Higher quality on a strong
+cloud model, but it depends on the model obeying the dedupe rules, and the
+whole batch fails if it does not. Switch with `"writer": {"mode": "agent"}`.
 
 A backend is an **argv template**, not a shell string, so quoting behaves the
 same on every OS:

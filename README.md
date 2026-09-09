@@ -77,7 +77,6 @@ uninstall, and the per-platform path table.
 | `ollama.md` | `ollama` |
 | [`timeout.md`](timeout.md) | timeout |
 | [`grep.md`](grep.md) | (grep |
-| [`bash.md`](bash.md) | bash |
 
 New technologies get their own file automatically (`database.md`, `cloud.md`,
 `make.md`, ...). `_skipped.md` records anything the writer judged not worth

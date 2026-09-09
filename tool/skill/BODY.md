@@ -46,11 +46,19 @@ Everything is Python, so the same commands work on macOS, Linux and Windows
 | Re-wire hooks after an upgrade | `python3 $TOOL/install.py` |
 | Failed batches | `ls $KB/.runtime/failed/` |
 
-`distill.py` spawns a separate cheap agent session (first available of devin,
-claude, codex, copilot, opencode, cursor-agent) that writes the entries and
-commits them locally. It takes a minute or two — do not run it in the
-foreground if the user is waiting on something else. Force a specific writer
-with `AI_SKILLS_WRITER=claude python3 $TOOL/bin/distill.py`.
+`distill.py` writes the entries and commits them locally. By default
+(`writer.mode: text`) Python does all the routing, dedupe and file editing, and
+the model is only asked to describe one command at a time — so the default
+writer is a **local Ollama model** and nothing leaves the machine. A batch of a
+few records takes seconds. Force a specific writer with
+`AI_SKILLS_WRITER=claude python3 $TOOL/bin/distill.py`.
+
+If `writer.mode` is `agent`, a tool-using CLI edits the knowledge base itself
+instead, which is slower and needs a strong cloud model.
+
+A model that is unreachable is never treated as a verdict about a record: the
+batch is retried, and parked in `.runtime/failed/` only after
+`distill.max_attempts`. Check `doctor.py` for "model server reachable".
 
 Changing `watcher.*` timings only affects the next watcher: it reads its
 config once at startup, so stop the running one first if you need new timings
@@ -79,3 +87,4 @@ is wrong").
   `$env:AI_SKILLS_CAPTURE_OFF=1`).
 - Everywhere: `python3 $TOOL/uninstall.py` (removes hooks, keeps the knowledge).
 - Change model, batch size, timing or writer order: `$KB/config.json`.
+- Use a different local model: `writer.text_backends.ollama.model`.

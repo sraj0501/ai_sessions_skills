@@ -24,7 +24,18 @@ import capture     # noqa: E402
 import cfg         # noqa: E402
 import distill     # noqa: E402
 import json_merge  # noqa: E402
+import kb          # noqa: E402
 import procs       # noqa: E402
+
+ENTRY = """### Check what changed before committing
+<!-- sig: aaaaaaaaaaaa -->
+
+```bash
+git --no-pager diff --staged
+```
+
+- **What it does:** Shows staged changes.
+"""
 
 
 class TestUserConfigDir(unittest.TestCase):
@@ -453,6 +464,256 @@ class TestCommitScope(unittest.TestCase):
     def test_non_repo_is_a_no_op(self):
         with tempfile.TemporaryDirectory() as plain:
             distill.commit(Path(plain), self.runtime, 1, "test", set())
+
+
+class TestRouting(unittest.TestCase):
+    """Routing is a pure function in Python, not a table the model must obey."""
+
+    def route(self, binary, tool="exec"):
+        return kb.route({"binary": binary, "tool": tool})[0]
+
+    def test_known_technologies(self):
+        for binary, expected in [("git", "git.md"), ("gh", "github-cli.md"),
+                                 ("docker", "docker.md"), ("kubectl", "kubernetes.md"),
+                                 ("npm", "node.md"), ("pytest", "python.md"),
+                                 ("psql", "database.md"), ("terraform", "cloud.md")]:
+            self.assertEqual(self.route(binary), expected, binary)
+
+    def test_search_tools_go_to_shell_not_agent_tools(self):
+        """A grep record documents rg, so it is shell knowledge."""
+        self.assertEqual(self.route("rg", tool="grep"), "shell.md")
+
+    def test_only_toolless_actions_are_agent_tools(self):
+        self.assertEqual(self.route("edit", tool="edit"), "agent-tools.md")
+        self.assertEqual(self.route("devin"), "agent-tools.md")
+
+    def test_unknown_binary_gets_its_own_file(self):
+        self.assertEqual(self.route("brew"), "brew.md")
+        self.assertEqual(self.route("cargo"), "cargo.md")
+
+    def test_shell_interpreters_are_shell_knowledge(self):
+        """`bash script.sh` is a shell idiom, not its own technology."""
+        for binary in ("bash", "sh", "zsh"):
+            self.assertEqual(self.route(binary), "shell.md", binary)
+
+    def test_filename_cannot_escape_the_knowledge_base(self):
+        """A binary name reaches routing unsanitised, so it must not traverse."""
+        for hostile in ("../../etc/passwd", "/etc/shadow", "a/b/c", ".."):
+            name = self.route(hostile)
+            self.assertNotIn("/", name, hostile)
+            self.assertEqual(Path("/kb", name).resolve().parent, Path("/kb"), hostile)
+        self.assertEqual(self.route(""), "misc.md")
+        self.assertEqual(self.route("python3.11"), "python3.11.md")
+
+
+class TestEntryParsing(unittest.TestCase):
+    def test_parses_heading_sigs_and_commands(self):
+        entries = kb.parse("## Committing\n\n" + ENTRY)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0].heading, "Check what changed before committing")
+        self.assertEqual(entries[0].sigs, ["aaaaaaaaaaaa"])
+        self.assertEqual(entries[0].commands, ["git --no-pager diff --staged"])
+        self.assertEqual(entries[0].section, "Committing")
+
+    def test_multiple_sigs_on_one_entry(self):
+        text = ENTRY.replace("<!-- sig: aaaaaaaaaaaa -->",
+                             "<!-- sig: aaaaaaaaaaaa -->\n<!-- sig: bbbbbbbbbbbb -->")
+        self.assertEqual(kb.parse(text)[0].sigs, ["aaaaaaaaaaaa", "bbbbbbbbbbbb"])
+
+    def test_action_is_derived_from_the_command_block(self):
+        self.assertEqual(kb.action_of(kb.parse(ENTRY)[0]), ("git", ("diff",)))
+
+    def test_same_action_different_flags_is_a_match(self):
+        """This is what stops a second entry being written for a variant."""
+        entries = kb.parse(ENTRY)
+        self.assertIsNotNone(kb.find_match(entries, "git", ["diff"]))
+
+    def test_different_subcommand_is_not_a_match(self):
+        self.assertIsNone(kb.find_match(kb.parse(ENTRY), "git", ["merge"]))
+
+
+class TestKbMutation(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.path = self.dir / "git.md"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_add_sig_appends_and_is_idempotent(self):
+        self.path.write_text("## Committing\n\n" + ENTRY, encoding="utf-8")
+        head = "Check what changed before committing"
+        self.assertTrue(kb.add_sig(self.path, "cccccccccccc", head))
+        self.assertFalse(kb.add_sig(self.path, "cccccccccccc", head))
+        entry = kb.parse(self.path.read_text())[0]
+        self.assertEqual(entry.sigs, ["aaaaaaaaaaaa", "cccccccccccc"])
+        self.assertIn("git --no-pager diff --staged", self.path.read_text())
+
+    def test_insert_creates_file_with_header(self):
+        kb.insert_entry(self.path, "Git", "Committing", ENTRY)
+        text = self.path.read_text()
+        self.assertTrue(text.startswith("# Git"))
+        self.assertIn("## Committing", text)
+        self.assertEqual(len(kb.parse(text)), 1)
+
+    def test_insert_reuses_an_existing_section(self):
+        kb.insert_entry(self.path, "Git", "Committing", ENTRY)
+        kb.insert_entry(self.path, "Git", "Committing",
+                        ENTRY.replace("aaaaaaaaaaaa", "dddddddddddd")
+                             .replace("Check what changed", "Stage everything"))
+        text = self.path.read_text()
+        self.assertEqual(text.count("## Committing"), 1)
+        self.assertEqual(len(kb.parse(text)), 2)
+
+    def test_insert_preserves_earlier_entries(self):
+        kb.insert_entry(self.path, "Git", "Committing", ENTRY)
+        kb.insert_entry(self.path, "Git", "Branching",
+                        ENTRY.replace("aaaaaaaaaaaa", "eeeeeeeeeeee"))
+        self.assertIn("aaaaaaaaaaaa", self.path.read_text())
+        self.assertIn("## Branching", self.path.read_text())
+
+    def test_skipped_file_records_the_sig(self):
+        kb.note_skipped(self.dir, "ffffffffffff", "date", "prints the time")
+        self.assertIn("ffffffffffff", kb.documented_sigs(self.dir))
+
+    def test_documented_sigs_spans_every_file(self):
+        kb.insert_entry(self.path, "Git", "Committing", ENTRY)
+        kb.insert_entry(self.dir / "node.md", "Node", "Builds",
+                        ENTRY.replace("aaaaaaaaaaaa", "999999999999"))
+        self.assertEqual(kb.documented_sigs(self.dir), {"aaaaaaaaaaaa", "999999999999"})
+
+
+class TestModelResponseParsing(unittest.TestCase):
+    """The model is untrusted text: every shape it emits must be handled."""
+
+    GOOD = ("SECTION: Inspecting state\n"
+            "### Show the log compactly\n\n"
+            "```bash\ngit log --oneline -10\n```\n\n"
+            "- **What it does:** Prints ten commits, one line each.\n")
+
+    def test_clean_response(self):
+        section, entry = distill.parse_entry(self.GOOD)
+        self.assertEqual(section, "Inspecting state")
+        self.assertTrue(entry.startswith("### Show the log compactly"))
+
+    def test_whole_answer_wrapped_in_a_fence(self):
+        section, entry = distill.parse_entry("```markdown\n" + self.GOOD + "```\n")
+        self.assertEqual(section, "Inspecting state")
+        self.assertIn("git log --oneline -10", entry)
+
+    def test_chatter_before_the_entry_is_dropped(self):
+        section, entry = distill.parse_entry("Sure! Here is the entry:\n\n" + self.GOOD)
+        self.assertEqual(section, "Inspecting state")
+        self.assertTrue(entry.startswith("### "))
+
+    def test_model_emitted_sig_is_stripped(self):
+        """Python owns signatures; a hallucinated one must never survive."""
+        polluted = self.GOOD.replace("### Show the log compactly\n",
+                                     "### Show the log compactly\n<!-- sig: deadbeefcafe -->\n")
+        _section, entry = distill.parse_entry(polluted)
+        self.assertNotIn("deadbeefcafe", entry)
+
+    def test_missing_section_defaults(self):
+        section, _entry = distill.parse_entry(self.GOOD.split("\n", 1)[1])
+        self.assertEqual(section, "Other")
+
+    def test_skip_verdict(self):
+        section, reason = distill.parse_entry("SKIP: just prints the date")
+        self.assertIsNone(section)
+        self.assertEqual(reason, "just prints the date")
+
+    def test_garbage_is_rejected_not_written(self):
+        for junk in ("", "   ", "I cannot help with that.",
+                     "### Heading with no command block\n\n- **What it does:** x"):
+            section, reason = distill.parse_entry(junk)
+            self.assertIsNone(section, junk)
+            self.assertTrue(reason)
+
+
+class TestTextModeDistillation(unittest.TestCase):
+    """The whole text-mode loop, with a stub model instead of a real one."""
+
+    RESPONSE = ("SECTION: Inspecting state\n### Show the log compactly\n\n"
+                "```bash\ngit log --oneline -10\n```\n\n"
+                "- **What it does:** Prints ten commits.\n")
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.runtime = self.dir / ".runtime"
+        self.runtime.mkdir()
+        self.real_run = distill.run_text
+        self.calls = []
+
+    def tearDown(self):
+        distill.run_text = self.real_run
+        self.tmp.cleanup()
+
+    def stub(self, reply):
+        def fake(_backend, prompt, _timeout, _runtime):
+            self.calls.append(prompt)
+            return reply
+        distill.run_text = fake
+
+    def record(self, sig, binary, subcmds, command):
+        return {"sig": sig, "binary": binary, "subcommands": subcmds,
+                "command": command, "full_command": command, "tool": "exec", "ok": True}
+
+    def test_documents_and_routes(self):
+        self.stub(self.RESPONSE)
+        distill.distill_text(self.dir, self.runtime,
+                             [self.record("a1a1a1a1a1a1", "git", ["log"], "git log --oneline")],
+                             {"name": "stub"}, 10)
+        self.assertIn("a1a1a1a1a1a1", (self.dir / "git.md").read_text())
+
+    def test_second_variant_merges_without_calling_the_model(self):
+        self.stub(self.RESPONSE)
+        first = self.record("b1b1b1b1b1b1", "git", ["log"], "git log --oneline")
+        second = self.record("c1c1c1c1c1c1", "git", ["log"], "git log --oneline -20 --graph")
+        distill.distill_text(self.dir, self.runtime, [first], {"name": "stub"}, 10)
+        self.assertEqual(len(self.calls), 1)
+        distill.distill_text(self.dir, self.runtime, [second], {"name": "stub"}, 10)
+        self.assertEqual(len(self.calls), 1, "merge must not consult the model")
+        text = (self.dir / "git.md").read_text()
+        self.assertIn("c1c1c1c1c1c1", text)
+        self.assertEqual(len(kb.parse(text)), 1, "a variant must not create a second entry")
+
+    def test_already_documented_sig_is_untouched(self):
+        self.stub(self.RESPONSE)
+        rec = self.record("d1d1d1d1d1d1", "git", ["log"], "git log")
+        distill.distill_text(self.dir, self.runtime, [rec], {"name": "stub"}, 10)
+        before = (self.dir / "git.md").read_text()
+        distill.distill_text(self.dir, self.runtime, [rec], {"name": "stub"}, 10)
+        self.assertEqual((self.dir / "git.md").read_text(), before)
+
+    def test_model_outage_is_not_recorded_as_skipped(self):
+        """A dead model must leave the record for retry, not bury it in _skipped."""
+        self.stub(None)
+        rec = self.record("e1e1e1e1e1e1", "git", ["log"], "git log")
+        done, failed = distill.distill_text(self.dir, self.runtime, [rec], {"name": "stub"}, 10)
+        self.assertEqual(done, 0)
+        self.assertEqual(failed, [rec])
+        self.assertFalse((self.dir / kb.SKIPPED_FILE).exists())
+        self.assertNotIn("e1e1e1e1e1e1", kb.documented_sigs(self.dir))
+
+    def test_skip_verdict_is_recorded_so_it_never_returns(self):
+        self.stub("SKIP: just prints the date")
+        rec = self.record("f1f1f1f1f1f1", "date", [], "date")
+        _done, failed = distill.distill_text(self.dir, self.runtime, [rec], {"name": "stub"}, 10)
+        self.assertEqual(failed, [])
+        self.assertIn("f1f1f1f1f1f1", kb.documented_sigs(self.dir))
+
+    def test_existing_sections_are_offered_to_the_model(self):
+        self.stub(self.RESPONSE)
+        distill.distill_text(self.dir, self.runtime,
+                             [self.record("aaaa1111aaaa", "git", ["log"], "git log")],
+                             {"name": "stub"}, 10)
+        distill.distill_text(self.dir, self.runtime,
+                             [self.record("bbbb2222bbbb", "git", ["merge"], "git merge main")],
+                             {"name": "stub"}, 10)
+        self.assertIn("Inspecting state", self.calls[-1],
+                      "the model must see existing sections to avoid inventing near-duplicates")
 
 
 if __name__ == "__main__":
