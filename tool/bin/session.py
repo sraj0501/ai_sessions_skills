@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -35,10 +36,10 @@ def stop_watcher(runtime: Path) -> None:
         pid = int((runtime / "watcher.pid").read_text().strip())
     except Exception:
         return
-    try:
-        os.kill(pid, 15)
-    except Exception:
-        pass
+    if not procs.terminate(pid):
+        raise RuntimeError("could not stop watcher pid %s" % pid)
+    (runtime / "watcher.pid").unlink(missing_ok=True)
+    (runtime / "watcher.alive").unlink(missing_ok=True)
 
 
 def status(runtime: Path, poll: int) -> int:
@@ -64,8 +65,16 @@ USAGE = ("usage: session.py start|stop [reason]|restart|status\n"
 
 def spawn_watcher(runtime: Path, poll: int) -> None:
     if not procs.watcher_alive(runtime, poll):
-        procs.spawn_detached(procs.python_argv(cfg.TOOL_ROOT / "bin" / "watcher.py"),
-                             log=runtime / "watcher.log", cwd=cfg.kb_dir())
+        pid = procs.spawn_detached(procs.python_argv(cfg.TOOL_ROOT / "bin" / "watcher.py"),
+                                   log=runtime / "watcher.log", cwd=cfg.kb_dir())
+        if pid is None:
+            raise RuntimeError("could not launch watcher")
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            if procs.watcher_alive(runtime, poll):
+                return
+            time.sleep(0.05)
+        raise RuntimeError("watcher did not become ready; check watcher.log")
 
 
 def main() -> int:
@@ -89,15 +98,21 @@ def main() -> int:
         print("ai-session-skills stopped. Start again with: session.py start")
         return 0
     if action in START_WORDS:
-        was_paused = cfg.is_paused()
+        if cfg.is_paused():
+            import ide_capture
+            if ide_capture.enabled():
+                ide_capture.reset(runtime)
         cfg.set_paused(False)
         cfg.session_log("resumed")
         spawn_watcher(runtime, poll)
-        print("ai-session-skills started." if was_paused else
-              "ai-session-skills is already running.")
+        print("ai-session-skills watcher running; capture on.")
         return 0
     if action == "restart":
         stop_watcher(runtime)
+        if cfg.is_paused():
+            import ide_capture
+            if ide_capture.enabled():
+                ide_capture.reset(runtime)
         cfg.set_paused(False)
         spawn_watcher(runtime, poll)
         print("watcher restarted.")

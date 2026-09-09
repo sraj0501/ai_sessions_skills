@@ -15,6 +15,10 @@ knowledge base.
 
 ## Look something up (default behaviour)
 
+For keyword lookup, run `python $TOOL/bin/search.py <keywords>`; add `--topic git`
+to narrow a topic or `--full` to show complete entries. Browse `$KB/README.md`
+for the topic index. On Windows, `python` works when the `py` launcher is absent.
+
 Prefer the knowledge base over generic recall when asked how to do a CLI task —
 it holds this user's actual verified workflow, including local specifics (macOS
 `sed -i ''`, `CI=true npm run test`, fork-vs-upstream remotes).
@@ -29,6 +33,9 @@ it holds this user's actual verified workflow, including local specifics (macOS
 
 ## Operate the pipeline
 
+Resolve `$RUNTIME` with `python $TOOL/bin/cfg.py runtime`; it may be outside
+the knowledge folder. Resolve the active config with `python $TOOL/bin/cfg.py config`.
+
 Everything is Python, so the same commands work on macOS, Linux and Windows
 (use `py -3` instead of `python3` on Windows).
 
@@ -41,10 +48,10 @@ Everything is Python, so the same commands work on macOS, Linux and Windows
 | **Start it** | `python3 $TOOL/bin/session.py start` |
 | Running or not? | `python3 $TOOL/bin/session.py status` |
 | Health check of the whole setup | `python3 $TOOL/bin/doctor.py` |
-| What is captured but not yet documented | `cat $KB/.runtime/pending.jsonl` |
+| What is captured but not yet documented | `cat $RUNTIME/pending.jsonl` |
 | Write the queue up now (don't wait) | `python3 $TOOL/bin/distill.py` |
 | Watcher status | `python3 $TOOL/bin/doctor.py` (queue section) |
-| Recent activity | `tail -n 40 $KB/.runtime/watcher.log $KB/.runtime/distill.log` |
+| Recent activity | `tail -n 40 $RUNTIME/watcher.log $RUNTIME/distill.log` |
 | Signature of a command | `python3 $TOOL/bin/capture.py --sig '<command>'` |
 | Record an action manually | `python3 $TOOL/bin/capture.py --command '<command>' --harness manual` |
 | Where is each command filed? | `python3 $TOOL/bin/kb.py routes` |
@@ -52,7 +59,7 @@ Everything is Python, so the same commands work on macOS, Linux and Windows
 | Merge two files, sigs intact | `python3 $TOOL/bin/kb.py merge <from.md> <to.md>` |
 | Rebuild the dedupe cache | `python3 $TOOL/bin/sync_seen.py` |
 | Re-wire hooks after an upgrade | `python3 $TOOL/install.py` |
-| Failed batches | `ls $KB/.runtime/failed/` |
+| Failed batches | `ls $RUNTIME/failed/` |
 
 `distill.py` writes the entries and commits them locally. By default
 (`writer.mode: text`) Python does all the routing, dedupe and file editing, and
@@ -138,5 +145,5 @@ Three scopes, smallest first:
 - **Everywhere, permanently:** `python3 $TOOL/uninstall.py` removes the hooks
   and keeps the knowledge.
 
-Other settings live in `$KB/config.json`: model, batch size, timings, writer
+Other settings live in the config reported by `python $TOOL/bin/cfg.py config`: model, batch size, timings, writer
 order, and `writer.text_backends.ollama.model` for a different local model.

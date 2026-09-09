@@ -434,6 +434,37 @@ Environment overrides:
 
 ## Operating it
 
+### VS Code command capture
+
+`capture.codex_ide: true` enables a fallback for IDE sessions whose hooks do
+not fire. The watcher reads completed `commandExecution` items from Codex's
+local SQLite history in read-only mode and records them as `codex-ide` in the
+session log. It reads original commands, not chat messages or tool output.
+CLI and subagent sessions are excluded; ordinary hook capture still serves
+the CLI, and both paths share the same deduplication signatures.
+
+The first run starts at activation time, without importing old conversations.
+Polling uses `watcher.poll_seconds` (45 seconds here); processing can take
+longer while a writer batch is running. The watcher stays alive when this
+fallback is enabled. `session.py stop` pauses it; `session.py start` resumes
+from the current time, skipping commands run while paused. Start the watcher
+again after a machine restart if no session hook has started it.
+
+This adapter uses Codex's internal `state_5.sqlite` and
+`thread_history_1.sqlite` schema, verified against this installation. If a
+Codex upgrade changes that schema, errors appear in `.runtime/watcher.log`.
+The durable checkpoint lives in `.runtime/ide-capture.json`.
+
+In this repository, finished Markdown lives in `knowledge/`, while `config.json`
+and `.runtime/` remain at the root. `kb_dir` and `runtime_dir` resolve relative
+to the config file. An `AI_SKILLS_KB` override keeps its own `.runtime/` for
+isolated runs. Re-running the installer preserves the active config location.
+
+Browse `knowledge/README.md`, or search entries with
+`python tool/bin/search.py git branch`. Use `--topic git`, `--full`, and `--limit 20`
+to narrow or expand results. The search reads the Markdown directly, so there
+is no separate search index to rebuild.
+
 ```bash
 python3 tool/bin/doctor.py                 # platform, wiring, backend, queue, live test
 python3 tool/bin/log.py                    # what was captured, and what was skipped
@@ -460,6 +491,17 @@ python3 tool/tests/test_portable.py   # 117 unit tests, ~2s, no side effects
 sh tool/tests/smoke.sh                # 55 checks: install/capture/write/stop/uninstall
 python3 tool/tests/eval_writer.py     # writer output quality, needs a model
 ```
+
+Windows verification (use `python` if `py -3` is unavailable):
+
+```powershell
+python tool/tests/test_portable.py
+python tool/tests/smoke_windows.py
+```
+
+The Windows smoke check uses the real `.cmd` hooks, detached watcher and
+configured model in a temporary knowledge base, with commits disabled. It
+also checks deduplication and stops its watcher before removing test files.
 
 `eval_writer.py` grades real entries on format, heading, concision, grounding,
 specificity and cleanliness, so prompt and model changes are measured rather
@@ -497,7 +539,7 @@ Be aware of what has actually been exercised:
 |---|---|
 | **macOS** (darwin, Python 3.14) | Verified: 117 unit tests + 55 smoke checks, plus real captures, local-model writer runs and the quality eval |
 | **Linux** (Fedora 44, Python 3.14) | Verified: same unit and smoke suites, including the detached watcher and git commit |
-| **Windows** | **Untested.** Implemented with no POSIX-only calls: `DETACHED_PROCESS` spawning, `tasklist`/`taskkill` liveness, mkdir locks, `%APPDATA%` paths, CRLF `.cmd` shims. The path layout is unit-tested; nothing has run on a real Windows box |
+| **Windows** | Verified September 9, 2026: 119 unit tests plus real `.cmd` capture/session hooks, detached watcher, Ollama `gemma4:latest` writing and deduplication. Live Codex hook dispatch still requires a restarted session and trusted hooks. |
 | Capture for all six harness payload shapes | Verified (unit tests + live hooks) |
 | Writer: **devin**, **opencode** | Verified end-to-end |
 | Writer: **claude**, **copilot** | Invocation verified; runs could not complete on the test machine (not logged in / quota exhausted) |

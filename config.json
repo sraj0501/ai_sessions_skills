@@ -1,5 +1,6 @@
 {
-  "kb_dir": ".",
+  "kb_dir": "knowledge",
+  "runtime_dir": ".runtime",
 
   "auto_commit": true,
   "auto_push": false,
@@ -18,6 +19,7 @@
   },
 
   "capture": {
+    "codex_ide": true,
     "max_pending_records": 400,
     "skip_binaries": []
   },

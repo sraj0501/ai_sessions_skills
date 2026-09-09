@@ -31,3 +31,8 @@ A one-off test-harness command that waits for `.runtime/distill.lock` and then t
 <!-- sig: 91ea93ce091a -->
 
 `head '-20;' awk '...'` is a capture parser artefact, not a real, runnable command.
+
+### more
+<!-- sig: 6228e196e7b0 -->
+
+Used here only for paginating the output of other commands, which is better handled by piping to 'less'.

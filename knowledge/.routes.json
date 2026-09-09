@@ -1,0 +1,19 @@
+{
+  "awk": "shell.md",
+  "dir": "shell.md",
+  "findstr": "shell.md",
+  "get-content": "shell.md",
+  "more": "shell.md",
+  "powershell.exe": "python.md",
+  "psql": "postgresql.md",
+  "python": "python.md",
+  "sort": "shell.md",
+  "sort-object": "shell.md",
+  "systemctl": "systemd.md",
+  "timeout": "shell.md",
+  "tr": "shell.md",
+  "type": "shell.md",
+  "uniq": "shell.md",
+  "where": "shell.md",
+  "while": "shell.md"
+}

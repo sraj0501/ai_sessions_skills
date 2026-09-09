@@ -84,6 +84,23 @@ python3 -m json.tool config.json
 - **What it does:** Reformats JSON with indentation and fails loudly on invalid syntax.
 - **Why:** Zero-dependency `jq` substitute for the two things you usually want: readability and a syntax check.
 
+### Execute tests and inspect resulting logs
+<!-- sig: ce9b127c3f69 -->
+<!-- sig: f3c0fb0376e2 -->
+<!-- sig: 6f1fd0deba2f -->
+
+```bash
+python tool/tests/test_portable.py TestSessionVerbs '*>' '.runtime/session-test-results.log;'
+Get-Content .runtime/session-test-results.log -Tail '5;'
+rg -n -F 973cd4561d55 .runtime/session.log .runtime/pending.jsonl '.runtime/seen.txt;'
+Get-Content .runtime/watcher.log -Tail 3
+```
+
+- **What it does:** This sequence runs a specific test suite, redirects its output to a log file, then tails the results, searches for a specific hash across several runtime files, and finally tails the watcher log.
+- **Why:** It provides a comprehensive, multi-stage validation process: running the test, checking the immediate results, verifying data integrity across multiple state files, and checking recent activity.
+- **Example:** python tool/tests/test_portable.py TestSessionVerbs '*>' '.runtime/session-test-results.log;' Get-Content .runtime/session-test-results.log -Tail '5;' rg -n -F 973cd4561d55 .runtime/session.log .runtime/pending.jsonl '.runtime/seen.txt;' Get-Content .runtime/watcher.log -Tail 3
+- **Notes:** The command chains multiple distinct operations using semicolons. The `rg` command searches for the literal string '973cd4561d55' across the specified files.
+
 ## Static analysis
 
 ### Lint with ruff
@@ -129,3 +146,15 @@ python3 -m py_compile tool/bin/kb.py tool/bin/distill.py tool/bin/cfg.py
 - **Why:** Pre-compiling scripts speeds up the loading and execution time of the Python modules by bypassing the initial parsing step.
 - **Example:** `python3 -m py_compile tool/bin/kb.py tool/bin/distill.py tool/bin/cfg.py`
 - **Notes:** The generated `.pyc` files are typically placed in `__pycache__` directories.
+
+### Search for a pattern within a source file
+<!-- sig: 07568ecde141 -->
+
+```bash
+powershell.exe -NoProfile -Command "Select-String -Path 'devtrack_client\cli.go' -Pattern 'sage' -Context 5,15"
+```
+
+- **What it does:** Executes PowerShell to search for the literal pattern 'sage' within the file devtrack_client\cli.go. It displays the matching lines along with 5 lines of context before and 15 lines of context after the match.
+- **Why:** This allows quick inspection of how a specific keyword is used throughout a source file without running the application or using a dedicated IDE search.
+- **Example:** powershell.exe -NoProfile -Command "Select-String -Path 'devtrack_client\cli.go' -Pattern 'sage' -Context 5,15"
+- **Notes:** The -NoProfile flag ensures that the PowerShell session starts without loading the user's profile script, making execution predictable.

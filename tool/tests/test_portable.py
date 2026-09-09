@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 BIN = Path(__file__).resolve().parent.parent / "bin"
@@ -27,6 +28,7 @@ import distill     # noqa: E402
 import json_merge  # noqa: E402
 import kb          # noqa: E402
 import procs       # noqa: E402
+import search as knowledge_search
 
 ENTRY = """### Check what changed before committing
 <!-- sig: aaaaaaaaaaaa -->
@@ -281,6 +283,16 @@ class TestPayloadNormalisation(unittest.TestCase):
 
 
 class TestJsonMerge(unittest.TestCase):
+    def test_windows_paths_do_not_duplicate_hooks_on_reinstall(self):
+        marker = r"D:\repo\tool"
+        payload = {"hooks": {"PostToolUse": [{"hooks": [
+            {"command": marker + r"\bin\hook-capture.cmd codex"}]}]}}
+        json_merge.apply(self.path, payload, [marker])
+        self.assertEqual(json_merge.apply(self.path, payload, [marker]), "unchanged")
+        self.assertEqual(json.loads(self.path.read_text()), payload)
+        json_merge.remove(self.path, [marker])
+        self.assertEqual(json.loads(self.path.read_text()), {})
+
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         self.path = Path(self.dir) / "settings.json"
@@ -347,7 +359,46 @@ class TestLocking(unittest.TestCase):
             self.assertTrue(procs.DirLock(path, stale_after=60).acquire())
 
 
+class TestBackgroundLaunch(unittest.TestCase):
+    def test_windows_helpers_request_no_console(self):
+        with patch.object(procs, "IS_WINDOWS", True), patch.object(procs.subprocess, "run") as run:
+            procs.run(["tasklist"], capture_output=True)
+            self.assertTrue(run.call_args.kwargs["creationflags"] & 0x08000000)
+
+    def test_posix_helpers_do_not_receive_windows_flags(self):
+        with patch.object(procs, "IS_WINDOWS", False), patch.object(procs.subprocess, "run") as run:
+            procs.run(["git", "status"], capture_output=True)
+            self.assertNotIn("creationflags", run.call_args.kwargs)
+
+    @unittest.skipUnless(os.name == "nt", "Windows console regression")
+    def test_real_helper_has_no_console_and_preserves_piped_input(self):
+        done = procs.run([sys.executable, "-c",
+                          "import ctypes, sys; print(ctypes.windll.kernel32.GetConsoleWindow()); "
+                          "print(sys.stdin.read())"],
+                         input="hook payload", capture_output=True, text=True, check=True)
+        self.assertEqual(done.stdout.splitlines(), ["0", "hook payload"])
+
+    @unittest.skipUnless(os.name == "nt", "Windows detached regression")
+    def test_detached_process_has_no_console(self):
+        import time
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "console.txt"
+            pid = procs.spawn_detached([sys.executable, "-c",
+                "import ctypes, pathlib, sys; pathlib.Path(sys.argv[1]).write_text("
+                "str(ctypes.windll.kernel32.GetConsoleWindow()))", str(output)])
+            self.assertIsNotNone(pid)
+            deadline = time.monotonic() + 10
+            while not output.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertEqual(output.read_text(), "0")
+
+
 class TestLiveness(unittest.TestCase):
+    def test_tasklist_access_failure_does_not_report_a_dead_process(self):
+        with patch.object(procs, "IS_WINDOWS", True), patch.object(procs.subprocess, "run") as run:
+            run.return_value = subprocess.CompletedProcess([], 1, "", "Access denied")
+            self.assertTrue(procs.pid_alive(12345))
+
     def test_dead_pid_is_not_alive(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = Path(tmp)
@@ -406,6 +457,16 @@ class TestCommitScope(unittest.TestCase):
     def test_gitignored_runtime_is_never_dirty(self):
         (self.runtime / "pending.jsonl").write_text("noise\n", encoding="utf-8")
         self.assertEqual(distill.dirty_paths(self.kb), set())
+
+    def test_nested_knowledge_folder_commits_with_root_relative_paths(self):
+        nested = self.kb / "knowledge"
+        nested.mkdir()
+        self.write("README.md", "user work\n")
+        before = distill.dirty_paths(nested)
+        (nested / "shell.md").write_text("# Shell\n")
+        distill.commit(nested, self.runtime, 1, "test", before)
+        self.assertEqual(self.head_files(), ["knowledge/shell.md"])
+        self.assertIn("README.md", distill.dirty_paths(self.kb))
 
     def test_preexisting_work_is_left_uncommitted(self):
         self.write("README.md", "user work in progress\n")     # user, before the writer
@@ -521,7 +582,7 @@ class TestRouting(unittest.TestCase):
                         "....//....//x.md"):
             name = kb.safe_filename(hostile)
             self.assertNotIn("/", name, hostile)
-            self.assertEqual(Path("/kb", name).resolve().parent, Path("/kb"), hostile)
+            self.assertEqual(Path("/kb", name).resolve().parent, Path("/kb").resolve(), hostile)
         self.assertEqual(kb.safe_filename(""), "misc.md")
         self.assertEqual(kb.safe_filename("Shell.md"), "shell.md")
         self.assertEqual(kb.safe_filename("package managers"), "package-managers.md")
@@ -743,6 +804,9 @@ class TestPauseSwitchAndLog(unittest.TestCase):
     """The user-facing on/off switch and the activity log."""
 
     def setUp(self):
+        self.watcher_mock = patch.object(capture, "ensure_watcher")
+        self.watcher_mock.start()
+        self.addCleanup(self.watcher_mock.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.kb = Path(self.tmp.name)
         self.real_runtime = cfg.runtime_dir
@@ -840,6 +904,7 @@ class TestSessionVerbs(unittest.TestCase):
         self.kb = Path(self.tmp.name)
 
     def tearDown(self):
+        self.run_session("stop")
         self.tmp.cleanup()
 
     def run_session(self, *args):
@@ -856,6 +921,19 @@ class TestSessionVerbs(unittest.TestCase):
         self.assertTrue(self.paused())
         self.run_session("start")
         self.assertFalse(self.paused())
+
+    def test_restart_replaces_the_watcher_and_stop_releases_it(self):
+        self.assertEqual(self.run_session("start").returncode, 0)
+        pidfile = self.kb / ".runtime" / "watcher.pid"
+        first = int(pidfile.read_text())
+        done = self.run_session("restart")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        second = int(pidfile.read_text())
+        self.assertNotEqual(first, second)
+        self.assertFalse(procs.pid_alive(first))
+        self.assertTrue(procs.pid_alive(second))
+        self.assertEqual(self.run_session("stop").returncode, 0)
+        self.assertFalse(procs.pid_alive(second))
 
     def test_aliases_all_work(self):
         for stop_word in ("stop", "pause", "off"):
@@ -1131,6 +1209,38 @@ class TestTextModeDistillation(unittest.TestCase):
                              {"name": "stub"}, 10)
         self.assertIn("Inspecting state", self.calls[-1],
                       "the model must see existing sections to avoid inventing near-duplicates")
+
+
+class TestKnowledgeLayout(unittest.TestCase):
+    def test_agent_prompt_uses_separate_runtime_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            knowledge, runtime = root / "knowledge", root / ".runtime"
+            knowledge.mkdir()
+            runtime.mkdir()
+            prompt = distill.build_prompt(knowledge, runtime, 1).read_text(encoding="utf-8")
+            self.assertIn((runtime / "batch.jsonl").as_posix(), prompt)
+            self.assertNotIn("`.runtime/batch.jsonl`", prompt)
+
+    def test_runtime_setting_is_relative_to_config(self):
+        with patch.dict(os.environ, {}, clear=True), patch.object(cfg, "get", return_value=".runtime"), \
+                patch.object(cfg, "config_path", return_value=Path.cwd() / "config.json"):
+            self.assertEqual(cfg.runtime_dir(), Path.cwd() / ".runtime")
+
+    def test_explicit_kb_override_keeps_runtime_isolated(self):
+        with patch.dict(os.environ, {"AI_SKILLS_KB": str(Path.cwd() / "isolated")}):
+            self.assertEqual(cfg.runtime_dir(), Path.cwd() / "isolated" / ".runtime")
+
+    def test_keyword_search_matches_whole_entries_and_filters_topics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "git.md").write_text(ENTRY, encoding="utf-8")
+            (root / "_skipped.md").write_text(ENTRY, encoding="utf-8")
+            results = knowledge_search.search(root, "git staged")
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0]["path"].name, "git.md")
+            self.assertEqual(knowledge_search.search(root, "git missingword"), [])
+            self.assertEqual(knowledge_search.search(root, "git", "docker"), [])
 
 
 if __name__ == "__main__":

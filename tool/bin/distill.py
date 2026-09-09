@@ -58,13 +58,14 @@ def write_records(path: Path, records: list[dict]) -> None:
 
 def build_prompt(kb: Path, runtime: Path, count: int) -> Path:
     template = (cfg.TOOL_ROOT / "prompts" / "DISTILL_PROMPT.md").read_text(encoding="utf-8")
+    template = template.replace(".runtime/", runtime.as_posix().rstrip("/") + "/")
     existing = sorted(p.name for p in kb.glob("*.md"))
     prompt = runtime / "prompt.md"
     prompt.write_text(
         template
         + "\n## This run\n\n"
         + "- Knowledge-base directory (your working directory): `%s`\n" % kb
-        + "- Batch file: `.runtime/batch.jsonl` (%d records)\n" % count
+        + "- Batch file: `%s` (%d records)\n" % ((runtime / "batch.jsonl").as_posix(), count)
         + "- Knowledge-base files that already exist:\n"
         + "".join("  - `%s`\n" % name for name in existing)
         + "\nProcess every record in the batch file, then reply with one line:\n"
@@ -82,7 +83,7 @@ def run_backend(backend: dict, prompt: Path, kb: Path, timeout: int, runtime: Pa
     merged = dict(os.environ)
     merged.update(env)
     try:
-        done = subprocess.run(
+        done = procs.run(
             argv, cwd=str(kb), env=merged, timeout=timeout,
             input=stdin_data, capture_output=True, text=True)
     except subprocess.TimeoutExpired:
@@ -318,7 +319,7 @@ def run_text(backend: dict, prompt: str, timeout: int, runtime: Path,
     env.update({"AI_SKILLS_DISTILLER": "1", "AI_SKILLS_CAPTURE_OFF": "1"})
     stdin_data = prompt if mode == "stdin" else None
     try:
-        done = subprocess.run(argv, env=env, timeout=timeout, input=stdin_data,
+        done = procs.run(argv, env=env, timeout=timeout, input=stdin_data,
                               capture_output=True, text=True)
     except subprocess.TimeoutExpired:
         log(runtime, "model timed out after %ds" % timeout)
@@ -477,7 +478,7 @@ def undocumented(kb_dir: Path, records: list[dict]) -> int:
 
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True)
+    return procs.run(["git", *args], cwd=str(repo), capture_output=True, text=True)
 
 
 def dirty_paths(repo: Path) -> set[str]:
@@ -515,8 +516,12 @@ def commit(repo: Path, runtime: Path, count: int, backend_name: str,
     """
     if cfg.get("auto_commit", True) is not True:
         return
-    if git(repo, "rev-parse", "--git-dir").returncode != 0:
+    root = git(repo, "rev-parse", "--show-toplevel")
+    if root.returncode != 0:
         return
+    # Porcelain status paths are relative to the Git root, even when the
+    # knowledge base is a subdirectory. Stage/commit from the same root.
+    repo = Path(root.stdout.strip())
 
     preexisting = set() if preexisting is None else preexisting
     now = dirty_paths(repo)
@@ -616,7 +621,7 @@ def main() -> int:
                 stamp = time.strftime("%Y%m%d-%H%M%S")
                 batch.replace(runtime / "failed" / ("batch-%s.jsonl" % stamp))
                 attempts_file.unlink(missing_ok=True)
-                subprocess.run(procs.python_argv(cfg.TOOL_ROOT / "bin" / "sync_seen.py"),
+                procs.run(procs.python_argv(cfg.TOOL_ROOT / "bin" / "sync_seen.py"),
                                capture_output=True)
                 log(runtime, "gave up after %d attempts; batch parked in "
                              "failed/batch-%s.jsonl and signatures released" % (attempt, stamp))
@@ -624,7 +629,7 @@ def main() -> int:
 
         batch.unlink(missing_ok=True)
         attempts_file.unlink(missing_ok=True)
-        subprocess.run(procs.python_argv(cfg.TOOL_ROOT / "bin" / "sync_seen.py"),
+        procs.run(procs.python_argv(cfg.TOOL_ROOT / "bin" / "sync_seen.py"),
                        capture_output=True)
         commit(kb_dir, runtime, len(records), backend["name"], preexisting)
         log(runtime, "done")

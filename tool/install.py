@@ -233,6 +233,8 @@ def main() -> int:
 
     config = (kb / "config.json") if kb == TOOL.parent else \
         (cfg.user_config_dir() / "ai-session-skills" / "config.json")
+    if not args.kb and cfg.config_path():
+        config = cfg.config_path()
 
     print()
     print("ai-session-skills installer")
@@ -244,7 +246,8 @@ def main() -> int:
     print()
 
     if not dry:
-        (kb / ".runtime").mkdir(parents=True, exist_ok=True)
+        runtime = kb / ".runtime" if args.kb else cfg.runtime_dir()
+        runtime.mkdir(parents=True, exist_ok=True)
         ensure_gitignore(kb)
         if not cfg.IS_WINDOWS:
             for script in list((TOOL / "bin").glob("*.sh")) + list((TOOL / "bin").glob("*.py")) \

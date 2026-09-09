@@ -95,7 +95,8 @@ def main() -> int:
             warn("%s: installed but not wired (run install)" % harness)
             continue
         text = Path(target).read_text(encoding="utf-8", errors="replace")
-        if str(cfg.TOOL_ROOT) in text:
+        # JSON and JavaScript strings escape Windows backslashes.
+        if str(cfg.TOOL_ROOT).replace("\\", "/") in text.replace("\\\\", "\\").replace("\\", "/"):
             ok("%s: wired via %s" % (harness, short(target)))
         else:
             warn("%s: %s has no ai-session-skills entries (run install)"
@@ -145,6 +146,18 @@ def main() -> int:
         warn("PAUSED since %s -- resume: session.py resume" % note)
     else:
         ok("capture on")
+
+    import ide_capture
+    if ide_capture.enabled():
+        state_file = runtime / ide_capture.STATE_FILE
+        if state_file.exists():
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            if state.get("last_poll_ms"):
+                ok("IDE history fallback enabled; last poll timestamp %s" % state["last_poll_ms"])
+            else:
+                warn("IDE history fallback enabled; waiting for first poll")
+        else:
+            warn("IDE history fallback enabled; waiting for initialization")
 
     print()
     print("queue")

@@ -120,6 +120,7 @@ wc -l pending.jsonl
 
 ### List all regular files in a tree, skipping .git
 <!-- sig: 4e45776fce36 -->
+<!-- sig: 62a0228d6916 -->
 
 ```bash
 find . -path ./.git -prune -o -type f -print
@@ -129,6 +130,18 @@ find . -path ./.git -prune -o -type f -print
 - **Why:** A quick inventory of the real files in a checkout before piping to `sort`, `wc`, or an archive command.
 - **Example:** `cd <repo> && find . -path ./.git -prune -o -type f -print | sort`
 - **Notes:** Keep the explicit `-o -type f -print` to avoid printing the `.git` directory itself on some `find` implementations.
+
+### List all files and directories in the current location
+<!-- sig: 5cea075f59fa -->
+
+```bash
+dir /b /a
+```
+
+- **What it does:** Lists the names of all files and directories in the current directory, showing only the bare name (/b) and including all types of files (/a).
+- **Why:** This provides a clean, simple list of every item present, ignoring extra metadata like size or date stamps.
+- **Example:** dir /b /a on the root of the project directory.
+- **Notes:** This is the Windows equivalent of 'ls -a' but outputs only the bare names.
 
 ## Path and command availability
 
@@ -144,10 +157,43 @@ which <command> 2>/dev/null
 - **Example:** `which ollama 2>/dev/null`.
 - **Notes:** Combine with `|| echo "not found"` to make the result explicit in non-interactive output.
 
+### Display the type of a file path
+<!-- sig: 1d92893431c9 -->
+
+```bash
+type C:Userssraj.codexskillssession-skillsSKILL.md
+```
+
+- **What it does:** The type command checks the specified path and outputs information about it, treating the path as a literal string.
+- **Why:** This is used to quickly verify if a path points to a file, directory, or other recognized system object without needing to read its contents.
+- **Example:** type C:Userssraj.codexskillssession-skillsSKILL.md
+- **Notes:** This command is specific to Windows environments and is not portable to Unix-like shells.
+
+### Locate executable files in the system path
+<!-- sig: 081e1885d8e1 -->
+
+```bash
+where powershell.exe
+```
+
+- **What it does:** The where command searches the directories listed in the system's PATH environment variable for files matching the specified executable name.
+- **Why:** It provides a quick way to confirm which specific executable file is being found when a command name might be ambiguous or when you need to verify its exact location.
+- **Example:** where powershell.exe to find all instances of the PowerShell executable.
+- **Notes:** This command is specific to Windows environments and uses the system PATH variable for its search scope.
+
 ## Searching
 
 ### Find which files contain a string
 <!-- sig: 3766104d2079 -->
+<!-- sig: 973cd4561d55 -->
+<!-- sig: 82bde54e21ec -->
+<!-- sig: 1e8bbf573275 -->
+<!-- sig: 01fcc7770651 -->
+<!-- sig: 1b517f08b389 -->
+<!-- sig: 792202ff3716 -->
+<!-- sig: 1f5a23e612a7 -->
+<!-- sig: 59f992bb3ca0 -->
+<!-- sig: aad1601858a3 -->
 
 ```bash
 rg -l -e 'ENTRA_REFRESH_TOKEN'
@@ -268,6 +314,18 @@ grep -B 2 -A 2 'pattern' <file>
 - **Example:** `grep -B 2 -A 2 'class User' src/models.py`
 - **Notes:** `grep` uses basic/extended regex; use `-F` for a literal pattern. Combine `-B`/`-A` or use `-C 2` for symmetric context.
 
+### Find all occurrences of specific text patterns
+<!-- sig: cf1902996385 -->
+
+```bash
+findstr /n "/c:case \"sage\"" /c:handleSage devtrack_clientcli.go
+```
+
+- **What it does:** Searches the file devtrack_clientcli.go for lines containing both the case-insensitive string "sage" and the string "handleSage".
+- **Why:** This is used to quickly locate all instances of specific code patterns across a single source file without using a full-text search tool.
+- **Example:** findstr /n "/c:case \"sage\"" /c:handleSage devtrack_clientcli.go
+- **Notes:** The /n flag prefixes each line with its line number, and the /c: flag specifies a literal string to search for.
+
 ## Editing and transforming text
 
 ### Print a specific line range of a file
@@ -365,6 +423,18 @@ sort -rn
 - **Example:** python3 tool/bin/kb.py routes | awk '{print $2}' | sort | uniq -c | sort -rn
 - **Notes:** The '-n' flag ensures proper numeric sorting, and '-r' reverses the order so the largest numbers appear first.
 
+### Sort the output of a previous command
+<!-- sig: ac5752fc7662 -->
+
+```bash
+sort-object
+```
+
+- **What it does:** This cmdlet sorts the incoming objects from the pipeline based on the specified property or object structure.
+- **Why:** It provides structured, predictable ordering to data streams coming from other commands, which is often necessary for reliable processing.
+- **Example:** rg --files tool .runtime | Sort-Object
+- **Notes:** When used in a pipeline, it processes objects sequentially as they arrive from the preceding command.
+
 ## Files, permissions, network
 
 ### Show the last-modified time of files in a custom format
@@ -436,6 +506,18 @@ cp /tmp/recs.jsonl .runtime/pending.jsonl
 - **Why:** Used to move generated or temporary data into a structured, persistent location where the application expects to find it.
 - **Example:** `cp /tmp/recs.jsonl .runtime/pending.jsonl`
 - **Notes:** If `.runtime` does not exist, the command will fail unless `mkdir -p` was run beforehand.
+
+### Read the entire content of a markdown file
+<!-- sig: f6230d6cef29 -->
+
+```bash
+Get-Content -Raw 'C:\Users\sraj\.codex\skills\session-skills\SKILL.md'
+```
+
+- **What it does:** Reads the entire content of the specified markdown file as a single raw string.
+- **Why:** Using -Raw ensures that the entire file content is returned as one string object, which is useful for processing the whole document at once.
+- **Example:** Get-Content -Raw 'C:\Users\sraj\.codex\skills\session-skills\SKILL.md'
+- **Notes:** The -Raw switch is crucial here; without it, Get-Content would return an array of strings, one for each line.
 
 ## Processes
 
@@ -529,6 +611,26 @@ AI_SKILLS_KB=/tmp/kbtest AI_SKILLS_CAPTURE_OFF=1 timeout 900 python3 tool/bin/di
 - **Why:** Using `timeout` prevents the script from hanging indefinitely, while chaining `echo` and `cat` ensures the exit status and log output are captured in a single run.
 - **Example:** `AI_SKILLS_KB=/tmp/kbtest AI_SKILLS_CAPTURE_OFF=1 timeout 900 python3 tool/bin/distill.py; echo 'exit=$?;'; echo '=== distill.log ===;'; cat /tmp/kbtest/.runtime/distill.log`
 - **Notes:** The environment variables (`AI_SKILLS_KB`, `AI_SKILLS_CAPTURE_OFF`) are required for the script to function correctly.
+
+### Extract specific line ranges from multiple Python scripts
+<!-- sig: f1db0a767022 -->
+
+```bash
+tool\install.py;
+Get-Content tool\install.py;
+lines[130..210];
+tool\bin\capture.py;
+Get-Content tool\bin\capture.py;
+lines[195..325];
+tool\bin\cfg.py;
+Get-Content tool\bin\cfg.py;
+lines[0..180]
+```
+
+- **What it does:** This sequence executes multiple PowerShell commands to read specific line ranges from three different Python files located in the tool directory.
+- **Why:** It allows for the programmatic extraction and inspection of targeted code blocks from several related source files without needing to view the entire contents of each script.
+- **Example:** Running the full sequence to compare line 130-210 from install.py against line 0-180 from cfg.py.
+- **Notes:** The script relies on PowerShell's `Get-Content` cmdlet and array slicing syntax (`[start..end]`) to manage the line extraction.
 
 ## Linting and validation
 

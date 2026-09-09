@@ -22,12 +22,24 @@ IS_WINDOWS = os.name == "nt"
 # --------------------------------------------------------------------------- #
 # spawning
 # --------------------------------------------------------------------------- #
+def run(*args, **kwargs):
+    """Run a background helper without allocating a Windows console.
+
+    Redirecting stdout alone does not prevent console windows when our parent
+    is detached. Apply this to every child, including tasklist and git.
+    """
+    if IS_WINDOWS:
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | getattr(
+            subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    return subprocess.run(*args, **kwargs)
+
+
 def spawn_detached(argv: list[str], log: Path | None = None, cwd: Path | None = None,
                    env: dict | None = None) -> int | None:
     """Start a process that outlives this one and is never waited on.
 
     POSIX: a new session (no controlling terminal, immune to SIGHUP).
-    Windows: DETACHED_PROCESS with its own process group and no console window.
+    Windows: CREATE_NO_WINDOW with its own process group.
     """
     kwargs: dict = {"stdin": subprocess.DEVNULL, "cwd": str(cwd) if cwd else None}
     if env:
@@ -47,7 +59,8 @@ def spawn_detached(argv: list[str], log: Path | None = None, cwd: Path | None = 
 
         if IS_WINDOWS:
             flags = 0
-            for name in ("DETACHED_PROCESS", "CREATE_NEW_PROCESS_GROUP", "CREATE_NO_WINDOW"):
+            # CREATE_NO_WINDOW is ignored when combined with DETACHED_PROCESS.
+            for name in ("CREATE_NEW_PROCESS_GROUP", "CREATE_NO_WINDOW"):
                 flags |= getattr(subprocess, name, 0)
             kwargs["creationflags"] = flags
         else:
@@ -75,8 +88,10 @@ def pid_alive(pid: int) -> bool:
         return False
     if IS_WINDOWS:
         try:
-            out = subprocess.run(["tasklist", "/FI", "PID eq %d" % pid, "/NH"],
+            out = run(["tasklist", "/FI", "PID eq %d" % pid, "/NH"],
                                  capture_output=True, text=True, timeout=10)
+            if out.returncode != 0:
+                return True  # restricted process visibility is not proof of death
             return str(pid) in (out.stdout or "")
         except Exception:
             return True    # can't tell; assume alive rather than double-spawn
@@ -119,11 +134,16 @@ def watcher_alive(runtime: Path, poll_seconds: int = 45) -> bool:
 def terminate(pid: int) -> bool:
     try:
         if IS_WINDOWS:
-            subprocess.run(["taskkill", "/PID", str(pid), "/F"],
-                           capture_output=True, timeout=15)
+            done = run(["taskkill", "/PID", str(pid), "/F"],
+                                  capture_output=True, timeout=15)
+            if done.returncode != 0:
+                return not pid_alive(pid)
         else:
             os.kill(pid, signal.SIGTERM)
-        return True
+        deadline = time.monotonic() + 5
+        while pid_alive(pid) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        return not pid_alive(pid)
     except Exception:
         return False
 

@@ -15,9 +15,11 @@ commands never leave the machine. The engine lives in
 
 ```
 ai_session_skills/
-├── git.md, shell.md, docker.md, ...  # the knowledge (this is the point)
+├── knowledge/                        # finished documentation and topic index
+│   ├── README.md                     # browse topics
+│   ├── git.md, shell.md, docker.md, ...
+│   └── .routes.json                  # learned binary -> file decisions
 ├── config.json                       # knobs: model, mode, timing, writer order
-├── .routes.json                      # learned binary -> file decisions
 ├── .runtime/                         # queue, dedupe cache, logs (gitignored)
 └── tool/                             # portable engine — see tool/README.md
     ├── install.py   + .sh / .ps1 shims
@@ -63,13 +65,29 @@ Re-running the installer is safe and never duplicates entries. See
 uninstall, and the per-platform path table.
 
 > **Status:** verified end-to-end on macOS and Fedora 44 (117 unit tests + 55
-> smoke checks). Windows is implemented with no POSIX-only calls and its path
-> layout is unit-tested, but it has not yet run on real Windows hardware — run
-> `doctor.py` after installing there.
+> smoke checks). Windows was verified on September 9, 2026: 119 unit tests
+> and a real Windows-hook → watcher → Ollama → documentation smoke check passed.
+> Run `doctor.py` after installing.
 
 ---
 
 ## Daily use
+
+Browse the [knowledge index](knowledge/README.md), or search complete entries:
+
+```powershell
+python tool/bin/search.py git branch
+python tool/bin/search.py "connection" --topic postgresql --full
+```
+
+All keywords must match. Headings and commands rank above matches in prose.
+In VS Code, use **Ctrl+Shift+F** with **Files to include: `knowledge/**/*.md`**.
+New topics are written to `knowledge/` and added to its index automatically.
+
+VS Code command capture also uses a local history fallback when IDE hooks
+do not fire. Look for `codex-ide` in `.runtime/session.log`; commands normally
+appear after the next watcher poll (45 seconds). See the
+[IDE capture details](tool/README.md#vs-code-command-capture).
 
 Ask any installed agent a CLI question and the `session-skills` skill points it
 here, so you get *your* verified workflow back rather than generic advice.
@@ -81,7 +99,8 @@ python3 tool/bin/session.py status # running? how much is queued?
 python3 tool/bin/doctor.py         # is everything wired and healthy?
 ```
 
-On Windows use `py -3` in place of `python3`.
+On Windows use `py -3` in place of `python3`. If the `py` launcher is absent,
+use `python` (Python 3), which works on the verified Windows installation.
 
 ### Is it actually working?
 
@@ -128,18 +147,18 @@ touched.
 
 | File | Covers |
 |---|---|
-| [`git.md`](git.md) | Git |
-| [`github-cli.md`](github-cli.md) | GitHub CLI (`gh`) |
-| [`shell.md`](shell.md) | Shell and file tools |
-| [`node.md`](node.md) | Node, npm and TypeScript |
-| [`python.md`](python.md) | Python |
-| [`docker.md`](docker.md) | Docker |
-| [`kubernetes.md`](kubernetes.md) | Kubernetes |
-| [`postgresql.md`](postgresql.md) | PostgreSQL |
-| [`systemd.md`](systemd.md) | System services |
-| [`brew.md`](brew.md) | Homebrew |
-| [`ollama.md`](ollama.md) | Ollama |
-| [`agent-tools.md`](agent-tools.md) | Agent-native tools and their CLI equivalents |
+| [`git.md`](knowledge/git.md) | Git |
+| [`github-cli.md`](knowledge/github-cli.md) | GitHub CLI (`gh`) |
+| [`shell.md`](knowledge/shell.md) | Shell and file tools |
+| [`node.md`](knowledge/node.md) | Node, npm and TypeScript |
+| [`python.md`](knowledge/python.md) | Python |
+| [`docker.md`](knowledge/docker.md) | Docker |
+| [`kubernetes.md`](knowledge/kubernetes.md) | Kubernetes |
+| [`postgresql.md`](knowledge/postgresql.md) | PostgreSQL |
+| [`systemd.md`](knowledge/systemd.md) | System services |
+| [`brew.md`](knowledge/brew.md) | Homebrew |
+| [`ollama.md`](knowledge/ollama.md) | Ollama |
+| [`agent-tools.md`](knowledge/agent-tools.md) | Agent-native tools and their CLI equivalents |
 
 191 actions documented so far. `_skipped.md` records anything the writer judged
 not worth documenting, with a reason. `python3 tool/bin/doctor.py` prints the

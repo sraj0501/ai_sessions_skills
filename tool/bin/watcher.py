@@ -19,6 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cfg      # noqa: E402
 import procs    # noqa: E402
+import ide_capture
 
 
 def log(runtime: Path, message: str) -> None:
@@ -65,7 +66,7 @@ def main() -> int:
                              runtime / "flush")
     log(runtime, "watcher up (pid %s, kb %s, poll %ds, quiet %ds, batch_max %d, idle_exit %ds)"
         % (pidfile.read_text().strip(), cfg.kb_dir(), poll, quiet, batch_max, idle_exit))
-    subprocess.run(procs.python_argv(cfg.TOOL_ROOT / "bin" / "sync_seen.py"),
+    procs.run(procs.python_argv(cfg.TOOL_ROOT / "bin" / "sync_seen.py"),
                    capture_output=True)
 
     try:
@@ -76,6 +77,12 @@ def main() -> int:
             if cfg.is_paused():
                 log(runtime, "paused; shutting down")
                 return 0
+
+            if ide_capture.enabled():
+                try:
+                    ide_capture.poll(runtime)
+                except Exception as exc:
+                    log(runtime, "IDE capture failed: %s" % exc)
 
             queued = count_lines(pending)
             retry = batch.exists() and batch.stat().st_size > 0
@@ -94,13 +101,13 @@ def main() -> int:
 
             if reason:
                 log(runtime, "distilling: " + reason)
-                subprocess.run(procs.python_argv(cfg.TOOL_ROOT / "bin" / "distill.py"),
+                procs.run(procs.python_argv(cfg.TOOL_ROOT / "bin" / "distill.py"),
                                capture_output=True)
                 continue
 
             if not queued and not retry:
                 idle = age(runtime / "heartbeat")
-                if idle >= idle_exit:
+                if idle >= idle_exit and not ide_capture.enabled():
                     log(runtime, "idle for %ds, shutting down" % int(idle))
                     return 0
     finally:

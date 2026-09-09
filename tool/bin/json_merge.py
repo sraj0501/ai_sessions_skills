@@ -34,7 +34,7 @@ def purge(node, markers: list[str]):
         kept = []
         for item in node:
             blob = json.dumps(item)
-            if any(m and m in blob for m in markers):
+            if any(m and json.dumps(m)[1:-1] in blob for m in markers):
                 continue
             kept.append(purge(item, markers))
         return kept

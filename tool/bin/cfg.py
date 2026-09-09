@@ -317,6 +317,12 @@ def kb_dir() -> Path:
 
 
 def runtime_dir() -> Path:
+    # Explicit KB overrides remain self-contained (tests and alternate KBs).
+    if not os.environ.get("AI_SKILLS_KB"):
+        setting = get("runtime_dir")
+        if setting:
+            path = config_path()
+            return ((path.parent if path else TOOL_ROOT) / str(setting)).resolve()
     return kb_dir() / ".runtime"
 
 
