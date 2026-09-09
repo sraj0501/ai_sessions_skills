@@ -81,6 +81,27 @@ def write_skill(dest: Path, style: str, kb: Path, dry: bool) -> str:
     return "wrote %s" % dest
 
 
+IGNORE_LINES = (".runtime/", ".DS_Store", "__pycache__/", "*.pyc")
+
+
+def ensure_gitignore(kb: Path) -> None:
+    """Keep the capture queue out of git.
+
+    `.runtime/pending.jsonl` holds raw command lines, which can contain
+    credentials, so a knowledge base created from scratch must not track it.
+    Only missing lines are appended; an existing file is left otherwise alone.
+    """
+    path = kb / ".gitignore"
+    existing = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    have = {line.strip() for line in existing}
+    missing = [line for line in IGNORE_LINES if line not in have]
+    if not missing:
+        return
+    body = "\n".join(existing + missing).strip() + "\n"
+    path.write_text(body, encoding="utf-8")
+    print("  wrote %s (%s)" % (path, ", ".join(missing)))
+
+
 def enable_codex_hooks(toml: Path, dry: bool) -> str | None:
     """Codex only evaluates hooks when the feature flag is on."""
     if not toml.is_file():
@@ -224,6 +245,7 @@ def main() -> int:
 
     if not dry:
         (kb / ".runtime").mkdir(parents=True, exist_ok=True)
+        ensure_gitignore(kb)
         if not cfg.IS_WINDOWS:
             for script in list((TOOL / "bin").glob("*.sh")) + list((TOOL / "bin").glob("*.py")) \
                     + list(TOOL.glob("*.sh")) + list(TOOL.glob("*.py")):

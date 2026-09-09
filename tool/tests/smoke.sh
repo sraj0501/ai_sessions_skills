@@ -191,6 +191,35 @@ else
 fi
 unset AI_SKILLS_CONFIG
 
+# ------------------------------------------------------------ activity ----- #
+echo
+echo "activity log"
+has "$KB/.runtime/session.log" "new" && pass "log records new actions" \
+                                     || fail "log records new actions"
+has "$KB/.runtime/session.log" "known" && pass "log records deduped actions" \
+                                       || fail "log records deduped actions"
+"$PY" "$TOOL/bin/log.py" --stats >"$SANDBOX/log.out" 2>&1
+has "$SANDBOX/log.out" "captured" && pass "log viewer summarises" \
+                                  || { fail "log viewer summarises"; cat "$SANDBOX/log.out"; }
+
+# ------------------------------------------------------- pause / resume ---- #
+echo
+echo "pause switch"
+"$PY" "$TOOL/bin/session.py" pause "smoke" >/dev/null 2>&1
+"$PY" "$TOOL/bin/session.py" status 2>&1 | grep -q PAUSED \
+  && pass "status reports paused" || fail "status reports paused"
+feed devin '{"tool_name":"exec","tool_input":{"command":"lsblk --json"},"tool_response":{"success":true}}'
+[ "$(queued)" = 0 ] && pass "capture is off while paused" \
+                    || fail "capture is off while paused (got $(queued))"
+"$PY" "$TOOL/bin/distill.py" >/dev/null 2>&1
+has "$KB/.runtime/distill.log" "paused" && pass "writer refuses to run while paused" \
+                                        || fail "writer refuses to run while paused"
+"$PY" "$TOOL/bin/session.py" resume >/dev/null 2>&1
+"$PY" "$TOOL/bin/session.py" status 2>&1 | grep -q "capture   on" \
+  && pass "status reports resumed" || fail "status reports resumed"
+feed devin '{"tool_name":"exec","tool_input":{"command":"lsblk --json"},"tool_response":{"success":true}}'
+[ "$(queued)" = 1 ] && pass "capture resumes" || fail "capture resumes (got $(queued))"
+
 # -------------------------------------------------------------- doctor ----- #
 echo
 echo "doctor"

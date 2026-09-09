@@ -695,6 +695,99 @@ class TestSectionCanonicalisation(unittest.TestCase):
         self.assertEqual(kb.canonical_section("", []), kb.DEFAULT_SECTION)
 
 
+class TestPauseSwitchAndLog(unittest.TestCase):
+    """The user-facing on/off switch and the activity log."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.kb = Path(self.tmp.name)
+        self.real_runtime = cfg.runtime_dir
+        cfg.runtime_dir = lambda: self.kb / ".runtime"
+
+    def tearDown(self):
+        cfg.runtime_dir = self.real_runtime
+        os.environ.pop("AI_SKILLS_CAPTURE_OFF", None)
+        self.tmp.cleanup()
+
+    def log_text(self):
+        path = cfg.runtime_dir() / cfg.SESSION_LOG
+        return path.read_text(encoding="utf-8") if path.exists() else ""
+
+    def test_pause_is_persistent_and_reversible(self):
+        self.assertFalse(cfg.is_paused())
+        cfg.set_paused(True, "testing")
+        self.assertTrue(cfg.is_paused())
+        self.assertIn("testing", (cfg.runtime_dir() / cfg.PAUSE_FILE).read_text())
+        cfg.set_paused(False)
+        self.assertFalse(cfg.is_paused())
+
+    def test_resume_when_not_paused_is_harmless(self):
+        cfg.set_paused(False)
+        self.assertFalse(cfg.is_paused())
+
+    def test_env_switch_is_process_local(self):
+        """AI_SKILLS_CAPTURE_OFF stops this shell without pausing globally."""
+        os.environ["AI_SKILLS_CAPTURE_OFF"] = "1"
+        self.assertTrue(cfg.capture_off())
+        self.assertFalse(cfg.is_paused(), "one shell must not pause every harness")
+
+    def test_paused_stops_capture(self):
+        cfg.set_paused(True)
+        self.assertTrue(cfg.capture_off())
+
+    def test_log_records_a_decision_per_line(self):
+        cfg.session_log("new", "abc123abc123", "git", "git status --short", "devin")
+        cfg.session_log("known", "abc123abc123", "git", "git status --short", "devin")
+        lines = self.log_text().strip().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertIn("new", lines[0])
+        self.assertIn("known", lines[1])
+        self.assertIn("git status --short", lines[0])
+
+    def test_log_flattens_newlines_so_one_action_is_one_line(self):
+        cfg.session_log("new", "abc123abc123", "sh", "line one\nline two", "devin")
+        self.assertEqual(len(self.log_text().strip().splitlines()), 1)
+
+    def test_log_never_raises(self):
+        """It runs inside the agent tool loop; failure must be silent."""
+        cfg.runtime_dir = lambda: Path("/definitely/not/writable/xyz")
+        cfg.session_log("new", "x", "y", "z")     # must not raise
+
+    def test_enqueue_logs_new_then_known(self):
+        record = {"sig": "aabbccddeeff", "binary": "git", "command": "git status",
+                  "harness": "devin", "kind": "shell", "tool": "exec"}
+        self.assertEqual(capture.enqueue([dict(record)]), 1)
+        self.assertEqual(capture.enqueue([dict(record)]), 0, "second time is a duplicate")
+        text = self.log_text()
+        self.assertIn("new", text)
+        self.assertIn("known", text)
+
+    def test_new_knowledge_base_never_tracks_the_queue(self):
+        """pending.jsonl holds raw commands, so git must not pick it up."""
+        sys.path.insert(0, str(BIN.parent))
+        import install
+        install.ensure_gitignore(self.kb)
+        body = (self.kb / ".gitignore").read_text()
+        self.assertIn(".runtime/", body)
+
+    def test_existing_gitignore_is_extended_not_replaced(self):
+        sys.path.insert(0, str(BIN.parent))
+        import install
+        (self.kb / ".gitignore").write_text("secrets.env\n", encoding="utf-8")
+        install.ensure_gitignore(self.kb)
+        body = (self.kb / ".gitignore").read_text()
+        self.assertIn("secrets.env", body)
+        self.assertIn(".runtime/", body)
+        install.ensure_gitignore(self.kb)          # idempotent
+        self.assertEqual(body, (self.kb / ".gitignore").read_text())
+
+    def test_repeat_within_one_command_line_is_marked(self):
+        record = {"sig": "112233445566", "binary": "tail", "command": "tail -5",
+                  "harness": "devin", "kind": "shell", "tool": "exec"}
+        capture.enqueue([dict(record), dict(record)])
+        self.assertIn("repeat", self.log_text())
+
+
 class TestHttpBackend(unittest.TestCase):
     """Regressions from wiring up local models."""
 

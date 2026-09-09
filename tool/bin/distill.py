@@ -344,6 +344,10 @@ def distill_text(kb_dir: Path, runtime: Path, records: list[dict], backend: dict
             log(runtime, "record %s errored: %s" % (record.get("sig"), exc))
             outcome = "failed"
         tally[outcome] += 1
+        cfg.session_log({"new": "documented", "merged": "merged",
+                         "skipped": "not-useful", "failed": "write-fail"}[outcome],
+                        record.get("sig", ""), record.get("binary", ""),
+                        record.get("command", ""), "writer")
         if outcome == "failed":
             failed.append(record)
         else:
@@ -441,6 +445,10 @@ def main() -> int:
     timeout = int(cfg.get("distill.timeout_seconds", 900) or 900)
     max_attempts = int(cfg.get("distill.max_attempts", 3) or 3)
     max_records = int(cfg.get("distill.max_batch_records", 40) or 40)
+
+    if cfg.is_paused():
+        log(runtime, "paused; not writing (resume with session.py resume)")
+        return 0
 
     mode = "text" if str(cfg.get("writer.mode", "text")).lower() == "text" else "agent"
     backend = cfg.writer_backend(mode)

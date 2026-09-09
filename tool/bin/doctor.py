@@ -139,6 +139,14 @@ def main() -> int:
             % (mode, "_text" if mode == "text" else ""))
 
     print()
+    print("capture switch")
+    if cfg.is_paused():
+        note = (runtime / cfg.PAUSE_FILE).read_text(encoding="utf-8").strip()
+        warn("PAUSED since %s -- resume: session.py resume" % note)
+    else:
+        ok("capture on")
+
+    print()
     print("queue")
     pending = runtime / "pending.jsonl"
     before = sum(1 for _ in pending.open("rb")) if pending.exists() else 0

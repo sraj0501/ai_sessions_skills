@@ -388,7 +388,12 @@ def enqueue(records: list[dict]) -> int:
     seen = load_seen(seen_file)
     fresh, sigs = [], set()
     for rec in records:
-        if rec["sig"] in seen or rec["sig"] in sigs:
+        # "known" means this exact action is already documented or queued, so
+        # nothing is lost by dropping it -- that is the dedupe doing its job.
+        decision = "known" if rec["sig"] in seen else ("repeat" if rec["sig"] in sigs else "new")
+        cfg.session_log(decision, rec["sig"], rec.get("binary", ""),
+                        rec.get("command", ""), rec.get("harness", ""))
+        if decision != "new":
             continue
         sigs.add(rec["sig"])
         fresh.append(rec)
@@ -399,6 +404,8 @@ def enqueue(records: list[dict]) -> int:
     try:
         with pending.open("rb") as fh:
             if sum(1 for _ in fh) >= cap:
+                cfg.session_log("full", detail="queue at cap (%d); dropped %d record(s)"
+                                % (cap, len(fresh)))
                 return 0
     except FileNotFoundError:
         pass
@@ -440,7 +447,9 @@ def main() -> int:
         return 0
 
     # Recursion guard: the writer is itself an agent session.
-    if os.environ.get("AI_SKILLS_DISTILLER") or os.environ.get("AI_SKILLS_CAPTURE_OFF"):
+    if os.environ.get("AI_SKILLS_DISTILLER"):
+        return 0
+    if cfg.capture_off():
         return 0
 
     if opts["command"]:
@@ -451,7 +460,15 @@ def main() -> int:
         if isinstance(payload, list) and payload:
             payload = payload[0]
 
-    added = enqueue(records_from_payload(payload, opts["harness"]))
+    records = records_from_payload(payload, opts["harness"])
+    if not records:
+        # Worth logging: it answers "why was that command not captured?".
+        attempted = _first(_as_dict(_first(payload, TOOL_INPUT_KEYS)) or payload,
+                           COMMAND_KEYS)
+        if attempted:
+            cfg.session_log("ignored", detail=str(attempted)[:160],
+                            harness=opts["harness"])
+    added = enqueue(records)
     if opts["verbose"]:
         print("captured %d new action(s)" % added)
     return 0

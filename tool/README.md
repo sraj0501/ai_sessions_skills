@@ -216,6 +216,51 @@ on Windows). Resolution order: `$AI_SKILLS_CONFIG` → user config →
 | `writer.prefer` | devin, claude, codex, copilot, opencode, cursor-agent | Agent backend order |
 | `writer.backends.<name>` | see `bin/cfg.py` | `bin`, `model`, `args`, `prompt` |
 
+## Watching it work, and switching it off
+
+```bash
+python3 tool/bin/log.py              # recent decisions + a summary
+python3 tool/bin/log.py --follow     # live, while you work
+python3 tool/bin/log.py --today --stats
+
+python3 tool/bin/session.py status   # on/off, queue depth, watcher
+python3 tool/bin/session.py pause "reviewing a client repo"
+python3 tool/bin/session.py resume
+```
+
+`.runtime/session.log` gets one line per decision:
+
+```
+2026-09-09 19:18:10  manual   known      07b5548da62f git          git status --short --branch
+2026-09-09 19:18:10  manual   new        181660d9b102 terraform    terraform apply -auto-approve
+```
+
+| Decision | Meaning |
+|---|---|
+| `new` | A distinct action, queued for documentation |
+| `known` | Already documented or queued — dropped by the dedupe |
+| `repeat` | The same action twice in one command line |
+| `ignored` | Nothing documentable parsed out |
+| `full` | Queue at its cap; records dropped |
+| `documented` / `merged` | The writer added an entry, or folded it onto one |
+| `not-useful` | Judged not worth an entry (see `_skipped.md`) |
+| `write-fail` | Model unreachable; the batch retries |
+
+A high `known` count means the dedupe is working, not that capture is broken.
+The log is trimmed to the last 4000 lines automatically.
+
+**Three off switches**, smallest scope first:
+
+| Scope | How | Reversible |
+|---|---|---|
+| One command or shell | `AI_SKILLS_CAPTURE_OFF=1 <cmd>` | ends with the process |
+| Everywhere | `session.py pause [reason]` | `session.py resume` |
+| Permanently | `uninstall.py` | re-run `install.py` |
+
+`pause` writes `.runtime/paused`, so it survives restarts and applies to every
+harness at once. It stops capture, refuses to run the writer, and shuts the
+watcher down. Records already queued stay queued and are written after resume.
+
 ## Writer modes
 
 **`text` (default) — works with a local model.** Python owns the knowledge

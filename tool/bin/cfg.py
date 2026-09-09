@@ -29,6 +29,7 @@ import json
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 from typing import Callable, Mapping
 
@@ -317,6 +318,67 @@ def kb_dir() -> Path:
 
 def runtime_dir() -> Path:
     return kb_dir() / ".runtime"
+
+
+# --------------------------------------------------------------------------- #
+# pause switch and session log
+# --------------------------------------------------------------------------- #
+PAUSE_FILE = "paused"
+SESSION_LOG = "session.log"
+LOG_KEEP_LINES = 4000
+
+
+def is_paused() -> bool:
+    """Capture and writing are off. Persistent, and shared by every harness."""
+    return (runtime_dir() / PAUSE_FILE).exists()
+
+
+def capture_off() -> bool:
+    """Paused globally, or switched off for this process tree only."""
+    return bool(os.environ.get("AI_SKILLS_CAPTURE_OFF")) or is_paused()
+
+
+def set_paused(paused: bool, reason: str = "") -> None:
+    marker = runtime_dir() / PAUSE_FILE
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    if paused:
+        marker.write_text("%s %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), reason),
+                          encoding="utf-8")
+    else:
+        marker.unlink(missing_ok=True)
+
+
+def session_log(decision: str, sig: str = "", binary: str = "", detail: str = "",
+                harness: str = "") -> None:
+    """One line per decision, so the pipeline can be watched working.
+
+    Never raises: this runs inside the agent's tool loop.
+    """
+    try:
+        runtime = runtime_dir()
+        runtime.mkdir(parents=True, exist_ok=True)
+        path = runtime / SESSION_LOG
+        line = "%s  %-8s %-10s %-12s %-12s %s\n" % (
+            time.strftime("%Y-%m-%d %H:%M:%S"), (harness or "-")[:8], decision[:10],
+            (sig or "-")[:12], (binary or "-")[:12],
+            " ".join(str(detail).split())[:160])
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(line)
+        _trim_log(path)
+    except Exception:
+        pass
+
+
+def _trim_log(path: Path) -> None:
+    """Keep the log bounded without needing a cron job."""
+    try:
+        if path.stat().st_size < 512 * 1024:
+            return
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines(True)
+        if len(lines) > LOG_KEEP_LINES:
+            path.write_text("".join(lines[-LOG_KEEP_LINES:]), encoding="utf-8")
+    except Exception:
+        pass
 
 
 def get(dotted: str, default=None):

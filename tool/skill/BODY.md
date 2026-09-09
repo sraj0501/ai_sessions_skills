@@ -34,6 +34,12 @@ Everything is Python, so the same commands work on macOS, Linux and Windows
 
 | Intent | Command |
 |---|---|
+| **Is it working? what was captured?** | `python3 $TOOL/bin/log.py` |
+| Live view while working | `python3 $TOOL/bin/log.py --follow` |
+| Today only / summary only | `python3 $TOOL/bin/log.py --today` / `--stats` |
+| **Turn capture off** | `python3 $TOOL/bin/session.py pause [reason]` |
+| **Turn it back on** | `python3 $TOOL/bin/session.py resume` |
+| On or off right now? | `python3 $TOOL/bin/session.py status` |
 | Health check of the whole setup | `python3 $TOOL/bin/doctor.py` |
 | What is captured but not yet documented | `cat $KB/.runtime/pending.jsonl` |
 | Write the queue up now (don't wait) | `python3 $TOOL/bin/distill.py` |
@@ -81,10 +87,38 @@ is wrong").
 - Run `python3 $TOOL/bin/sync_seen.py` after hand-editing, then commit in
   `$KB`. Do not push; `auto_push` is deliberately off.
 
-## Pausing capture
+## Watching it work
 
-- One command or one shell: prefix `AI_SKILLS_CAPTURE_OFF=1` (PowerShell:
-  `$env:AI_SKILLS_CAPTURE_OFF=1`).
-- Everywhere: `python3 $TOOL/uninstall.py` (removes hooks, keeps the knowledge).
-- Change model, batch size, timing or writer order: `$KB/config.json`.
-- Use a different local model: `writer.text_backends.ollama.model`.
+`log.py` prints one line per decision, so "is this actually doing anything?"
+has an answer. The decisions are:
+
+| Decision | Meaning |
+|---|---|
+| `new` | A distinct action, queued for documentation |
+| `known` | Already documented or queued — dropped by the dedupe |
+| `repeat` | The same action twice in one command line |
+| `ignored` | Nothing documentable parsed out (trivial binary, odd payload) |
+| `full` | The queue hit its cap and records were dropped |
+| `documented` | The writer added a new entry |
+| `merged` | Folded onto an existing entry as a variant |
+| `not-useful` | The writer judged it not worth an entry (see `_skipped.md`) |
+| `write-fail` | The model was unreachable; the batch will retry |
+
+A high `known` count is the system working, not failing — it means the action
+is already in the knowledge base.
+
+## Turning it off
+
+Three scopes, smallest first:
+
+- **One command or one shell:** prefix `AI_SKILLS_CAPTURE_OFF=1` (PowerShell:
+  `$env:AI_SKILLS_CAPTURE_OFF=1`). Affects only that process tree.
+- **Everywhere, reversibly:** `python3 $TOOL/bin/session.py pause "reason"`.
+  Persistent across restarts and shared by every harness: it stops capture,
+  stops the writer and shuts the watcher down. Undo with `session.py resume`.
+  Anything already queued stays queued and is written after resuming.
+- **Everywhere, permanently:** `python3 $TOOL/uninstall.py` removes the hooks
+  and keeps the knowledge.
+
+Other settings live in `$KB/config.json`: model, batch size, timings, writer
+order, and `writer.text_backends.ollama.model` for a different local model.

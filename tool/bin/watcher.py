@@ -51,6 +51,8 @@ def main() -> int:
     batch_max = int(cfg.get("watcher.batch_max", 20) or 20)
     idle_exit = int(cfg.get("watcher.idle_exit_seconds", 900) or 900)
 
+    if cfg.is_paused():
+        return 0
     if procs.watcher_alive(runtime, poll):
         return 0                                   # another watcher owns this KB
 
@@ -70,6 +72,10 @@ def main() -> int:
         while True:
             time.sleep(poll)
             alive.touch()
+
+            if cfg.is_paused():
+                log(runtime, "paused; shutting down")
+                return 0
 
             queued = count_lines(pending)
             retry = batch.exists() and batch.stat().st_size > 0
