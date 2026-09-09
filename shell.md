@@ -42,6 +42,7 @@ cat config.json
 <!-- sig: d9db06bd8076 -->
 <!-- sig: 0926e1fcbe08 -->
 <!-- sig: d64a43183ffe -->
+<!-- sig: 0f8ca7ee894b -->
 
 ```bash
 head -n 30 package.json
@@ -49,7 +50,7 @@ head -n 30 package.json
 
 - **What it does:** Prints the first 30 lines and stops.
 - **Why:** Caps output when piping something long (`... | head -30`), which keeps command output readable and cheap.
-- **Variants:** `head -1` (or `head -n 1`) keeps a single line, handy for extracting a branch name or one value from a pipe such as `git status -sb | head -1`.
+- **Variants:** `head -1` (or `head -n 1`) keeps a single line, handy for extracting a branch name or one value from a pipe such as `git status -sb | head -1`; `head` with no arguments is equivalent to `head -n 10` and is the shortest way to cap a pipeline.
 
 ### Read the last N lines of a file or pipe
 <!-- sig: d85d1c71612e -->
@@ -199,6 +200,7 @@ find . -name '*.sql'
 
 ### Count matching lines in a queue and pretty-print the most recent record
 <!-- sig: ed504be81133 -->
+<!-- sig: ae5ce0e27d7a -->
 
 ```bash
 grep -c <pattern> <queue-file> 2>/dev/null
@@ -208,7 +210,20 @@ tail -n 1 <queue-file> | python3 -m json.tool
 - **What it does:** `grep -c` returns the number of lines matching `<pattern>` in the queue file; `tail -n 1` extracts the last queued record and `python3 -m json.tool` formats it as readable JSON.
 - **Why:** A quick sanity check when verifying a captured event landed in the queue and inspecting the latest entry.
 - **Example:** `grep -c cargo .runtime/pending.jsonl 2>/dev/null; tail -n 1 .runtime/pending.jsonl | python3 -m json.tool`.
+- **Variants:** `grep -c 'sig:' git.md` counts the dedupe-signature lines in a knowledge-base file.
 - **Notes:** `2>/dev/null` on the first command keeps a missing queue file from producing an error; `python3 -m json.tool` fails if the last line is not valid JSON.
+
+### Show matching lines with context using grep
+<!-- sig: 14443ee0d76a -->
+
+```bash
+grep -B 2 -A 2 'pattern' <file>
+```
+
+- **What it does:** Prints each matching line of `<file>` plus 2 lines before (`-B`) and 2 lines after (`-A`).
+- **Why:** Quick context view in a single known file, without ripgrep's `.gitignore` handling or opening an editor.
+- **Example:** `grep -B 2 -A 2 'class User' src/models.py`
+- **Notes:** `grep` uses basic/extended regex; use `-F` for a literal pattern. Combine `-B`/`-A` or use `-C 2` for symmetric context.
 
 ## Editing and transforming text
 

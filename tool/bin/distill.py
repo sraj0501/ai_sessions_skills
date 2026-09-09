@@ -100,6 +100,140 @@ def run_backend(backend: dict, prompt: Path, kb: Path, timeout: int, runtime: Pa
     return done.returncode
 
 
+# --------------------------------------------------------------------------- #
+# text mode: Python owns the knowledge base, the model only writes prose
+# --------------------------------------------------------------------------- #
+FENCE_ONLY = re.compile(r"^```[a-zA-Z]*\s*$")
+SKIP_RE = re.compile(r"^\s*SKIP\s*:\s*(.+)$", re.MULTILINE)
+SECTION_LINE = re.compile(r"^\s*SECTION\s*:\s*(.+)$", re.MULTILINE)
+
+
+def entry_prompt(record: dict) -> str:
+    template = (cfg.TOOL_ROOT / "prompts" / "ENTRY_PROMPT.md").read_text(encoding="utf-8")
+    lines = [template, "\n## Now document this command\n",
+             "Command: `%s`" % record.get("command", "")]
+    subcmds = record.get("subcommands") or []
+    lines.append("Binary: `%s`%s" % (record.get("binary", ""),
+                                     (", subcommands: `%s`" % " ".join(subcmds)) if subcmds else ""))
+    full = record.get("full_command") or ""
+    if full and full != record.get("command"):
+        lines.append("It was part of this command line: `%s`" % full)
+    if record.get("ok") is False:
+        lines.append("This command FAILED when it was run. Document it anyway and "
+                     "note the likely failure mode.")
+    lines.append("\nOutput the entry now, starting with the SECTION: line.")
+    return "\n".join(lines)
+
+
+def run_text(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | None:
+    """One text-in/text-out generation. No tools, no file access, no cwd needs."""
+    argv = [backend["bin"]] + [a.replace("{prompt_text}", prompt) for a in backend["args"]]
+    env = dict(os.environ)
+    env.update({"AI_SKILLS_DISTILLER": "1", "AI_SKILLS_CAPTURE_OFF": "1"})
+    stdin_data = prompt if backend.get("prompt") == "stdin" else None
+    try:
+        done = subprocess.run(argv, env=env, timeout=timeout, input=stdin_data,
+                              capture_output=True, text=True)
+    except subprocess.TimeoutExpired:
+        log(runtime, "model timed out after %ds" % timeout)
+        return None
+    except FileNotFoundError:
+        log(runtime, "model binary vanished: %s" % backend["bin"])
+        return None
+    if done.returncode != 0:
+        err = "\n".join((done.stderr or "").strip().splitlines()[-2:])
+        log(runtime, "model exited %d: %s" % (done.returncode, err.replace("\n", " | ")))
+        return None
+    return done.stdout
+
+
+def parse_entry(text: str) -> tuple[str, str] | tuple[None, str]:
+    """Model output -> (section, entry markdown), or (None, skip reason).
+
+    Tolerates the things small models do: wrapping the whole answer in a code
+    fence, emitting a sig comment, adding chatter before the heading.
+    """
+    body = (text or "").strip()
+    if not body:
+        return None, "empty response"
+
+    lines = body.splitlines()
+    if lines and FENCE_ONLY.match(lines[0]):           # whole answer fenced
+        closing = next((i for i in range(len(lines) - 1, 0, -1)
+                        if lines[i].strip() == "```"), None)
+        if closing:
+            lines = lines[1:closing]
+
+    heading_at = next((i for i, line in enumerate(lines) if line.startswith("### ")), None)
+    if heading_at is None:
+        found = SKIP_RE.search(body)
+        return None, (found.group(1).strip() if found else "no entry heading in response")
+
+    section = "Other"
+    found = SECTION_LINE.search("\n".join(lines[:heading_at]) or "")
+    if found:
+        section = found.group(1).strip().strip("<>").strip()
+
+    kept = [line for line in lines[heading_at:] if not kb.SIG_RE.search(line)]
+    entry = "\n".join(kept).strip()
+    if "```" not in entry:
+        return None, "response had no command block"
+    return section, entry
+
+
+def document_record(kb_dir: Path, runtime: Path, record: dict, backend: dict,
+                    timeout: int) -> str:
+    """Place one record into the knowledge base. Returns what happened."""
+    sig = record.get("sig") or ""
+    binary = str(record.get("binary") or "")
+    subcmds = list(record.get("subcommands") or [])
+
+    filename, title = kb.route(record)
+    path = kb_dir / filename
+    is_new_file = not path.exists()
+
+    if not is_new_file:
+        existing = kb.parse(path.read_text(encoding="utf-8", errors="replace"))
+        match = kb.find_match(existing, binary, subcmds)
+        if match:
+            kb.add_sig(path, sig, match.heading)
+            return "merged"
+
+    section, entry = parse_entry(run_text(backend, entry_prompt(record), timeout, runtime))
+    if section is None:
+        kb.note_skipped(kb_dir, sig, record.get("command", ""), entry)
+        return "skipped"
+
+    head, rest = entry.split("\n", 1) if "\n" in entry else (entry, "")
+    kb.insert_entry(path, title, section, "%s\n<!-- sig: %s -->\n%s" % (head, sig, rest))
+    if is_new_file:
+        kb.ensure_readme_row(kb_dir, filename, title)
+    return "new"
+
+
+def distill_text(kb_dir: Path, runtime: Path, records: list[dict], backend: dict,
+                 timeout: int) -> tuple[int, list[dict]]:
+    """Document every record. Returns (documented count, records still missing)."""
+    done_sigs = kb.documented_sigs(kb_dir)
+    tally = {"new": 0, "merged": 0, "skipped": 0, "duplicate": 0}
+    failed = []
+    for record in records:
+        if record.get("sig") in done_sigs:
+            tally["duplicate"] += 1
+            continue
+        try:
+            outcome = document_record(kb_dir, runtime, record, backend, timeout)
+        except Exception as exc:                      # never lose the batch to one bad record
+            log(runtime, "record %s failed: %s" % (record.get("sig"), exc))
+            failed.append(record)
+            continue
+        tally[outcome] += 1
+        done_sigs.add(record.get("sig"))
+    log(runtime, "distilled: %(new)d new, %(merged)d merged, %(skipped)d skipped, "
+                 "%(duplicate)d already known" % tally)
+    return sum(tally.values()), failed
+
+
 def undocumented(kb: Path, records: list[dict]) -> int:
     docs = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in kb.glob("*.md"))
     have = set(SIG_RE.findall(docs))

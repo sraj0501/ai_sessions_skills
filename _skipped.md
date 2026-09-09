@@ -21,3 +21,13 @@ A one-off test-harness command that waits for `.runtime/distill.lock` and then t
 <!-- sig: f77989948cd7 -->
 
 `head -12` is a parser artefact from inside the captured `git commit` multi-line message, not a real `head` invocation.
+
+### Grep for a multiline pattern that grep cannot match
+<!-- sig: 3dc9a7007d1e -->
+
+`grep -A3 -B1 'sig.*\n.*sig'` is a malformed one-off probe; without `-P` or `-z`, `\n` is not a newline and the pattern is not a reusable workflow.
+
+### Head with a mangled flag and an awk script
+<!-- sig: 91ea93ce091a -->
+
+`head '-20;' awk '...'` is a capture parser artefact, not a real, runnable command.
