@@ -115,8 +115,8 @@ def entry_prompt(record: dict, existing_sections: list[str] | None = None) -> st
     lines = [template, "\n## Now document this command\n",
              "Command: `%s`" % record.get("command", "")]
     if existing_sections:
-        lines.append("\nThe file already has these sections. Reuse one of them "
-                     "**exactly** if the command fits; only invent a new name if none do:\n"
+        lines.append("\nUse one of these existing `section` values **exactly** if the "
+                     "command fits; only invent a new one if none do:\n"
                      + "\n".join("- %s" % s for s in existing_sections))
     subcmds = record.get("subcommands") or []
     lines.append("Binary: `%s`%s" % (record.get("binary", ""),
@@ -127,14 +127,37 @@ def entry_prompt(record: dict, existing_sections: list[str] | None = None) -> st
     if record.get("ok") is False:
         lines.append("This command FAILED when it was run. Document it anyway and "
                      "note the likely failure mode.")
-    lines.append("\nOutput the entry now, starting with the SECTION: line.")
+    lines.append("\nReply with the JSON object now.")
     return "\n".join(lines)
 
 
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+JSON_BLOCK = re.compile(r"\{.*\}", re.S)
+
+# The output contract. Sent to Ollama as `format`, which constrains decoding so
+# the reply cannot be anything else; other backends are asked for the same
+# shape in the prompt and validated on arrival.
+ENTRY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "worth_documenting": {"type": "boolean"},
+        "skip_reason": {"type": "string"},
+        "section": {"type": "string"},
+        "heading": {"type": "string"},
+        "commands": {"type": "array", "items": {"type": "string"}},
+        "what": {"type": "string"},
+        "why": {"type": "string"},
+        "example": {"type": "string"},
+        "notes": {"type": "string"},
+    },
+    "required": ["worth_documenting", "section", "heading", "commands",
+                 "what", "why", "example"],
+}
+REQUIRED_PROSE = ("heading", "what", "why")
 
 
-def run_http(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | None:
+def run_http(backend: dict, prompt: str, timeout: int, runtime: Path,
+             schema: dict | None = None) -> str | None:
     """Generate over Ollama's HTTP API.
 
     Deliberately not `ollama run`: that streams through a terminal renderer
@@ -151,6 +174,11 @@ def run_http(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | N
         # Reasoning models otherwise spend most of their tokens (and time)
         # thinking. Filling a fixed template does not need it.
         payload["think"] = backend["think"]
+    if schema:
+        # Constrained decoding: the sampler can only emit tokens that keep the
+        # output a valid instance of this schema, so format compliance stops
+        # depending on how well the model follows instructions.
+        payload["format"] = schema
     body = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(backend["url"], data=body,
                                      headers={"Content-Type": "application/json"})
@@ -171,10 +199,11 @@ def run_http(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | N
     return text
 
 
-def run_text(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | None:
+def run_text(backend: dict, prompt: str, timeout: int, runtime: Path,
+             schema: dict | None = None) -> str | None:
     """One text-in/text-out generation. No tools, no file access, no cwd needs."""
     if backend.get("url"):
-        return run_http(backend, prompt, timeout, runtime)
+        return run_http(backend, prompt, timeout, runtime, schema)
 
     mode = backend.get("prompt", "stdin")
     prompt_file = runtime / "entry-prompt.md"
@@ -202,38 +231,50 @@ def run_text(backend: dict, prompt: str, timeout: int, runtime: Path) -> str | N
     return ANSI.sub("", done.stdout or "")
 
 
-def parse_entry(text: str) -> tuple[str, str] | tuple[None, str]:
-    """Model output -> (section, entry markdown), or (None, skip reason).
+def parse_fields(text: str, command: str) -> tuple[dict | None, str, str]:
+    """Model output -> (fields, reason, status).
 
-    Tolerates the things small models do: wrapping the whole answer in a code
-    fence, emitting a sig comment, adding chatter before the heading.
+    status is "ok", "skip" (the model judged the command not worth an entry)
+    or "malformed" (the reply was not usable). The caller must not treat those
+    last two alike: a skip is a verdict, malformed output is worth retrying
+    under a schema.
+
+    Enforces what a schema cannot express: prose is clean, no stray sigs.
     """
     body = (text or "").strip()
     if not body:
-        return None, "empty response"
+        return None, "empty response", "malformed"
 
-    lines = body.splitlines()
-    if lines and FENCE_ONLY.match(lines[0]):           # whole answer fenced
-        closing = next((i for i in range(len(lines) - 1, 0, -1)
-                        if lines[i].strip() == "```"), None)
-        if closing:
-            lines = lines[1:closing]
+    found = JSON_BLOCK.search(body)             # tolerate chatter or a fence around it
+    if not found:
+        return None, "response was not JSON", "malformed"
+    try:
+        fields = json.loads(found.group(0))
+    except Exception as exc:
+        return None, "unparseable JSON (%s)" % exc, "malformed"
+    if not isinstance(fields, dict):
+        return None, "JSON was not an object", "malformed"
 
-    heading_at = next((i for i, line in enumerate(lines) if line.startswith("### ")), None)
-    if heading_at is None:
-        found = SKIP_RE.search(body)
-        return None, (found.group(1).strip() if found else "no entry heading in response")
+    if fields.get("worth_documenting") is False:
+        return None, str(fields.get("skip_reason") or "not worth documenting").strip(), "skip"
 
-    section = "Other"
-    found = SECTION_LINE.search("\n".join(lines[:heading_at]) or "")
-    if found:
-        section = found.group(1).strip().strip("<>").strip()
+    for key in REQUIRED_PROSE:
+        if not str(fields.get(key) or "").strip():
+            return None, "missing required field: %s" % key, "malformed"
 
-    kept = [line for line in lines[heading_at:] if not kb.SIG_RE.search(line)]
-    entry = "\n".join(kept).strip()
-    if "```" not in entry:
-        return None, "response had no command block"
-    return section, entry
+    # Signatures are ours; a model must never supply or influence one.
+    for key in ("heading", "what", "why", "example", "notes"):
+        if key in fields and isinstance(fields[key], str):
+            fields[key] = kb.SIG_RE.sub("", fields[key]).strip()
+
+    heading = " ".join(str(fields["heading"]).split()).strip(" .#`")
+    if not heading:
+        return None, "empty heading", "malformed"
+    fields["heading"] = heading
+
+    commands = [c for c in (fields.get("commands") or []) if str(c).strip()]
+    fields["commands"] = [str(c).strip() for c in commands] or [command]
+    return fields, "", "ok"
 
 
 def document_record(kb_dir: Path, runtime: Path, record: dict, backend: dict,
@@ -256,19 +297,32 @@ def document_record(kb_dir: Path, runtime: Path, record: dict, backend: dict,
             return "merged"
         known_sections = kb.sections(text)
 
-    raw = run_text(backend, entry_prompt(record, known_sections), timeout, runtime)
+    command = record.get("command", "")
+    prompt = entry_prompt(record, known_sections)
+
+    # Ask unconstrained first: forcing tokens to satisfy a grammar measurably
+    # costs prose quality. Only if the reply is unusable is the schema applied,
+    # which makes a well-formed answer the worst case instead of the norm.
+    raw = run_text(backend, prompt, timeout, runtime)
     if raw is None:
         # The model was unreachable or errored. That is not a verdict about the
         # record, so leave it undocumented and let the batch retry.
         return "failed"
 
-    section, entry = parse_entry(raw)
-    if section is None:
-        kb.note_skipped(kb_dir, sig, record.get("command", ""), entry)
+    fields, reason, status = parse_fields(raw, command)
+    if status == "malformed" and ENTRY_SCHEMA and backend.get("url"):
+        log(runtime, "reply unusable (%s); retrying under the schema" % reason)
+        retry = run_text(backend, prompt, timeout, runtime, ENTRY_SCHEMA)
+        if retry is None:
+            return "failed"
+        fields, reason, status = parse_fields(retry, command)
+
+    if fields is None:
+        kb.note_skipped(kb_dir, sig, command, reason)
         return "skipped"
 
-    head, rest = entry.split("\n", 1) if "\n" in entry else (entry, "")
-    kb.insert_entry(path, title, section, "%s\n<!-- sig: %s -->\n%s" % (head, sig, rest))
+    section = kb.canonical_section(fields.get("section", ""), known_sections)
+    kb.insert_entry(path, title, section, kb.render_entry(fields, sig))
     if is_new_file:
         kb.ensure_readme_row(kb_dir, filename, title)
     return "new"

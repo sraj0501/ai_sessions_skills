@@ -47,18 +47,15 @@ printf 'model = "gpt-5.5"\n\n[features]\nmulti_agent = true\n' >"$HOME/.codex/co
 cat >"$SANDBOX/bin/claude" <<'STUB'
 #!/bin/sh
 exec python3 -c '
-import re, sys
+import json, re, sys
 prompt = sys.stdin.read()
 found = re.search(r"^Command: `(.+)`$", prompt, re.M)
 command = found.group(1) if found else "true"
-print("SECTION: Smoke")
-print("### Stub entry for %s" % command.split()[0])
-print("")
-print("```bash")
-print(command)
-print("```")
-print("")
-print("- **What it does:** stub")
+print(json.dumps({
+    "worth_documenting": True, "skip_reason": "", "section": "Smoke",
+    "heading": "Stub entry for %s" % command.split()[0], "commands": [command],
+    "what": "stub", "why": "stub", "example": command, "notes": "",
+}))
 '
 STUB
 chmod +x "$SANDBOX/bin/claude"

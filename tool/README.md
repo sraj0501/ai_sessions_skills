@@ -257,6 +257,34 @@ Measured on this machine, local `gemma4` and cloud `swe-1-7-medium` both score
 touching `prompts/ENTRY_PROMPT.md` — prompt changes that read like
 improvements are not reliably improvements.
 
+### The output contract
+
+The model returns a **JSON object**, never markdown: `worth_documenting`,
+`skip_reason`, `section`, `heading`, `commands[]`, `what`, `why`, `example`,
+`notes`. `bin/kb.py:render_entry()` turns those fields into the entry, so
+layout, bullet order, fencing and the `sig` comment come from Python. A model
+cannot emit a malformed entry, because it never writes the entry.
+
+Structure is enforced in two stages:
+
+1. The reply is requested unconstrained and validated on arrival.
+2. If it is unusable, it is retried with the schema sent as Ollama's `format`,
+   which constrains decoding so the output *cannot* be anything but a valid
+   instance.
+
+That order is deliberate, and measured. Constrained decoding gave no format
+benefit on the eval and slightly *hurt* content — forcing tokens to satisfy a
+grammar distorts the model's distribution:
+
+| model | schema always | schema on failure |
+|---|---|---|
+| gemma4 | 48/48 | 48/48 |
+| ornith-1.5:9b | 46/48 | 48/48 |
+
+So the schema is the floor, not the norm: best prose in the common case,
+guaranteed structure in the worst. A skip verdict is distinguished from
+malformed output, so a considered "not worth documenting" is never retried.
+
 Three settings matter more than prompt wording:
 
 - **`temperature: 0`.** A reference manual wants the most likely description,

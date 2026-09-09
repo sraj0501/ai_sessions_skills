@@ -585,50 +585,114 @@ class TestKbMutation(unittest.TestCase):
 
 
 class TestModelResponseParsing(unittest.TestCase):
-    """The model is untrusted text: every shape it emits must be handled."""
+    """The model is untrusted output: every shape it emits must be handled."""
 
-    GOOD = ("SECTION: Inspecting state\n"
-            "### Show the log compactly\n\n"
-            "```bash\ngit log --oneline -10\n```\n\n"
-            "- **What it does:** Prints ten commits, one line each.\n")
+    GOOD = json.dumps({
+        "worth_documenting": True, "skip_reason": "",
+        "section": "Inspecting state", "heading": "Show the log compactly",
+        "commands": ["git log --oneline -10"],
+        "what": "Prints ten commits, one line each.",
+        "why": "Fast overview.", "example": "git log --oneline -10", "notes": "",
+    })
 
     def test_clean_response(self):
-        section, entry = distill.parse_entry(self.GOOD)
-        self.assertEqual(section, "Inspecting state")
-        self.assertTrue(entry.startswith("### Show the log compactly"))
+        fields, _, _status = distill.parse_fields(self.GOOD, "git log")
+        self.assertEqual(fields["section"], "Inspecting state")
+        self.assertEqual(fields["heading"], "Show the log compactly")
 
-    def test_whole_answer_wrapped_in_a_fence(self):
-        section, entry = distill.parse_entry("```markdown\n" + self.GOOD + "```\n")
-        self.assertEqual(section, "Inspecting state")
-        self.assertIn("git log --oneline -10", entry)
-
-    def test_chatter_before_the_entry_is_dropped(self):
-        section, entry = distill.parse_entry("Sure! Here is the entry:\n\n" + self.GOOD)
-        self.assertEqual(section, "Inspecting state")
-        self.assertTrue(entry.startswith("### "))
+    def test_answer_wrapped_in_a_fence_or_chatter(self):
+        for wrapped in ("```json\n" + self.GOOD + "\n```",
+                        "Sure! Here is the JSON:\n\n" + self.GOOD,
+                        self.GOOD + "\n\nLet me know if you need more."):
+            fields, reason, _status = distill.parse_fields(wrapped, "git log")
+            self.assertIsNotNone(fields, reason)
+            self.assertEqual(fields["heading"], "Show the log compactly")
 
     def test_model_emitted_sig_is_stripped(self):
         """Python owns signatures; a hallucinated one must never survive."""
-        polluted = self.GOOD.replace("### Show the log compactly\n",
-                                     "### Show the log compactly\n<!-- sig: deadbeefcafe -->\n")
-        _section, entry = distill.parse_entry(polluted)
-        self.assertNotIn("deadbeefcafe", entry)
+        polluted = self.GOOD.replace("Show the log compactly",
+                                     "Show the log <!-- sig: deadbeefcafe -->")
+        fields, _, _status = distill.parse_fields(polluted, "git log")
+        self.assertNotIn("deadbeefcafe", json.dumps(fields))
 
-    def test_missing_section_defaults(self):
-        section, _entry = distill.parse_entry(self.GOOD.split("\n", 1)[1])
-        self.assertEqual(section, "Other")
-
-    def test_skip_verdict(self):
-        section, reason = distill.parse_entry("SKIP: just prints the date")
-        self.assertIsNone(section)
+    def test_skip_verdict_is_distinguished_from_malformed(self):
+        """A verdict must not be retried, and garbage must not be recorded."""
+        payload = json.dumps({"worth_documenting": False,
+                              "skip_reason": "just prints the date"})
+        fields, reason, status = distill.parse_fields(payload, "date")
+        self.assertIsNone(fields)
         self.assertEqual(reason, "just prints the date")
+        self.assertEqual(status, "skip")
+
+        _f, _r, status = distill.parse_fields("I cannot help", "date")
+        self.assertEqual(status, "malformed")
+
+    def test_empty_commands_fall_back_to_the_captured_command(self):
+        payload = json.loads(self.GOOD)
+        payload["commands"] = []
+        fields, _, _status = distill.parse_fields(json.dumps(payload), "git log --oneline")
+        self.assertEqual(fields["commands"], ["git log --oneline"])
 
     def test_garbage_is_rejected_not_written(self):
+        missing = json.loads(self.GOOD)
+        missing["what"] = ""
         for junk in ("", "   ", "I cannot help with that.",
-                     "### Heading with no command block\n\n- **What it does:** x"):
-            section, reason = distill.parse_entry(junk)
-            self.assertIsNone(section, junk)
+                     "{not json at all}", "[1,2,3]", json.dumps(missing)):
+            fields, reason, _status = distill.parse_fields(junk, "cmd")
+            self.assertIsNone(fields, junk)
             self.assertTrue(reason)
+
+
+class TestDeterministicRendering(unittest.TestCase):
+    """Layout comes from Python, so the model cannot produce a malformed entry."""
+
+    FIELDS = {"heading": "Show the log compactly",
+              "commands": ["git log --oneline -10", "git log --graph"],
+              "what": "Prints ten commits.", "why": "Fast overview.",
+              "example": "git log --oneline -10", "notes": "Needs --no-pager in CI."}
+
+    def test_renders_a_parseable_entry(self):
+        text = kb.render_entry(self.FIELDS, "abcdef123456")
+        entry = kb.parse(text)[0]
+        self.assertEqual(entry.heading, "Show the log compactly")
+        self.assertEqual(entry.sigs, ["abcdef123456"])
+        self.assertEqual(entry.commands, ["git log --oneline -10", "git log --graph"])
+
+    def test_blank_notes_omits_the_bullet(self):
+        text = kb.render_entry({**self.FIELDS, "notes": "  "}, "abcdef123456")
+        self.assertNotIn("**Notes:**", text)
+
+    def test_multiline_prose_is_flattened(self):
+        text = kb.render_entry({**self.FIELDS, "what": "One.\n\nTwo."}, "abcdef123456")
+        self.assertIn("- **What it does:** One. Two.", text)
+        self.assertEqual(len(kb.parse(text)), 1)
+
+
+class TestSectionCanonicalisation(unittest.TestCase):
+    def test_exact_and_case_insensitive_match_reuse(self):
+        self.assertEqual(kb.canonical_section("branching", ["Branching"]), "Branching")
+
+    def test_near_duplicate_snaps_to_existing(self):
+        for proposed in ("Remote and syncing", "Remotes and syncing.", "remotes  and syncing"):
+            self.assertEqual(kb.canonical_section(proposed, ["Remotes and syncing"]),
+                             "Remotes and syncing", proposed)
+
+    def test_genuinely_new_section_is_kept(self):
+        self.assertEqual(kb.canonical_section("Containers", ["Branching"]), "Containers")
+
+    def test_related_but_differently_worded_sections_are_not_merged(self):
+        """Deliberate: matching is conservative, so distinct groups survive.
+
+        "Stashing and cleanup" vs "Stashing and saving work" scores ~0.59, well
+        under the cutoff. Lowering it to catch this would also merge unrelated
+        groups, so the prompt (which lists existing sections) is what prevents
+        the duplicate, not the fuzzy match.
+        """
+        got = kb.canonical_section("Stashing and cleanup", ["Stashing and saving work"])
+        self.assertEqual(got, "Stashing and cleanup")
+
+    def test_empty_falls_back_to_default(self):
+        self.assertEqual(kb.canonical_section("", []), kb.DEFAULT_SECTION)
 
 
 class TestHttpBackend(unittest.TestCase):
@@ -695,9 +759,12 @@ class TestHttpBackend(unittest.TestCase):
 class TestTextModeDistillation(unittest.TestCase):
     """The whole text-mode loop, with a stub model instead of a real one."""
 
-    RESPONSE = ("SECTION: Inspecting state\n### Show the log compactly\n\n"
-                "```bash\ngit log --oneline -10\n```\n\n"
-                "- **What it does:** Prints ten commits.\n")
+    RESPONSE = json.dumps({
+        "worth_documenting": True, "section": "Inspecting state",
+        "heading": "Show the log compactly", "commands": ["git log --oneline -10"],
+        "what": "Prints ten commits.", "why": "Fast overview.",
+        "example": "git log --oneline -10", "notes": "",
+    })
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -712,7 +779,7 @@ class TestTextModeDistillation(unittest.TestCase):
         self.tmp.cleanup()
 
     def stub(self, reply):
-        def fake(_backend, prompt, _timeout, _runtime):
+        def fake(_backend, prompt, _timeout, _runtime, _schema=None):
             self.calls.append(prompt)
             return reply
         distill.run_text = fake
@@ -759,11 +826,42 @@ class TestTextModeDistillation(unittest.TestCase):
         self.assertNotIn("e1e1e1e1e1e1", kb.documented_sigs(self.dir))
 
     def test_skip_verdict_is_recorded_so_it_never_returns(self):
-        self.stub("SKIP: just prints the date")
+        self.stub(json.dumps({"worth_documenting": False,
+                              "skip_reason": "just prints the date"}))
         rec = self.record("f1f1f1f1f1f1", "date", [], "date")
         _done, failed = distill.distill_text(self.dir, self.runtime, [rec], {"name": "stub"}, 10)
         self.assertEqual(failed, [])
         self.assertIn("f1f1f1f1f1f1", kb.documented_sigs(self.dir))
+
+    def test_malformed_reply_is_retried_under_the_schema(self):
+        """Structure is guaranteed by falling back to constrained decoding."""
+        attempts = []
+
+        def fake(_backend, _prompt, _timeout, _runtime, schema=None):
+            attempts.append(schema)
+            return "sorry, no idea" if schema is None else self.RESPONSE
+        distill.run_text = fake
+
+        rec = self.record("9a9a9a9a9a9a", "git", ["log"], "git log")
+        distill.distill_text(self.dir, self.runtime, [rec],
+                             {"name": "stub", "url": "http://x"}, 10)
+        self.assertEqual(len(attempts), 2, "should retry once")
+        self.assertIsNone(attempts[0], "first attempt is unconstrained")
+        self.assertIsNotNone(attempts[1], "retry supplies the schema")
+        self.assertIn("9a9a9a9a9a9a", (self.dir / "git.md").read_text())
+
+    def test_skip_verdict_is_not_retried(self):
+        attempts = []
+
+        def fake(_backend, _prompt, _timeout, _runtime, schema=None):
+            attempts.append(schema)
+            return json.dumps({"worth_documenting": False, "skip_reason": "trivial"})
+        distill.run_text = fake
+
+        rec = self.record("8b8b8b8b8b8b", "date", [], "date")
+        distill.distill_text(self.dir, self.runtime, [rec],
+                             {"name": "stub", "url": "http://x"}, 10)
+        self.assertEqual(len(attempts), 1, "a verdict must not trigger a retry")
 
     def test_existing_sections_are_offered_to_the_model(self):
         self.stub(self.RESPONSE)

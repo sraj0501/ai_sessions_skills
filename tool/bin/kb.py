@@ -16,6 +16,7 @@ multi-step planning.
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 import sys
@@ -160,6 +161,46 @@ def find_match(entries: list[Entry], binary: str, subcmds: list[str]) -> Entry |
         if action_of(entry) == want:
             return entry
     return None
+
+
+def canonical_section(name: str, existing: list[str]) -> str:
+    """Snap a proposed section onto an existing one when it means the same.
+
+    Models coin "Stashing and cleanup" next to "Stashing and saving work".
+    Case-insensitive equality catches most of it; close matching catches the
+    rest without blocking a genuinely new group.
+    """
+    name = (name or "").strip().strip("#").strip() or DEFAULT_SECTION
+    for section in existing:
+        if section.lower() == name.lower():
+            return section
+    close = difflib.get_close_matches(name.lower(), [s.lower() for s in existing],
+                                      n=1, cutoff=0.82)
+    if close:
+        return next(s for s in existing if s.lower() == close[0])
+    return name
+
+
+def render_entry(fields: dict, sig: str) -> str:
+    """Build the markdown for an entry from validated fields.
+
+    The model supplies prose only; layout, ordering, fencing and the sig
+    comment are produced here, so no model can emit a malformed entry.
+    """
+    commands = [c.rstrip() for c in fields.get("commands") or [] if c.strip()]
+    lines = ["### %s" % fields["heading"].strip(),
+             "<!-- sig: %s -->" % sig,
+             "",
+             "```bash",
+             *commands,
+             "```",
+             ""]
+    for label, key in (("What it does", "what"), ("Why", "why"),
+                       ("Example", "example"), ("Notes", "notes")):
+        value = " ".join(str(fields.get(key) or "").split())
+        if value:
+            lines.append("- **%s:** %s" % (label, value))
+    return "\n".join(lines)
 
 
 def sections(text: str) -> list[str]:

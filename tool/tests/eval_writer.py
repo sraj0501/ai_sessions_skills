@@ -118,6 +118,9 @@ def grade(record: dict, entry: kb.Entry, text: str) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend", default=None, help="force a writer backend")
+    parser.add_argument("--model", default=None, help="override the model name")
+    parser.add_argument("--no-schema", action="store_true",
+                        help="disable constrained decoding, to measure its effect")
     parser.add_argument("--limit", type=int, default=len(CASES))
     parser.add_argument("--verbose", action="store_true")
     opts = parser.parse_args()
@@ -129,6 +132,10 @@ def main() -> int:
     if not backend:
         print("no text backend available")
         return 1
+    if opts.model:
+        backend["model"] = opts.model
+    if opts.no_schema:
+        distill.ENTRY_SCHEMA = None
 
     tmp = Path(tempfile.mkdtemp(prefix="kbeval-"))
     runtime = tmp / ".runtime"
