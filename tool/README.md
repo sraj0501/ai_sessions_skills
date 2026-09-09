@@ -18,31 +18,69 @@ agent session.
 
 ## Install
 
+The engine is pure Python 3 (standard library only) so the same code runs on
+**Windows, macOS and Linux**. The shell scripts are thin shims; `install.py`
+is the real entry point everywhere.
+
+**macOS / Linux**
+
 ```bash
 git clone <this repo> ~/ai-session-skills     # tool/ lives inside
-bash ~/ai-session-skills/tool/install.sh      # wires every harness it finds
-bash ~/ai-session-skills/tool/bin/doctor.sh   # verify
+python3 ~/ai-session-skills/tool/install.py   # wires every harness it finds
+python3 ~/ai-session-skills/tool/bin/doctor.py
 ```
 
-Options:
+**Windows (PowerShell)**
 
-```bash
-bash tool/install.sh --only claude,devin   # subset
-bash tool/install.sh --kb ~/notes/skills   # knowledge base somewhere else
-bash tool/install.sh --dry-run             # show what it would change
-bash tool/uninstall.sh                     # remove wiring, keep knowledge
+```powershell
+git clone <this repo> C:\tools\ai-session-skills
+py -3 C:\tools\ai-session-skills\tool\install.py
+py -3 C:\tools\ai-session-skills\tool\bin\doctor.py
+```
+
+`tool\install.ps1` and `tool/install.sh` do the same thing if you prefer a
+native-looking launcher; `install.ps1` may need
+`powershell -ExecutionPolicy Bypass -File tool\install.ps1`. On Windows,
+prefer a tool path **without spaces** — some harnesses run hook commands
+through PowerShell, where a quoted path needs an `&` prefix that plain
+`cmd.exe` does not.
+
+Options (identical on every platform):
+
+```
+--only claude,devin     subset of harnesses
+--kb ~/notes/skills     knowledge base somewhere else
+--dry-run               show what it would change
 ```
 
 Re-running is safe. Every entry written carries the tool's absolute path as a
 marker; existing marked entries are purged before re-adding, so you never get
 duplicates, and unrelated settings in those files are preserved (a
-`*.ai-skills.bak` copy is kept).
+`*.ai-skills.bak` copy is kept). Uninstall with `tool/uninstall.py`.
 
 **Restart any running agent session** — every harness loads hook config at
 startup. **Codex additionally requires trusting the hooks**: run `/hooks`
 inside Codex once and approve them.
 
-Requirements: `python3` and `bash`. No pip installs, no node dependencies.
+Requirements: Python 3.8+ and git. No pip installs, no node dependencies, no
+bash requirement on Windows. Note that minimal Fedora containers do not ship
+Python — `sudo dnf install python3` first (a Fedora Workstation already has it).
+
+### Where things live per platform
+
+| | Windows | macOS / Linux |
+|---|---|---|
+| Devin | `%APPDATA%\devin\config.json` | `$XDG_CONFIG_HOME/devin/config.json` |
+| Claude Code | `%USERPROFILE%\.claude\settings.json` | `~/.claude/settings.json` |
+| Codex | `%USERPROFILE%\.codex\hooks.json` | `~/.codex/hooks.json` |
+| Copilot CLI | `%USERPROFILE%\.copilot\hooks\` | `~/.copilot/hooks/` |
+| Cursor | `%USERPROFILE%\.cursor\hooks.json` | `~/.cursor/hooks.json` |
+| OpenCode | `%APPDATA%\opencode\plugin\` | `$XDG_CONFIG_HOME/opencode/plugin/` |
+| Hook shim invoked | `bin\hook-*.cmd` | `bin/hook-*.sh` |
+
+`XDG_CONFIG_HOME` is honoured on Linux/macOS and defaults to `~/.config`.
+Copilot hook entries carry both a `bash` and a `powershell` command so one
+file works on any OS.
 
 ---
 
@@ -183,17 +221,39 @@ Environment overrides:
 ## Operating it
 
 ```bash
-bash tool/bin/doctor.sh                    # paths, wiring, backend, queue, live test
+python3 tool/bin/doctor.py                 # platform, wiring, backend, queue, live test
 cat <kb>/.runtime/pending.jsonl            # captured, not yet documented
-bash tool/bin/distill.sh                   # write the queue now
+python3 tool/bin/distill.py                # write the queue now
+python3 tool/bin/session.py start          # start the watcher by hand
 python3 tool/bin/capture.py --command 'git rebase -i main'   # record by hand
 python3 tool/bin/sync_seen.py              # rebuild the dedupe cache
-tail -n 40 <kb>/.runtime/{watcher,distill}.log
 ls <kb>/.runtime/failed/                   # batches that never completed
 ```
 
 `.runtime/` holds the queue, dedupe cache, logs, watcher pidfile and parked
 batches. It is gitignored and safe to delete.
+
+A watcher reads `watcher.*` timings once at startup, so new timings apply to
+the next watcher — stop the running one if you need them immediately.
+
+## Tests
+
+```bash
+python3 tool/tests/test_portable.py   # 38 unit tests, <1s, no side effects
+sh tool/tests/smoke.sh                # 42 checks: full install/capture/write/uninstall
+```
+
+`test_portable.py` verifies the Windows, macOS and Linux path layouts from any
+machine, because path resolution and backend rendering are pure functions of
+(platform, environment, home). `smoke.sh` runs the whole pipeline in a
+throwaway `HOME` with a stub writer, so it needs no agent CLI, no network and
+no credentials, and never touches your real configs. To check Linux from
+another OS:
+
+```bash
+docker run --rm -v "$PWD:/work:ro" fedora:latest sh -c \
+  'dnf install -y -q python3 git && cp -r /work/tool /tmp/tool && sh /tmp/tool/tests/smoke.sh'
+```
 
 ---
 
@@ -211,10 +271,19 @@ batches. It is gitignored and safe to delete.
 
 ## Verified vs best-effort
 
-Verified end-to-end on macOS: capture for all six harness payload shapes;
-writing with the **Devin** and **OpenCode** backends. The **Claude** and
-**Copilot** backends were confirmed to invoke correctly but could not complete
-a run on the test machine (not logged in / quota exhausted). The **Codex** and
-**Cursor** writer backends are built from their documented CLI flags and are
-untested. `doctor.sh` reports which backend would be used; if a backend fails,
-the batch is retried and then parked rather than lost.
+Be aware of what has actually been exercised:
+
+| | Status |
+|---|---|
+| **macOS** (darwin, Python 3.14) | Verified: 38 unit tests + 42 smoke checks, plus real captures and real writer runs |
+| **Linux** (Fedora 44, Python 3.14) | Verified: same 38 unit tests + 42 smoke checks, including the detached watcher and git commit |
+| **Windows** | **Untested.** Implemented with no POSIX-only calls: `DETACHED_PROCESS` spawning, `tasklist`/`taskkill` liveness, mkdir locks, `%APPDATA%` paths, CRLF `.cmd` shims. The path layout is unit-tested; nothing has run on a real Windows box |
+| Capture for all six harness payload shapes | Verified (unit tests + live hooks) |
+| Writer: **devin**, **opencode** | Verified end-to-end |
+| Writer: **claude**, **copilot** | Invocation verified; runs could not complete on the test machine (not logged in / quota exhausted) |
+| Writer: **codex**, **cursor-agent** | Built from documented CLI flags, untested |
+
+If a writer backend fails, the batch is retried and then parked in
+`.runtime/failed/` with its signatures released — never silently lost.
+`doctor.py` reports the platform, the wiring and the backend that would run,
+and it exits non-zero when a check fails.

@@ -1,0 +1,14 @@
+# Line endings matter for the platform shims: cmd.exe and PowerShell want
+# CRLF, POSIX shells and Python want LF. Enforce both on checkout so the
+# repo works identically on Windows, macOS and Linux.
+*                text=auto
+
+*.cmd            text eol=crlf
+*.bat            text eol=crlf
+*.ps1            text eol=crlf
+
+*.sh             text eol=lf
+*.py             text eol=lf
+*.js             text eol=lf
+*.md             text eol=lf
+*.json           text eol=lf

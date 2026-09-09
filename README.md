@@ -8,20 +8,23 @@ recording **the action, the command, what it does, and why**. One file per
 technology.
 
 Capture works across **Devin CLI, Claude Code, Codex CLI, Copilot CLI, OpenCode
-and Cursor**, all feeding this one knowledge base. The engine that does it lives
-in [`tool/`](tool/README.md) and is self-contained and portable.
+and Cursor**, on **Windows, macOS and Linux**, all feeding this one knowledge
+base. The engine that does it lives in [`tool/`](tool/README.md): pure Python 3
+standard library, no dependencies.
 
 ```
 ai_session_skills/
 ├── git.md, docker.md, node.md, ...   # the knowledge (this is the point)
 ├── config.json                       # knobs: model, timing, writer order
-├── .runtime/                          # queue, dedupe cache, logs (gitignored)
-└── tool/                              # portable engine — see tool/README.md
-    ├── install.sh, uninstall.sh
-    ├── bin/       capture, watcher, writer, doctor
-    ├── adapters/  opencode plugin
-    ├── prompts/   writer instructions
-    └── skill/     shared skill body
+├── .runtime/                         # queue, dedupe cache, logs (gitignored)
+└── tool/                             # portable engine — see tool/README.md
+    ├── install.py   + .sh / .ps1 shims
+    ├── uninstall.py + .sh / .ps1 shims
+    ├── bin/         capture · watcher · distill · doctor · hook shims
+    ├── adapters/    opencode plugin
+    ├── prompts/     writer instructions
+    ├── skill/       shared skill body
+    └── tests/       unit + smoke tests
 ```
 
 ---
@@ -75,13 +78,14 @@ here, so you get *your* verified workflow back rather than generic advice.
 Nothing needs to be recorded by hand.
 
 ```bash
-bash tool/bin/doctor.sh          # is everything wired and healthy?
-bash tool/bin/distill.sh         # document the queue now instead of waiting
+python3 tool/bin/doctor.py       # is everything wired and healthy?
+python3 tool/bin/distill.py      # document the queue now instead of waiting
 cat .runtime/pending.jsonl       # what has been captured but not written up
 ```
 
-Pause capture for one command with `AI_SKILLS_CAPTURE_OFF=1 <command>`, or
-everywhere with `bash tool/uninstall.sh` (the knowledge is never touched).
+On Windows use `py -3` in place of `python3`. Pause capture for one command
+with `AI_SKILLS_CAPTURE_OFF=1 <command>`, or everywhere with
+`python3 tool/uninstall.py` (the knowledge is never touched).
 
 Full engine documentation, configuration reference and the harness matrix:
 **[`tool/README.md`](tool/README.md)**.

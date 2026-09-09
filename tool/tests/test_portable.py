@@ -159,6 +159,19 @@ class TestSignatures(unittest.TestCase):
         self.assertEqual(self.sig("brew services restart postgresql@16"),
                          self.sig("brew services restart redis"))
 
+    def test_names_do_not_leak_into_signatures(self):
+        """A service/release/pod/package name must not create a new action."""
+        self.assertEqual(self.sig("systemctl status sshd"), self.sig("systemctl status httpd"))
+        self.assertEqual(self.sig("helm upgrade api ./chart"), self.sig("helm upgrade web ./chart"))
+        self.assertEqual(self.sig("kubectl logs pod-abc"), self.sig("kubectl logs pod-xyz"))
+        self.assertEqual(self.sig("dnf install ripgrep"), self.sig("dnf install jq"))
+
+    def test_real_subcommands_still_split(self):
+        self.assertNotEqual(self.sig("systemctl status sshd"), self.sig("systemctl restart sshd"))
+        self.assertNotEqual(self.sig("helm repo add x https://y"), self.sig("helm repo update"))
+        self.assertNotEqual(self.sig("kubectl get pods"), self.sig("kubectl get svc"))
+        self.assertNotEqual(self.sig("az boards work-item show"), self.sig("az boards query"))
+
     def test_distinct_actions_stay_distinct(self):
         self.assertNotEqual(self.sig("npm run test"), self.sig("npm run build"))
         self.assertNotEqual(self.sig("git --no-pager diff"), self.sig("git --no-pager log"))

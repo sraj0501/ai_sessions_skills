@@ -29,25 +29,32 @@ it holds this user's actual verified workflow, including local specifics (macOS
 
 ## Operate the pipeline
 
+Everything is Python, so the same commands work on macOS, Linux and Windows
+(use `py -3` instead of `python3` on Windows).
+
 | Intent | Command |
 |---|---|
-| Health check of the whole setup | `bash $TOOL/bin/doctor.sh` |
+| Health check of the whole setup | `python3 $TOOL/bin/doctor.py` |
 | What is captured but not yet documented | `cat $KB/.runtime/pending.jsonl` |
-| Write the queue up now (don't wait) | `bash $TOOL/bin/distill.sh` |
-| Is the watcher running | `ps -p "$(cat $KB/.runtime/watcher.pid 2>/dev/null)" 2>/dev/null \|\| echo "not running"` |
-| Start the watcher | `bash $TOOL/bin/hook-session.sh start` |
+| Write the queue up now (don't wait) | `python3 $TOOL/bin/distill.py` |
+| Watcher status | `python3 $TOOL/bin/doctor.py` (queue section) |
+| Start the watcher | `python3 $TOOL/bin/session.py start` |
 | Recent activity | `tail -n 40 $KB/.runtime/watcher.log $KB/.runtime/distill.log` |
 | Signature of a command | `python3 $TOOL/bin/capture.py --sig '<command>'` |
 | Record an action manually | `python3 $TOOL/bin/capture.py --command '<command>' --harness manual` |
 | Rebuild the dedupe cache | `python3 $TOOL/bin/sync_seen.py` |
-| Re-wire hooks after an upgrade | `bash $TOOL/install.sh` |
+| Re-wire hooks after an upgrade | `python3 $TOOL/install.py` |
 | Failed batches | `ls $KB/.runtime/failed/` |
 
-`distill.sh` spawns a separate cheap agent session (first available of devin,
+`distill.py` spawns a separate cheap agent session (first available of devin,
 claude, codex, copilot, opencode, cursor-agent) that writes the entries and
 commits them locally. It takes a minute or two — do not run it in the
 foreground if the user is waiting on something else. Force a specific writer
-with `AI_SKILLS_WRITER=claude bash $TOOL/bin/distill.sh`.
+with `AI_SKILLS_WRITER=claude python3 $TOOL/bin/distill.py`.
+
+Changing `watcher.*` timings only affects the next watcher: it reads its
+config once at startup, so stop the running one first if you need new timings
+to take effect immediately.
 
 ## Add or correct an entry by hand
 
@@ -68,6 +75,7 @@ is wrong").
 
 ## Pausing capture
 
-- One command or one shell: prefix `AI_SKILLS_CAPTURE_OFF=1`.
-- Everywhere: `bash $TOOL/uninstall.sh` (removes hooks, keeps the knowledge).
+- One command or one shell: prefix `AI_SKILLS_CAPTURE_OFF=1` (PowerShell:
+  `$env:AI_SKILLS_CAPTURE_OFF=1`).
+- Everywhere: `python3 $TOOL/uninstall.py` (removes hooks, keeps the knowledge).
 - Change model, batch size, timing or writer order: `$KB/config.json`.

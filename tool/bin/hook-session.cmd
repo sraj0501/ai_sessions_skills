@@ -1,25 +1,24 @@
 @echo off
-rem Windows session-lifecycle hook shim.
+rem Windows session-lifecycle hook shim. Returns immediately and prints
+rem nothing. All logic lives in session.py.
 rem
 rem   hook-session.cmd start|end [harness-name]
-rem
-rem Returns immediately and prints nothing. All logic lives in session.py.
 setlocal
 set "ACTION=%~1"
 if "%ACTION%"=="" set "ACTION=start"
 set "HARNESS=%~2"
 if "%HARNESS%"=="" set "HARNESS=%AI_SKILLS_HARNESS%"
 if "%HARNESS%"=="" set "HARNESS=unknown"
-where py >nul 2>nul && (
-  py -3 "%~dp0session.py" "%ACTION%" "%HARNESS%" 2>nul
-  exit /b 0
-)
-where python3 >nul 2>nul && (
-  python3 "%~dp0session.py" "%ACTION%" "%HARNESS%" 2>nul
-  exit /b 0
-)
-where python >nul 2>nul && (
-  python "%~dp0session.py" "%ACTION%" "%HARNESS%" 2>nul
-  exit /b 0
-)
+set "SCRIPT=%~dp0session.py"
+
+where py.exe >nul 2>nul
+if not errorlevel 1 py -3 "%SCRIPT%" "%ACTION%" "%HARNESS%" 2>nul
+if not errorlevel 1 exit /b 0
+
+where python3.exe >nul 2>nul
+if not errorlevel 1 python3 "%SCRIPT%" "%ACTION%" "%HARNESS%" 2>nul
+if not errorlevel 1 exit /b 0
+
+where python.exe >nul 2>nul
+if not errorlevel 1 python "%SCRIPT%" "%ACTION%" "%HARNESS%" 2>nul
 exit /b 0

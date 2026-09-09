@@ -61,7 +61,13 @@ SUBCMD_BINS = {
     "code", "jj", "hg", "svn",
 }
 KEEP_FLAG_VALUE = {("python", "-m"), ("python3", "-m")}
-BASE_DEPTH = {"az": 3, "aws": 3, "gcloud": 3, "kubectl": 2, "helm": 2, "systemctl": 2}
+# How many leading positional tokens belong to the action's identity.
+# The default of 1 keeps `npm install lodash`/`npm install express` and
+# `systemctl status sshd`/`systemctl status httpd` as single actions: anything
+# whose second token is a *name* (package, service, release, pod) must not
+# reach the signature. Only the cloud CLIs have genuinely deep hierarchies;
+# commands with real nested subcommands are listed in NESTED below.
+BASE_DEPTH = {"az": 3, "aws": 3, "gcloud": 3}
 NESTED = {
     "git": {"stash", "remote", "submodule", "worktree", "bisect", "reflog", "notes",
             "config", "sparse-checkout", "lfs", "maintenance", "subtree"},
@@ -74,6 +80,11 @@ NESTED = {
     "go": {"mod", "tool"}, "brew": {"services"},
     "poetry": {"run"}, "uv": {"run", "pip", "tool"},
     "terraform": {"state", "workspace"}, "make": set(),
+    # `kubectl get pods` vs `kubectl get svc` is a different action; but
+    # `kubectl logs <pod>` must not create an entry per pod name.
+    "kubectl": {"get", "describe", "delete", "apply", "create", "edit", "patch",
+                "scale", "rollout", "top", "config", "label", "annotate"},
+    "helm": {"repo", "plugin", "dependency"},
 }
 IDENT = re.compile(r"^[A-Za-z][A-Za-z0-9_:+-]*$")
 
