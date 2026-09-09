@@ -8,6 +8,7 @@
 ### Check which Python is on PATH
 <!-- sig: bec3ef4b11d4 -->
 <!-- sig: bf5b33915b7a -->
+<!-- sig: 31226dd4f217 -->
 
 ```bash
 python3 -V

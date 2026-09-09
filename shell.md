@@ -51,6 +51,7 @@ cat config.json
 <!-- sig: c7facca824ba -->
 <!-- sig: bb73fa797198 -->
 <!-- sig: b7c735936704 -->
+<!-- sig: a6067e6acb07 -->
 
 ```bash
 head -n 30 package.json
@@ -71,6 +72,7 @@ head -n 30 package.json
 <!-- sig: e9c77a3402b3 -->
 <!-- sig: a6983d0c7692 -->
 <!-- sig: e088ac41e175 -->
+<!-- sig: 1b90f9e27a19 -->
 
 ```bash
 tail -n 25 .runtime/watcher.log
@@ -339,6 +341,7 @@ curl -s https://api.github.com/rate_limit
 
 ### Recursively remove a directory tree
 <!-- sig: ee37b30a68f0 -->
+<!-- sig: febcc4591eaf -->
 
 ```bash
 rm -rf <directory>

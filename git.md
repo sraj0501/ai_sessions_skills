@@ -42,6 +42,8 @@ git --no-pager diff --staged
 <!-- sig: b7d90c2bc367 -->
 <!-- sig: a0ab6770605b -->
 <!-- sig: fbfc5faa6794 -->
+<!-- sig: ab5dbc39d5cb -->
+<!-- sig: 046311f6b3a2 -->
 
 ```bash
 git log --oneline -10
@@ -90,6 +92,7 @@ git remote -v
 
 ### Show what changed in a specific commit
 <!-- sig: 6a4bd45661c0 -->
+<!-- sig: 7a6f06380530 -->
 
 ```bash
 git show --stat <commit>
@@ -214,6 +217,7 @@ git add -- tool/bin/distill.py tool/tests/test_portable.py
 ### Commit staged changes with a message
 <!-- sig: 69f49c02d2dc -->
 <!-- sig: ddbb44ba277f -->
+<!-- sig: 42bac871c372 -->
 
 ```bash
 git commit -m "fix: populate howfound from Jira classification"
