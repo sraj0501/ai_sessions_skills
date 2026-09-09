@@ -197,6 +197,18 @@ batches. It is gitignored and safe to delete.
 
 ---
 
+## Known quirks
+
+- Some harnesses read each other's skill directories for compatibility (Devin
+  CLI reads `~/.claude/skills` and `~/.copilot/skills`), so `devin skills list`
+  shows `session-skills` once per location. The copies are generated from the
+  same body, so it is cosmetic. Install fewer copies with
+  `install.sh --only <harness>` if it bothers you.
+- Codex skips untrusted hooks silently until you approve them in `/hooks`.
+- OpenCode's `tool.execute.after` is not fired in every version
+  (anomalyco/opencode#25918), so the plugin listens on `before` as well.
+  Duplicate events collapse to one signature, so nothing is double-documented.
+
 ## Verified vs best-effort
 
 Verified end-to-end on macOS: capture for all six harness payload shapes;
