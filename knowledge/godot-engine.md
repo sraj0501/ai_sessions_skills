@@ -34,6 +34,8 @@ $godot.Source --version
 <!-- sig: e29e2baae908 -->
 <!-- sig: 37e889fd29e1 -->
 <!-- sig: b39c89c1cba0 -->
+<!-- sig: ead7068ea73c -->
+<!-- sig: 305ce7b516fd -->
 
 ```bash
 '$godotExe' = 'D:\Program Files (x86)\Steam\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe'
