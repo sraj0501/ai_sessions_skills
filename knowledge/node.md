@@ -97,3 +97,15 @@ npx tsc --noEmit
 - **What it does:** Executes the local (or temporarily fetched) package binary — here, a type-check with no emitted output.
 - **Why:** Useful when a repo has no `type-check` script, or to check a single package: `npx tsc -p packages/backend --noEmit`.
 - **Notes:** Add `--no-install` to fail rather than silently downloading a package that is not in the project.
+
+### Validate inline JavaScript within a wiki file
+<!-- sig: e75087fd5e7e -->
+
+```bash
+node -e 'const fs=require(\'fs\');const h=fs.readFileSync(\'devtrack_wiki/wiki/wiki.html\',\'utf8\');const blocks=[...h.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).filter(s=>s.trim());blocks.forEach((s,i)=>{try{new Function(s)}catch(e){console.error(\'inline script \' + i + '\': \' + e.message);process.exitCode=1}});if(!process.exitCode)console.log('`
+```
+
+- **What it does:** Reads the content of devtrack_wiki/wiki/wiki.html, extracts all content found within <script> tags, and attempts to execute each block as JavaScript code.
+- **Why:** This script validates that all embedded JavaScript blocks within the wiki file are syntactically correct and executable.
+- **Example:** node -e 'const fs=require(\'fs\');const h=fs.readFileSync(\'devtrack_wiki/wiki/wiki.html\',\'utf8\');const blocks=[...h.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).filter(s=>s.trim());blocks.forEach((s,i)=>{try{new Function(s)}catch(e){console.error(\'inline script \' + i + '\': \' + e.message);process.exitCode=1}});if(!process.exitCode)console.log('`
+- **Notes:** The script exits with code 1 if any script block fails to execute, which is useful for CI/CD pipelines.
