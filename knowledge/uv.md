@@ -7,6 +7,7 @@
 
 ### Run specific backend test files with minimal output
 <!-- sig: 9fac445d7d3f -->
+<!-- sig: 1662f7e12eea -->
 
 ```bash
 uv run pytest backend/tests/test_admin_queue.py backend/tests/test_queue_status_store.py backend/tests/test_http_triggers.py backend/tests/test_eod_queue_action.py -q --tb=short
