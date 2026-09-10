@@ -28,6 +28,9 @@ and set **Files to include** to `knowledge/**/*.md`.
 | [systemd](systemd.md) | Linux services |
 | [Agent tools](agent-tools.md) | Agent tools and equivalent commands |
 | [`uv.md`](uv.md) | Uv |
+| [`get-childitem.md`](get-childitem.md) | Get Childitem |
+| [`select-object.md`](select-object.md) | Select Object |
+| [`godot.md`](godot.md) | Godot Engine |
 
 `_skipped.md` records actions the writer judged unsuitable for documentation.
 `.routes.json` stores routing decisions. Capture logs and pending actions are

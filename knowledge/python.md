@@ -49,6 +49,18 @@ python3 -m pip install -r requirements.txt
 - **Why:** `python3 -m pip` guarantees the pip that belongs to *that* interpreter, avoiding the classic "installed but not importable" mismatch.
 - **Notes:** Add `-q` to quiet the output in automation. On externally-managed Homebrew Python, install into a venv rather than using `--break-system-packages`.
 
+### Retrieve the Steam installation path from registry
+<!-- sig: 68a4d430e83e -->
+
+```bash
+Get-ItemPropertyValue -Path 'HKCU:\Software\Valve\Steam' -Name SteamPath
+```
+
+- **What it does:** This cmdlet retrieves a specific property value, 'SteamPath', from the specified registry path 'HKCU:\Software\Valve\Steam'.
+- **Why:** It directly accesses a known configuration value in the user's registry hive, which is more precise than searching the entire registry.
+- **Example:** Get-ItemPropertyValue -Path 'HKCU:\Software\Valve\Steam' -Name SteamPath
+- **Notes:** The path must be correctly escaped for PowerShell syntax, and the registry key must exist for the command to succeed.
+
 ## Running and testing
 
 ### Run the test suite quietly
