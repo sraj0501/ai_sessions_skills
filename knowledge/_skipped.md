@@ -36,3 +36,8 @@ A one-off test-harness command that waits for `.runtime/distill.lock` and then t
 <!-- sig: 6228e196e7b0 -->
 
 Used here only for paginating the output of other commands, which is better handled by piping to 'less'.
+
+### ForEach-Object '{' '$_.Matches[0].Groups[1].Value' -replace '\\\\,\' '}' foreach '($root' in '$roots
+<!-- sig: e74fc609fe69 -->
+
+unparseable JSON (Unterminated string starting at: line 6 column 5 (char 168))
