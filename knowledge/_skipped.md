@@ -41,3 +41,8 @@ Used here only for paginating the output of other commands, which is better hand
 <!-- sig: e74fc609fe69 -->
 
 unparseable JSON (Unterminated string starting at: line 6 column 5 (char 168))
+
+### '$gitExe' = 'C:\Program Files\Git\cmd\git.exe'
+<!-- sig: b4a52e70d305 -->
+
+This is variable assignment, not an executable shell command.
