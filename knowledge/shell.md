@@ -58,6 +58,7 @@ cat config.json
 <!-- sig: 2126ee85aacf -->
 <!-- sig: 6dc786901c5a -->
 <!-- sig: decbd66eacc6 -->
+<!-- sig: ec97a2060723 -->
 
 ```bash
 head -n 30 package.json
@@ -85,6 +86,8 @@ head -n 30 package.json
 <!-- sig: 36bf7ee75ee3 -->
 <!-- sig: 0a298316cc55 -->
 <!-- sig: d41804041dae -->
+<!-- sig: 3f56d08b9c02 -->
+<!-- sig: 9031b6065603 -->
 
 ```bash
 tail -n 25 .runtime/watcher.log
@@ -473,6 +476,7 @@ chmod +x bin/watcher.sh
 ### Fetch a URL quietly
 <!-- sig: 4d94586ad6ee -->
 <!-- sig: 237f2f607f73 -->
+<!-- sig: 57aeb276a64b -->
 
 ```bash
 curl -s https://api.github.com/rate_limit
@@ -485,6 +489,7 @@ curl -s https://api.github.com/rate_limit
 ### Recursively remove a directory tree
 <!-- sig: ee37b30a68f0 -->
 <!-- sig: febcc4591eaf -->
+<!-- sig: c24453cd8f42 -->
 
 ```bash
 rm -rf <directory>
@@ -631,6 +636,22 @@ lines[0..180]
 - **Why:** It allows for the programmatic extraction and inspection of targeted code blocks from several related source files without needing to view the entire contents of each script.
 - **Example:** Running the full sequence to compare line 130-210 from install.py against line 0-180 from cfg.py.
 - **Notes:** The script relies on PowerShell's `Get-Content` cmdlet and array slicing syntax (`[start..end]`) to manage the line extraction.
+
+### Check live database session counts and recent entries
+<!-- sig: e5a5e97e6f74 -->
+
+```bash
+uv run python -c "
+import sqlite3
+c = sqlite3.connect('data/interviews.db')
+print('sessions rows:', c.execute('select count(*) from sessions').fetchone()[0])
+print('latest:', c.execute('select candidate_name, created_at from sessions order by id desc limit 3').fetchall()"
+```
+
+- **What it does:** This command connects to the local sqlite database file data/interviews.db and executes two queries. It first counts all records in the sessions table, and then fetches the name and creation timestamp for the three most recent entries.
+- **Why:** It provides a quick, programmatic way to verify the current state of session tracking data within the database without needing a dedicated GUI tool.
+- **Example:** uv run python -c "import sqlite3; c = sqlite3.connect('data/interviews.db'); print('sessions rows:', c.execute('select count(*) from sessions').fetchone()[0]); print('latest:', c.execute('select candidate_name, created_at from sessions order by id desc limit 3').fetchall()"
+- **Notes:** The output format is controlled by the print statements within the Python script, which prints the count and then a list of tuples for the latest entries.
 
 ## Linting and validation
 

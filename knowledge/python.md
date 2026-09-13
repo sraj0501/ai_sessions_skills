@@ -101,6 +101,49 @@ Get-Content .runtime/watcher.log -Tail 3
 - **Example:** python tool/tests/test_portable.py TestSessionVerbs '*>' '.runtime/session-test-results.log;' Get-Content .runtime/session-test-results.log -Tail '5;' rg -n -F 973cd4561d55 .runtime/session.log .runtime/pending.jsonl '.runtime/seen.txt;' Get-Content .runtime/watcher.log -Tail 3
 - **Notes:** The command chains multiple distinct operations using semicolons. The `rg` command searches for the literal string '973cd4561d55' across the specified files.
 
+### Execute tests quietly and capture stderr
+<!-- sig: 1662f7e12eea -->
+
+```bash
+uv run pytest -q '2>&1'
+```
+
+- **What it does:** Runs the pytest test suite using the uv environment manager, suppressing output (-q) and redirecting standard error (2) to standard output (1).
+- **Why:** This ensures that any error messages written to stderr are captured and treated as standard output, allowing subsequent piping or logging to capture them uniformly.
+- **Example:** uv run pytest -q '2>&1' to run tests and pipe all output to a log file.
+- **Notes:** The single quotes around '2>&1' are crucial to ensure shell expansion happens correctly within the pytest arguments.
+
+### Test the web API endpoints using testclient
+<!-- sig: 898680b6b404 -->
+
+```bash
+uv run python -c 'from fastapi.testclient import TestClient
+from src.web_api import app
+from src.config import settings
+
+with TestClient(app) as c:
+    print("'health:'", c.get("'\/api/health'\'").json())
+    r = c.post("'\/api/auth/login'\', json={'username': settings.portal_username, 'password': settings.portal_password})
+    print("'login:'", r.status_code)
+```
+
+- **What it does:** Executes a Python script using uv that initializes a TestClient against the FastAPI application. It then performs GET and POST requests to test the health and login endpoints.
+- **Why:** This provides a controlled, isolated way to test the API's core functionality (like authentication and health checks) without needing to run a live server instance.
+- **Example:** uv run python -c '... (script content) ...' to verify login status after setting up credentials.
+- **Notes:** The script relies on `src.web_api.app` and `src.config.settings` being correctly configured in the execution environment.
+
+### Start the web API server on a specific port
+<!-- sig: 3b6af0ad4aac -->
+
+```bash
+uv run uvicorn src.web_api:app --port 8000 '2>&1'
+```
+
+- **What it does:** Executes the uvicorn server using the uv environment manager, pointing it to the app instance in src.web_api, and binding it to port 8000. The redirection ensures stderr is merged with stdout.
+- **Why:** This provides a controlled way to run the application server within a specific virtual environment managed by uv, while capturing both standard output and standard error into the same stream.
+- **Example:** uv run uvicorn src.web_api:app --port 8000 '2>&1' to test the API locally.
+- **Notes:** The trailing '2>&1' redirects standard error (2) to standard output (1), ensuring all logs appear together. The subsequent pipe to tail -40 is for viewing only the last 40 lines.
+
 ## Static analysis
 
 ### Lint with ruff
