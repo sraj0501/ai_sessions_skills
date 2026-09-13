@@ -14,6 +14,7 @@
 <!-- sig: 9c2fad1f9f73 -->
 <!-- sig: c0a3783dc9f5 -->
 <!-- sig: 9dbd253c14b2 -->
+<!-- sig: a30f669386d8 -->
 
 ```bash
 git status --short --branch
@@ -152,6 +153,7 @@ git pull --rebase origin staging
 
 ### Publish the current branch and set its upstream
 <!-- sig: 37c1b01873ae -->
+<!-- sig: 9f8e57644b2e -->
 
 ```bash
 git push -u origin HEAD
