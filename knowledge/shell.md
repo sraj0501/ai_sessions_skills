@@ -181,6 +181,57 @@ where powershell.exe
 - **Example:** where powershell.exe to find all instances of the PowerShell executable.
 - **Notes:** This command is specific to Windows environments and uses the system PATH variable for its search scope.
 
+### Locate all instances of an executable
+<!-- sig: 3aa39e96e820 -->
+
+```bash
+where.exe godot
+```
+
+- **What it does:** This command searches the system's PATH environment variable to find all executable files named 'godot'.
+- **Why:** It is useful for confirming which specific version or installation path of an executable is being found by the shell, especially when multiple versions might exist.
+- **Example:** where.exe godot to see all installed Godot engine executables.
+- **Notes:** This command is specific to Windows environments and uses the 'where.exe' utility.
+
+### Check for existence of multiple executable paths
+<!-- sig: 343ced09be69 -->
+
+```bash
+'$candidates' = '@(' 'C:\Program Files (x86)\Steam\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe,' 'C:\Program Files (x86)\Steam\steamapps\common\Godot Engine\Godot_v4.7-stable_win64.exe,' 'C:\Program Files\Steam\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' ')' '$found' = '$candidates'
+```
+
+- **What it does:** This script block assigns an array containing several potential paths to the variable `$candidates`, and then filters this array to find only the paths that actually exist on the filesystem, storing the results in `$found`.
+- **Why:** It systematically checks multiple known locations for a required executable, which is necessary when the exact installation path of a tool like Godot Engine is uncertain.
+- **Example:** Running the script block to populate `$found` with valid Godot executables.
+- **Notes:** This is a PowerShell snippet. The logic relies on the `Test-Path` cmdlet to validate the existence of each specified path.
+
+### Check existence and retrieve details of a file
+<!-- sig: 30709d8c5756 -->
+
+```bash
+$path = 'C:\Users\sraj\.codex\visualizations\2026\09\10\01a08c95-8193-7763-aaa7-3156f1c8763b\circuit-clash-concept.html'; Write-Output 'exists=$(Test-Path -LiteralPath $path)'; if '(Test-Path' -LiteralPath '$path)' '{' Get-Item -LiteralPath '$path'`],
+what`
+This script first assigns the full path to the variable $path, then outputs a boolean indicating if the path exists, and finally, if it exists, it retrieves item details and the first three lines of content.
+```
+
+- **What it does:** This script first assigns the full path to the variable $path, then outputs a boolean indicating if the path exists, and finally, if it exists, it retrieves item details and the first three lines of content.
+- **Why:** It combines path checking, metadata retrieval, and content preview into a single, conditional block.
+- **Example:** Running the command with the specified path will output the existence status and file details for circuit-clash-concept.html.
+- **Notes:** The script uses PowerShell syntax and relies on the variable $path being correctly set to the target file's absolute path.
+
+### Retrieve metadata for multiple files
+<!-- sig: 3ec4563bf4f7 -->
+<!-- sig: e3b61c377491 -->
+
+```bash
+Get-Item -LiteralPath '$doc,$image'
+```
+
+- **What it does:** Retrieves system information for the specified files, which are passed as a comma-separated list to the -LiteralPath parameter.
+- **Why:** This is a direct way to check the existence and basic properties of multiple, potentially disparate files in one call.
+- **Example:** Get-Item -LiteralPath 'D:\git_apps\games\NeonBlocks\design\CIRCUIT_CLASH_VISION.md','D:\git_apps\games\NeonBlocks\design\references\circuit-clash-3d-concept.png'
+- **Notes:** The -LiteralPath parameter is used here to correctly handle the comma separation of multiple paths without PowerShell interpreting the comma as a separator for multiple arguments.
+
 ## Searching
 
 ### Find which files contain a string
@@ -197,6 +248,13 @@ where powershell.exe
 <!-- sig: cb034de033fa -->
 <!-- sig: ec43ba54700b -->
 <!-- sig: 06b772db48c9 -->
+<!-- sig: 718533df33c1 -->
+<!-- sig: d27d8f3b3559 -->
+<!-- sig: c751884d4dd9 -->
+<!-- sig: 881e01afe6c8 -->
+<!-- sig: ad126d107e54 -->
+<!-- sig: 2d99f065df7f -->
+<!-- sig: 2d4c4b3e0bd9 -->
 
 ```bash
 rg -l -e 'ENTRA_REFRESH_TOKEN'
@@ -329,6 +387,22 @@ findstr /n "/c:case \"sage\"" /c:handleSage devtrack_clientcli.go
 - **Example:** findstr /n "/c:case \"sage\"" /c:handleSage devtrack_clientcli.go
 - **Notes:** The /n flag prefixes each line with its line number, and the /c: flag specifies a literal string to search for.
 
+### Filter directory items by name pattern
+<!-- sig: 1efdf5d03996 -->
+<!-- sig: b77c48f66493 -->
+<!-- sig: f10d31c96434 -->
+<!-- sig: 425b190db584 -->
+<!-- sig: ac4e54c52278 -->
+
+```bash
+Where-Object Name -Match Godot
+```
+
+- **What it does:** Filters the incoming pipeline objects, keeping only those where the Name property matches the regular expression 'Godot'.
+- **Why:** It allows for precise filtering of directory listings based on a pattern, which is more flexible than simple equality checks.
+- **Example:** Get-ChildItem -LiteralPath 'D:\Program Files (x86)\Steam\steamapps\common' -Directory | Where-Object Name -Match 'Godot'
+- **Notes:** This command is typically piped from another cmdlet like Get-ChildItem. The pattern 'Godot' is treated as a regex.
+
 ## Editing and transforming text
 
 ### Print a specific line range of a file
@@ -428,6 +502,8 @@ sort -rn
 
 ### Sort the output of a previous command
 <!-- sig: ac5752fc7662 -->
+<!-- sig: d579cb775220 -->
+<!-- sig: 3a49e3015a2b -->
 
 ```bash
 sort-object
@@ -437,6 +513,20 @@ sort-object
 - **Why:** It provides structured, predictable ordering to data streams coming from other commands, which is often necessary for reliable processing.
 - **Example:** rg --files tool .runtime | Sort-Object
 - **Notes:** When used in a pipeline, it processes objects sequentially as they arrive from the preceding command.
+
+### Show differences in a specific file
+<!-- sig: 51d74c2f296b -->
+<!-- sig: d1b4a6c42309 -->
+<!-- sig: 10b6f3d6d4db -->
+
+```bash
+cmd /c git diff -- README.md
+```
+
+- **What it does:** Executes git diff via the Windows command prompt to show unstaged changes between the working directory and the index for README.md.
+- **Why:** This explicitly targets a single file's differences, which is useful for reviewing changes in a README before committing, without needing to stage the entire repository.
+- **Example:** cmd /c git diff -- README.md to check documentation updates.
+- **Notes:** The use of 'cmd /c' is necessary to correctly pass the git command through the Windows shell.
 
 ## Files, permissions, network
 
@@ -512,6 +602,12 @@ cp /tmp/recs.jsonl .runtime/pending.jsonl
 
 ### Read the entire content of a markdown file
 <!-- sig: f6230d6cef29 -->
+<!-- sig: d58da3ef8576 -->
+<!-- sig: d80496ea78f0 -->
+<!-- sig: 61296789507e -->
+<!-- sig: 7404e77209e8 -->
+<!-- sig: b3cb264707d3 -->
+<!-- sig: 3a2a082c5b15 -->
 
 ```bash
 Get-Content -Raw 'C:\Users\sraj\.codex\skills\session-skills\SKILL.md'
@@ -521,6 +617,54 @@ Get-Content -Raw 'C:\Users\sraj\.codex\skills\session-skills\SKILL.md'
 - **Why:** Using -Raw ensures that the entire file content is returned as one string object, which is useful for processing the whole document at once.
 - **Example:** Get-Content -Raw 'C:\Users\sraj\.codex\skills\session-skills\SKILL.md'
 - **Notes:** The -Raw switch is crucial here; without it, Get-Content would return an array of strings, one for each line.
+
+### Create a directory structure forcefully
+<!-- sig: 1686ced82075 -->
+
+```bash
+New-Item -ItemType Directory -Force -Path 'D:\git\_apps\games\NeonBlocks'
+```
+
+- **What it does:** This cmdlet creates a new item, specifically a directory, at the specified path. The -Force parameter ensures that parent directories are created if they do not already exist.
+- **Why:** It guarantees the target directory exists without failing if intermediate directories are missing, which is safer than multiple explicit creation steps.
+- **Example:** New-Item -ItemType Directory -Force -Path 'D:\git\_apps\games\NeonBlocks' to prepare the destination for new game assets.
+- **Notes:** The -Force parameter is crucial here as it allows the command to succeed even if the parent directories in the path do not exist.
+
+### Copy multiple project files to a new location
+<!-- sig: e1f5dccd98c8 -->
+
+```bash
+Copy-Item -LiteralPath 'D:\git_apps\Devtrack_\.codex_stage\NeonBlocks\project.godot,D:\git_apps\Devtrack_\.codex_stage\NeonBlocks\main.tscn,D:\git_apps\Devtrack_\.codex_stage\NeonBlocks\game.gd,D:\git_apps\Devtrack_\.codex_stage\NeonBlocks\README.md' -Destination 'D:\git_\apps\games\NeonBlocks' -Force
+```
+
+- **What it does:** Copies multiple specified files from the source directory to the destination directory, overwriting existing files if necessary.
+- **Why:** This is a direct way to synchronize a set of related project assets from a staging area to a final games directory.
+- **Example:** Copy-Item -LiteralPath 'D:\git_apps\Devtrack_\.codex_stage\NeonBlocks\project.godot,D:\git_apps\Devtrack_\.codex_stage\NeonBlocks\main.tscn,D:\git_apps\Devtrack_\.codex_stage\NeonBlocks\game.gd,D:\git_apps\Devtrack_\.codex_stage\NeonBlocks\README.md' -Destination 'D:\git_\apps\games\NeonBlocks' -Force
+- **Notes:** The initial Out-Null; is used to suppress output from the preceding command (New-Item) if it were run in sequence.
+
+### Delete a specific application directory
+<!-- sig: b1cd33d79854 -->
+
+```bash
+Remove-Item -LiteralPath 'D:\git_apps\games\tetris'
+```
+
+- **What it does:** Removes the directory located at 'D:\git_apps\games\tetris' using the specified literal path.
+- **Why:** This is the explicit PowerShell way to delete a directory structure, ensuring that paths containing special characters or spaces are handled correctly via -LiteralPath.
+- **Example:** Remove-Item -LiteralPath 'D:\git_apps\games\tetris' to clean up an old game directory.
+- **Notes:** If the directory is not empty, you may need to add the -Recurse parameter to force deletion of contents.
+
+### Copy a file only if the destination does not exist
+<!-- sig: d15bd7e83b36 -->
+
+```bash
+Out-Null if '(Test-Path -LiteralPath '$destinationImage') {' throw 'Destination already exists; refusing to overwrite it.' '} Copy-Item -LiteralPath '$sourceImage' -Destination '$destinationImage' Get-Item -LiteralPath '$destinationImage'
+```
+
+- **What it does:** This script checks if the destination file exists; if it does, it throws an error and stops execution. If it doesn't exist, it copies the source file to the destination.
+- **Why:** This pattern ensures that an overwrite operation is explicitly prevented, which is safer than relying on default copy behavior.
+- **Example:** Out-Null if '(Test-Path -LiteralPath 'D:\git_apps\games\NeonBlocks\design\references\circuit-clash-3d-concept.png') {' throw 'Destination already exists; refusing to overwrite it.' '} Copy-Item -LiteralPath 'C:\Users\sraj\.codex\generated_images\01a08c95-8193-7763-aaa7-3156f1c8763b\exec-d6bef533-66c7-46eb-bca2-1b403ce9b77e.png' -Destination 'D:\git_apps\games\NeonBlocks\design\references\circuit-clash-3d-concept.png' Get-Item -LiteralPath 'D:\git_apps\games\NeonBlocks\design\references\circuit-clash-3d-concept.png'
+- **Notes:** The structure uses an 'if' block to conditionally execute the throw statement, which is then followed by the copy operation. The final Get-Item is likely for confirmation or subsequent logic.
 
 ## Processes
 
@@ -535,6 +679,18 @@ ps -p <pid> -o pid,etime,command 2>/dev/null
 - **Why:** A quick health check for a long-running background watcher or daemon without parsing a full `ps aux` list.
 - **Example:** `ps -p 32594 -o pid,etime,command 2>/dev/null`.
 - **Notes:** `etime` shows elapsed time as `[[DD-]HH:]MM:SS`. Use `comm` or `%cpu` instead of `command` if you only need the executable name or CPU usage.
+
+### Launch the game engine with specific project arguments
+<!-- sig: 1471c10a43af -->
+
+```bash
+Start-Process -FilePath 'D:\Program Files (x86)\Steam\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' -ArgumentList '--editor,--path,D:\git\_apps\games\NeonBlocks'
+```
+
+- **What it does:** Starts a new process using the specified executable path and passes arguments to launch the Godot editor pointing to the NeonBlocks project directory.
+- **Why:** This is the explicit way to launch an external application with arguments in PowerShell, ensuring the process starts correctly regardless of the current shell context.
+- **Example:** Start-Process -FilePath 'D:\Program Files (x86)\Steam\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' -ArgumentList '--editor,--path,D:\git\_apps\games\NeonBlocks'
+- **Notes:** The path arguments must be correctly escaped for PowerShell execution.
 
 ## Archives and compression
 
@@ -635,6 +791,92 @@ lines[0..180]
 - **Example:** Running the full sequence to compare line 130-210 from install.py against line 0-180 from cfg.py.
 - **Notes:** The script relies on PowerShell's `Get-Content` cmdlet and array slicing syntax (`[start..end]`) to manage the line extraction.
 
+### Check for local admin artifacts existence
+<!-- sig: 402a31973b52 -->
+
+```bash
+if exist .codex-cache '(dir' /s /b '.codex-cache)' else '(echo' 'NO_LOCAL_ADMIN_E2E_ARTIFACTS)'
+```
+
+- **What it does:** This command checks if the directory .codex-cache exists using 'if exist'. If it does, it executes 'dir /s /b .codex-cache' to list its contents recursively; otherwise, it prints the string 'NO_LOCAL_ADMIN_E2E_ARTIFACTS'.
+- **Why:** It provides a conditional check to determine if necessary local artifacts are present before proceeding with a build or operation.
+- **Example:** if exist .codex-cache '(dir' /s /b '.codex-cache)' else '(echo' 'NO_LOCAL_ADMIN_E2E_ARTIFACTS)'
+- **Notes:** This syntax is specific to Windows batch scripting and relies on the 'if' conditional structure.
+
+### Process and display contents of multiple files
+<!-- sig: f6dee5b3e54f -->
+
+```bash
+for %f in (.claude\memory\project_mcp_distribution.md .claude\memory\project_launch_strategy.md .claude\memory\project_platform_modes.md .claude\memory\project_documentation.md .claude\memory\project_server_ui_refresh.md .claude\memory\feedback_rules.md .claude\memory\reference_subsystems.md .claude\memory\project_autoload_env.md .claude\memory\project_local_agents.md .claude\memory\project_saas_license.md) do @echo ====%f==== & @type %f
+```
+
+- **What it does:** This batch loop iterates over a list of specified markdown files, printing a separator header for each file, and then executing the @type command on the file path.
+- **Why:** It automates the process of sequentially processing and displaying the contents of several related documentation files within a single batch script execution.
+- **Example:** for %f in (file1.md file2.md) do @echo ====%f==== & @type %f
+- **Notes:** The command uses batch scripting syntax (`for`, `do`, `&`) and relies on the availability of the `@type` utility.
+
+### Generate a comprehensive project overview report
+<!-- sig: 022c27a29a32 -->
+
+```bash
+Write-Output '--- README ---;'
+Get-Content -LiteralPath 'README.md';
+Write-Output '--- main.tscn ---;'
+Get-Content -LiteralPath 'main.tscn';
+Write-Output '--- game.gd outline ---;'
+rg -n '^(extends|class_name|signal|const|var |@onready|func )' 'game.gd';
+Write-Output '--- git status ---;'
+git status --short --branch
+```
+
+- **What it does:** This sequence outputs headers, reads the content of README.md and main.tscn, uses ripgrep to find declarations in game.gd, and finally shows the current git status.
+- **Why:** It aggregates multiple disparate pieces of project metadata—documentation, scene structure, code declarations, and git state—into a single, readable output stream for review.
+- **Example:** Running this entire pipeline before submitting a pull request to summarize the current state of the project.
+- **Notes:** The use of Write-Output ensures clear section breaks between the different content blocks being concatenated.
+
+### Collect all potential Steam installation paths from registry
+<!-- sig: eef054086751 -->
+
+```bash
+$steamPaths = @()
+$regPaths = @('HKCU:\Software\Valve\Steam','HKLM:\SOFTWARE\WOW6432Node\Valve\Steam','HKLM:\SOFTWARE\Valve\Steam')
+foreach ($key in $regPaths) { if (Test-Path '$key') { $props = Get-ItemProperty '$key' if ($props.SteamPath) { $steamPaths += $props.SteamPath } if ($props.InstallPath) { $steamPaths += $props.InstallPath } } }
+$steamPaths = $steamPaths | Sort-Object -Unique
+Write-Output 'Steam roots:'
+$steamPaths
+```
+
+- **What it does:** This script initializes an array to hold Steam paths, then iterates through three specified registry keys. For each existing key, it retrieves properties like SteamPath and InstallPath, appending any found values to the $steamPaths array.
+- **Why:** It systematically checks multiple common registry locations where Steam might store its installation or configuration paths, ensuring comprehensive coverage.
+- **Example:** $steamPaths = @() $regPaths = @('HKCU:\Software\Valve\Steam','HKLM:\SOFTWARE\WOW6432Node\Valve\Steam','HKLM:\SOFTWARE\Valve\Steam') foreach ($key in $regPaths) { if (Test-Path '$key') { $props = Get-ItemProperty '$key' if ($props.SteamPath) { $steamPaths += $props.SteamPath } if ($props.InstallPath) { $steamPaths += $props.InstallPath } } }
+- **Notes:** The script relies on the existence of specific registry keys and properties. The final output is a sorted, unique list of collected paths.
+
+### List executable files within a specific game directory
+<!-- sig: 74a83a9cbbe5 -->
+
+```bash
+'$manifest' = 'D:\Program Files (x86)\Steam\steamapps\appmanifest_404790.acf' if '(Test-Path' -LiteralPath '$manifest)' '{' Get-Content -LiteralPath '$manifest' '}' '$common' = 'D:\Program Files (x86)\Steam\steamapps\common' Get-ChildItem -LiteralPath '$common' -Directory | Where-Object { $_.Name -match 'Godot' } | ForEach-Object { Write-Output "Directory: $($_.FullName)" ; Get-ChildItem -LiteralPath $_.FullName -Recurse -File -Filter '*.exe' | Select-Object FullName,Length }}
+```
+
+- **What it does:** This script first checks for and reads a specific Steam manifest file, then finds all subdirectories named 'Godot' within the common Steam directory. Finally, it recursively lists all `.exe` files inside those Godot directories, outputting their full path and length.
+- **Why:** This complex sequence is necessary to reliably locate and inventory all executable assets within a specific game's installation folder structure, which is more robust than simple globbing.
+- **Example:** Running the full command block to inventory executables in the Godot subdirectory of the Steam common folder.
+- **Notes:** The script relies on PowerShell's conditional execution and pipeline processing. The initial manifest check is executed first, regardless of the subsequent directory listing.
+
+### Validate required input directories and files
+<!-- sig: be498f4d1e94 -->
+
+```bash
+if (-not (Test-Path -LiteralPath $sourceImage)) { throw "Generated source image was not found." }
+New-Item -ItemType Directory -Path $referenceDir -Force | Out-Null
+if (Test-Path -LiteralPath $destinationImage) { throw "Destination already exists; "
+```
+
+- **What it does:** This block checks if the source image exists, ensures the reference directory exists, and then checks if the destination image already exists.
+- **Why:** It provides necessary pre-flight checks to prevent subsequent image processing commands from failing due to missing inputs or overwriting existing outputs unexpectedly.
+- **Example:** Running this block before an image comparison script to ensure all paths are valid.
+- **Notes:** The script uses PowerShell cmdlets like Test-Path and New-Item. The variables $sourceImage, $referenceDir, and $destinationImage must be correctly set beforehand.
+
 ## Linting and validation
 
 ### Check markdown files for embedded ANSI escape codes
@@ -648,3 +890,18 @@ lines[0..180]
 - **Why:** To validate that markdown files are clean and do not contain raw terminal control characters that could break rendering or cause unexpected behavior.
 - **Example:** `(grep -lP '\x1b' '*.md' 2>/dev/null)`
 - **Notes:** The `-l` flag ensures only filenames are printed, not the matching lines. The `-P` flag is required to correctly interpret the hexadecimal escape sequence `\x1b`.
+
+## Viewing history
+
+### View the last twenty commits in a readable format
+<!-- sig: 48b676a6a96f -->
+<!-- sig: 31fded609e41 -->
+
+```bash
+set 'GIT_NO_DEVTRACK=1&&' git log --oneline '-20&&' type README.md
+```
+
+- **What it does:** This command first sets an environment variable, then runs git log to display the last 20 commits on a single line, and finally types the content of README.md.
+- **Why:** It combines viewing recent commit history with immediately displaying the contents of a key documentation file in one sequence.
+- **Example:** set 'GIT_NO_DEVTRACK=1&&' git log --oneline '-20&&' type README.md to check recent changes and documentation simultaneously.
+- **Notes:** The use of '&&' ensures the subsequent command only runs if the preceding one succeeds. The 'set' command is used here to conditionally set an environment variable for the git operation.

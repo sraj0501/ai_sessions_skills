@@ -15,6 +15,9 @@
 <!-- sig: c0a3783dc9f5 -->
 <!-- sig: 9dbd253c14b2 -->
 <!-- sig: d48cabb14f27 -->
+<!-- sig: e2d72e57d7f8 -->
+<!-- sig: 184a58679609 -->
+<!-- sig: 78a6809a037f -->
 
 ```bash
 git status --short --branch
@@ -34,6 +37,16 @@ git status --short --branch
 <!-- sig: c174fa97b1a5 -->
 <!-- sig: ebeca0666c22 -->
 <!-- sig: 79f56f70ae55 -->
+<!-- sig: f3a13a68767e -->
+<!-- sig: a384d532de05 -->
+<!-- sig: e14b7661e9be -->
+<!-- sig: 6b322b5eb63b -->
+<!-- sig: ac424ea4582f -->
+<!-- sig: eec9455bb787 -->
+<!-- sig: dcf98d2c07fc -->
+<!-- sig: 622f1a1e1d98 -->
+<!-- sig: 1cd3d1dbcbde -->
+<!-- sig: 7c402d92bbb6 -->
 
 ```bash
 git --no-pager diff
@@ -55,6 +68,17 @@ git --no-pager diff --staged
 <!-- sig: d6787a980826 -->
 <!-- sig: b175dc07cb10 -->
 <!-- sig: bba794eb9a87 -->
+<!-- sig: 223e825c75df -->
+<!-- sig: 3965e4346cfb -->
+<!-- sig: 8b27018f461a -->
+<!-- sig: 9b51d2f67a72 -->
+<!-- sig: ba51dcb57027 -->
+<!-- sig: 68b0c22faf7f -->
+<!-- sig: e2c8fb88140a -->
+<!-- sig: f9e9e9239549 -->
+<!-- sig: a5ceaf3e9c2d -->
+<!-- sig: 105d4db9bf59 -->
+<!-- sig: 76d71216d104 -->
 
 ```bash
 git log --oneline -10
@@ -80,6 +104,8 @@ git log -3 --format='%s%n%b---'
 
 ### Find out which branch is checked out
 <!-- sig: 5f84b4c8c60a -->
+<!-- sig: 2d352e05c5e4 -->
+<!-- sig: 285859faaacc -->
 
 ```bash
 git branch --show-current
@@ -104,6 +130,12 @@ git remote -v
 ### Show what changed in a specific commit
 <!-- sig: 6a4bd45661c0 -->
 <!-- sig: 7a6f06380530 -->
+<!-- sig: f5fbff819fa6 -->
+<!-- sig: d0a30ee846dc -->
+<!-- sig: 3a576487e1e8 -->
+<!-- sig: dbb24726b8cf -->
+<!-- sig: 5fd258aa5e08 -->
+<!-- sig: 154bdf80986a -->
 
 ```bash
 git show --stat <commit>
@@ -112,6 +144,42 @@ git show --stat <commit>
 - **What it does:** Prints the commit metadata plus a list of changed files with insertion/deletion counts, but not the full diff.
 - **Why:** A quick sanity check on what a commit touched before cherry-picking, reverting, or discussing it.
 - **Example:** `git show --stat e51dabe` to see the file impact of that commit.
+
+### List all existing version tags
+<!-- sig: 6fd7d558eacb -->
+
+```bash
+git tag --list v3.1.1
+```
+
+- **What it does:** Retrieves a list of tags that match the specified pattern, in this case, exactly 'v3.1.1'.
+- **Why:** This confirms the exact existence and spelling of a version tag before attempting to check it out or use it in a release script.
+- **Example:** git tag --list v3.1.1 to verify the tag exists before deploying.
+- **Notes:** If you omit the pattern, it lists all tags. Using a pattern like 'v*' is often more useful.
+
+### Get the full SHA-1 hash of the current commit
+<!-- sig: 185221081e5e -->
+
+```bash
+git rev-parse HEAD
+```
+
+- **What it does:** This command resolves the symbolic reference HEAD to its full, 40-character SHA-1 hash identifier.
+- **Why:** It provides a canonical, unambiguous string representation of the current commit, which is useful for scripting or cross-referencing.
+- **Example:** git rev-parse HEAD to get the current commit hash for an API call.
+- **Notes:** This output is the exact commit hash, which is often required when interacting with external systems or scripts.
+
+### Show the status of the current branch
+<!-- sig: 66d282d757db -->
+
+```bash
+git status --short --branch
+```
+
+- **What it does:** Displays a concise summary of the repository's status, including which branch is active and any modified files.
+- **Why:** Provides a quick, machine-readable overview of the working directory state without the verbose output of a standard status check.
+- **Example:** git status --short --branch on a feature branch to check for uncommitted changes.
+- **Notes:** The full path to git.exe is used here, which is necessary if git is not in the system PATH.
 
 ## Remotes and syncing
 
@@ -154,6 +222,7 @@ git pull --rebase origin staging
 
 ### Publish the current branch and set its upstream
 <!-- sig: 37c1b01873ae -->
+<!-- sig: 9f8e57644b2e -->
 
 ```bash
 git push -u origin HEAD
@@ -162,6 +231,18 @@ git push -u origin HEAD
 - **What it does:** Pushes the checked-out branch to `origin` under the same name and records it as the tracking branch, so later `git push`/`git pull` need no arguments.
 - **Why:** `HEAD` avoids retyping (and mistyping) the branch name.
 - **Notes:** Push to your fork (`origin`), not to a shared repo, unless that is explicitly the workflow. Never push straight to `main`/`staging` — open a PR from a branch.
+
+### Check remote branch existence and SHA
+<!-- sig: dee87eabe14c -->
+
+```bash
+git ls-remote --heads origin feat/TASK-154-server-admin-ui
+```
+
+- **What it does:** Lists the SHA-1 hash and reference for the specified branch on the origin remote without fetching the full object data.
+- **Why:** This confirms that a branch exists on the remote server and retrieves its exact commit hash without needing to check out or merge anything.
+- **Example:** git ls-remote --heads origin feat/TASK-154-server-admin-ui to verify the remote tracking branch hash.
+- **Notes:** This command only reads the remote reference; it does not update local tracking branches.
 
 ## Branching
 
@@ -179,6 +260,7 @@ git checkout -b fix/kpi4-vuepacs-4430804
 
 ### Switch to an existing branch
 <!-- sig: c16cdcb44d0b -->
+<!-- sig: 3e399b442904 -->
 
 ```bash
 git switch staging
@@ -200,10 +282,23 @@ git branch -r --contains <commit>
 - **Example:** `git branch -r --contains e51dabe` to see which remote branches include that commit.
 - **Notes:** Returns nothing if no remote branch contains the commit. Use `2>/dev/null` to suppress errors from missing remote refs in scripts.
 
+### Check if one commit is an ancestor
+<!-- sig: 7a35792152c9 -->
+
+```bash
+git merge-base --is-ancestor v3.1.1 5fc3a11
+```
+
+- **What it does:** Determines if the commit hash 5fc3a11 is an ancestor of the tag v3.1.1. The --is-ancestor flag returns a non-zero exit code if it is not an ancestor.
+- **Why:** This provides a programmatic way to verify lineage between two specific points in history, which is more reliable than visual inspection.
+- **Example:** git merge-base --is-ancestor v3.1.1 5fc3a11 to script logic checking release history.
+- **Notes:** The exit code is the primary output; check $? immediately after running the command.
+
 ## Staging and committing
 
 ### Stage everything, including deletions
 <!-- sig: ad068f775213 -->
+<!-- sig: d41a0a50eea6 -->
 
 ```bash
 git add -A
@@ -279,6 +374,43 @@ git config user.name T
 - **Why:** Git requires a configured user name and email to correctly attribute commits, which is necessary before pushing to remote repositories.
 - **Example:** `git config --global user.name "Jane Doe"`
 - **Notes:** Use `--global` to set the name for all repositories on the machine; omitting it sets the name only for the current repository.
+
+### Stage all changes in the repository
+<!-- sig: 6e26d25c4407 -->
+<!-- sig: e28d1fe0ff40 -->
+<!-- sig: 8fc6b954ab91 -->
+<!-- sig: d66bc6052fbf -->
+<!-- sig: 85b9b6430d74 -->
+<!-- sig: 0d4e31513861 -->
+
+```bash
+$gitExe add --all
+```
+
+- **What it does:** Stages all changes, including modified, deleted, and new files across the entire repository, into the staging index.
+- **Why:** This ensures that every tracked change, regardless of its location, is included in the next commit snapshot.
+- **Example:** '$gitExe add --all' after modifying files in src/ and deleting old assets.
+- **Notes:** This command stages everything, which is useful for a full baseline commit but can include unintended changes if not careful.
+
+### Commit changes while disabling GPG signing
+<!-- sig: 64917c63c0d8 -->
+<!-- sig: e13e97237f75 -->
+<!-- sig: 13b3e1068f3e -->
+<!-- sig: 155d06b56656 -->
+<!-- sig: 7d823d231280 -->
+<!-- sig: 9365f2d5658c -->
+<!-- sig: bffbaca84269 -->
+<!-- sig: a652f1c923d3 -->
+<!-- sig: 1f092dea1269 -->
+
+```bash
+'C:\Program Files\Git\cmd\git.exe' -c commit.gpgsign=false commit -m 'Baseline: preserve original Neon Blocks prototype and concept;'
+```
+
+- **What it does:** This executes a git commit, setting the commit.gpgsign configuration variable to false for this specific operation. The commit message is 'Baseline: preserve original Neon Blocks prototype and concept;'.
+- **Why:** It allows committing changes to the repository without requiring or performing a GPG signature, which might be necessary for initial commits or CI environments.
+- **Example:** 'C:\Program Files\Git\cmd\git.exe' -c commit.gpgsign=false commit -m 'Baseline: preserve original Neon Blocks prototype and concept;'
+- **Notes:** The surrounding PowerShell logic checks the exit code ($LASTEXITCODE) to conditionally run a subsequent tag command, which is not documented here.
 
 ## Shelving work
 
