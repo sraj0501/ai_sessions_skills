@@ -255,6 +255,14 @@ Get-Item -LiteralPath '$doc,$image'
 <!-- sig: ad126d107e54 -->
 <!-- sig: 2d99f065df7f -->
 <!-- sig: 2d4c4b3e0bd9 -->
+<!-- sig: fdee19b6f362 -->
+<!-- sig: bc09f56f77cf -->
+<!-- sig: 3c2d76ee8b0e -->
+<!-- sig: fb1fef807332 -->
+<!-- sig: 79402b8b748e -->
+<!-- sig: 01add8a7b723 -->
+<!-- sig: 68bed290e21e -->
+<!-- sig: ae5218129dcb -->
 
 ```bash
 rg -l -e 'ENTRA_REFRESH_TOKEN'
@@ -608,6 +616,8 @@ cp /tmp/recs.jsonl .runtime/pending.jsonl
 <!-- sig: 7404e77209e8 -->
 <!-- sig: b3cb264707d3 -->
 <!-- sig: 3a2a082c5b15 -->
+<!-- sig: c51cb700dbfd -->
+<!-- sig: d75e64617e68 -->
 
 ```bash
 Get-Content -Raw 'C:\Users\sraj\.codex\skills\session-skills\SKILL.md'
@@ -666,6 +676,18 @@ Out-Null if '(Test-Path -LiteralPath '$destinationImage') {' throw 'Destination 
 - **Example:** Out-Null if '(Test-Path -LiteralPath 'D:\git_apps\games\NeonBlocks\design\references\circuit-clash-3d-concept.png') {' throw 'Destination already exists; refusing to overwrite it.' '} Copy-Item -LiteralPath 'C:\Users\sraj\.codex\generated_images\01a08c95-8193-7763-aaa7-3156f1c8763b\exec-d6bef533-66c7-46eb-bca2-1b403ce9b77e.png' -Destination 'D:\git_apps\games\NeonBlocks\design\references\circuit-clash-3d-concept.png' Get-Item -LiteralPath 'D:\git_apps\games\NeonBlocks\design\references\circuit-clash-3d-concept.png'
 - **Notes:** The structure uses an 'if' block to conditionally execute the throw statement, which is then followed by the copy operation. The final Get-Item is likely for confirmation or subsequent logic.
 
+### Forcefully delete a specific configuration file
+<!-- sig: e3635f09ec86 -->
+
+```bash
+del /f /q D:git_appsDevtrack_.codexhooks.json
+```
+
+- **What it does:** Deletes the file D:git_appsDevtrack_.codexhooks.json, forcing deletion of read-only attributes (/f) and suppressing confirmation prompts (/q).
+- **Why:** This is used to clean up a specific, potentially problematic hook file in a development repository without interactive confirmation.
+- **Example:** del /f /q D:git_appsDevtrack_.codexhooks.json before re-running setup scripts.
+- **Notes:** The /f flag forces deletion even if the file is read-only, and /q suppresses prompts for confirmation.
+
 ## Processes
 
 ### Check whether a specific process is still running
@@ -691,6 +713,18 @@ Start-Process -FilePath 'D:\Program Files (x86)\Steam\steamapps\common\Godot Eng
 - **Why:** This is the explicit way to launch an external application with arguments in PowerShell, ensuring the process starts correctly regardless of the current shell context.
 - **Example:** Start-Process -FilePath 'D:\Program Files (x86)\Steam\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' -ArgumentList '--editor,--path,D:\git\_apps\games\NeonBlocks'
 - **Notes:** The path arguments must be correctly escaped for PowerShell execution.
+
+### List processes matching a specific executable name
+<!-- sig: e1737ca014a7 -->
+
+```bash
+tasklist /V /FO CSV /FI "IMAGENAME eq Code.exe"
+```
+
+- **What it does:** Displays a detailed list of running processes, filtering the output to only include entries where the Image Name equals Code.exe, and formatting the result as CSV.
+- **Why:** This provides a structured, machine-readable list of processes matching a specific executable name, which is better for scripting than the default output.
+- **Example:** tasklist /V /FO CSV /FI "IMAGENAME eq Code.exe" to check for running instances of the IDE.
+- **Notes:** The /V flag provides verbose output, and /FO CSV ensures the output is comma-separated values, making it easy to parse in a script.
 
 ## Archives and compression
 
@@ -876,6 +910,18 @@ if (Test-Path -LiteralPath $destinationImage) { throw "Destination already exist
 - **Why:** It provides necessary pre-flight checks to prevent subsequent image processing commands from failing due to missing inputs or overwriting existing outputs unexpectedly.
 - **Example:** Running this block before an image comparison script to ensure all paths are valid.
 - **Notes:** The script uses PowerShell cmdlets like Test-Path and New-Item. The variables $sourceImage, $referenceDir, and $destinationImage must be correctly set beforehand.
+
+### Execute a Python script with a specific harness
+<!-- sig: 4a5a839db7fa -->
+
+```bash
+'C:\WINDOWS\system32\cmd.exe' /c 'C:\Users\sraj\AppData\Roaming\uv\python\cpython-3.13-windows-x86_64-none\pythonw.exe D:\git_apps\ai_sessions_skills\tool\bin\capture.py --harness codex < D:\git_apps\ai_sessions_skills\.runtime\windowless-hook-probe.json'
+```
+
+- **What it does:** This command executes the Python script capture.py using the pythonw interpreter, passing the --harness codex argument, and redirecting the content of windowless-hook-probe.json as standard input.
+- **Why:** This pattern is used to run a specific Python utility (capture.py) in a controlled environment, feeding it configuration data from a local JSON file.
+- **Example:** 'C:\WINDOWS\system32\cmd.exe' /c 'C:\Users\sraj\AppData\Roaming\uv\python\cpython-3.13-windows-x86_64-none\pythonw.exe D:\git_apps\ai_sessions_skills\tool\bin\capture.py --harness codex < D:\git_apps\ai_sessions_skills\.runtime\windowless-hook-probe.json'
+- **Notes:** The use of 'pythonw.exe' suggests running the script without opening a console window. The input redirection (<) feeds the contents of the specified JSON file into the script's standard input.
 
 ## Linting and validation
 

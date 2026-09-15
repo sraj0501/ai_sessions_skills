@@ -1,4 +1,4 @@
-"""Read completed VS Code command items from Codex's local history, read-only.
+"""Read completed command items from Codex's local history, read-only.
 
 Opt-in fallback for sessions whose PostToolUse hook is not delivered. The
 SQLite projection is an internal Codex format; schema errors are reported,
@@ -23,6 +23,14 @@ def enabled():
     return (cfg.get("capture.codex_ide", False) is True
             and not os.environ.get("AI_SKILLS_KB")
             and not os.environ.get("AI_SKILLS_DISTILLER"))
+
+
+def sources():
+    """History thread sources explicitly enabled for capture."""
+    value = cfg.get("capture.codex_sources", ["vscode"])
+    if isinstance(value, str):
+        value = [value]
+    return [str(item) for item in value if isinstance(item, str) and item]
 
 
 def home():
@@ -77,8 +85,14 @@ def poll(runtime=None, codex_home=None):
     state = json.loads(state_path.read_text(encoding="utf-8"))
     count = 0
     with connect(base / "state_5.sqlite") as index, connect(base / "thread_history_1.sqlite") as history:
-        # Exclude CLI/cloud/subagent writer sessions to prevent recursion.
-        threads = index.execute("SELECT id FROM threads WHERE source = 'vscode' AND archived = 0").fetchall()
+        enabled_sources = sources()
+        if not enabled_sources:
+            return 0
+        placeholders = ",".join("?" for _ in enabled_sources)
+        threads = index.execute(
+            "SELECT id FROM threads WHERE source IN (%s) AND archived = 0" % placeholders,
+            enabled_sources,
+        ).fetchall()
         for (thread,) in threads:
             progress = state["threads"].setdefault(thread, {"ordinal": -1, "pending": []})
             pending = set(progress["pending"])

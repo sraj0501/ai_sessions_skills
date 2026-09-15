@@ -34,6 +34,7 @@ and set **Files to include** to `knowledge/**/*.md`.
 | [`godot-engine.md`](godot-engine.md) | Godot Engine |
 | [`foreach-object.md`](foreach-object.md) | Foreach Object |
 | [`godot-tools.md`](godot-tools.md) | Godot Tools |
+| [`codex.md`](codex.md) | Codex |
 
 `_skipped.md` records actions the writer judged unsuitable for documentation.
 `.routes.json` stores routing decisions. Capture logs and pending actions are

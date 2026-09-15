@@ -18,6 +18,7 @@
 <!-- sig: e2d72e57d7f8 -->
 <!-- sig: 184a58679609 -->
 <!-- sig: 78a6809a037f -->
+<!-- sig: 53d692e5d48d -->
 
 ```bash
 git status --short --branch
@@ -136,6 +137,7 @@ git remote -v
 <!-- sig: dbb24726b8cf -->
 <!-- sig: 5fd258aa5e08 -->
 <!-- sig: 154bdf80986a -->
+<!-- sig: 025bc9d66cf9 -->
 
 ```bash
 git show --stat <commit>
@@ -159,6 +161,7 @@ git tag --list v3.1.1
 
 ### Get the full SHA-1 hash of the current commit
 <!-- sig: 185221081e5e -->
+<!-- sig: 153cdd61669d -->
 
 ```bash
 git rev-parse HEAD
@@ -180,6 +183,43 @@ git status --short --branch
 - **Why:** Provides a quick, machine-readable overview of the working directory state without the verbose output of a standard status check.
 - **Example:** git status --short --branch on a feature branch to check for uncommitted changes.
 - **Notes:** The full path to git.exe is used here, which is necessary if git is not in the system PATH.
+
+### Check the type of a specific commit object
+<!-- sig: e444084d366b -->
+
+```bash
+git -C D:git_appsai_sessions_skills cat-file -t 94a2544f8c85a630fa8b5d9a94d9938121aef11b
+```
+
+- **What it does:** Changes the directory to D:git_appsai_sessions_skills and then uses cat-file to determine the type (-t) of the object identified by the SHA 94a2544f8c85a630fa8b5d9a94d9938121aef11b.
+- **Why:** This allows programmatic verification of what kind of object (blob, tree, commit, etc.) a specific SHA points to without checking out the content.
+- **Example:** git -C D:git_appsai_sessions_skills cat-file -t 94a2544f8c85a630fa8b5d9a94d9938121aef11b
+- **Notes:** The -C flag changes the directory context for the operation, ensuring the object lookup is relative to D:git_appsai_sessions_skills.
+
+### List all files recursively from a specific tree
+<!-- sig: b985742cfdce -->
+
+```bash
+git -C D:git_appsai_sessions_skills ls-tree -r --name-only 94a2544f8c85a630fa8b5d9a94d9938121aef11b tool/tests
+```
+
+- **What it does:** This command changes directory to D:git_appsai_sessions_skills, then lists the contents of the tree identified by commit hash 94a2544f8c85a630fa8b5d9a94d9938121aef11b within the tool/tests directory.
+- **Why:** It provides a comprehensive, recursive listing of all file names within a specific commit's directory structure without showing any metadata.
+- **Example:** git -C D:git_appsai_sessions_skills ls-tree -r --name-only 94a2544f8c85a630fa8b5d9a94d9938121aef11b tool/tests
+- **Notes:** The -C flag changes the directory context for the operation. The commit hash and path must be correct for the listing to succeed.
+
+### Search for test function definitions across multiple files
+<!-- sig: 87f0e53edb56 -->
+<!-- sig: 7a8eb4211305 -->
+
+```bash
+git -C D:git_appsai_sessions_skills grep -n -E '^    def test_|^def test_|^class Test' 94a2544f8c85a630fa8b5d9a94d9938121aef11b -- tool/tests/test_portable.py tool/tests/test_ide_capture.py
+```
+
+- **What it does:** Executes grep within the context of the D:git_appsai_sessions_skills directory to find lines containing specific test function patterns across two specified files.
+- **Why:** This allows searching for code patterns related to tests across multiple files without needing to check out or modify the repository state first.
+- **Example:** git -C D:git_appsai_sessions_skills grep -n -E '^ def test_|^def test_|^class Test' 94a2544f8c85a630fa8b5d9a94d9938121aef11b -- tool/tests/test_portable.py tool/tests/test_ide_capture.py
+- **Notes:** The -C flag changes the directory for the operation, and the pattern searches for lines starting with ' def test_', 'def test_', or 'class Test'.
 
 ## Remotes and syncing
 
@@ -411,6 +451,30 @@ $gitExe add --all
 - **Why:** It allows committing changes to the repository without requiring or performing a GPG signature, which might be necessary for initial commits or CI environments.
 - **Example:** 'C:\Program Files\Git\cmd\git.exe' -c commit.gpgsign=false commit -m 'Baseline: preserve original Neon Blocks prototype and concept;'
 - **Notes:** The surrounding PowerShell logic checks the exit code ($LASTEXITCODE) to conditionally run a subsequent tag command, which is not documented here.
+
+### Verify ignored files in the staging area
+<!-- sig: 8a1508382323 -->
+
+```bash
+git check-ignore -v .codex_stageSageProbe
+```
+
+- **What it does:** Checks which files Git is configured to ignore, showing the pattern and the file path for the specified file.
+- **Why:** This confirms that a specific file, .codex_stageSageProbe, is correctly being ignored by Git, preventing accidental commits.
+- **Example:** git check-ignore -v .codex_stageSageProbe
+- **Notes:** The -v flag provides verbose output, showing the pattern that caused the file to be ignored.
+
+### List files tracked by a specific index
+<!-- sig: 25b039121b61 -->
+
+```bash
+git ls-files .codex_stage
+```
+
+- **What it does:** Lists the names of files that are currently tracked by Git within the index, specifically those matching the pattern .codex_stage.
+- **Why:** This allows inspection of the exact contents of the index for a specific set of files without needing to check out or commit them.
+- **Example:** git ls-files .codex_stage to verify which files are staged for the next commit.
+- **Notes:** This command only shows files known to Git; it does not list untracked files.
 
 ## Shelving work
 

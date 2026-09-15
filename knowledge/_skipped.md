@@ -46,3 +46,13 @@ unparseable JSON (Unterminated string starting at: line 6 column 5 (char 168))
 <!-- sig: b4a52e70d305 -->
 
 This is variable assignment, not an executable shell command.
+
+### codex --version
+<!-- sig: a8d24c4ea4a7 -->
+
+Checks the version of the tool; this is a simple informational check.
+
+### codex --help
+<!-- sig: 3e0659ba8205 -->
+
+This is a general help request for the tool, not a specific workflow.
