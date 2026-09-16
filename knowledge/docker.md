@@ -39,6 +39,20 @@ docker compose build
 - **Why:** Needed after changing a Dockerfile or the dependency manifests it copies; source-only changes usually just need a restart.
 - **Notes:** `--no-cache` forces a full rebuild when a cached layer is stale.
 
+### Execute a Python script within a container
+<!-- sig: 9d7576771b0f -->
+<!-- sig: 85e682b9f7b7 -->
+
+```bash
+docker run --rm --entrypoint python ei-collectors-us31-verify2 -c 'import importlib
+mods = ['"'main'"'"'"'config_manager'"'"'"'database_manager'"'"'"'api_database_adapter'"'"'"'collector_api_client'"'"'"'data_quality_checker'"'"'"'signals_contract'"'"'"'execution_mode'"'"'"'ado_collector'"'"'"'github_collector'"'"'"'jira_collector'"'"'"'sonarqube_coll'
+```
+
+- **What it does:** Runs a specified Docker image, overriding the default entrypoint to use Python, and executes a complex Python script provided via the -c flag.
+- **Why:** This method allows running a specific, isolated Python script against a defined environment without needing to build a custom image for the task.
+- **Example:** docker run --rm --entrypoint python ei-collectors-us31-verify2 -c 'import importlib\nmods = ["'main'"'"'"'config_manager'"'"'"'database_manager'"'"'"'api_database_adapter'"'"'"'collector_api_client'"'"'"'data_quality_checker'"'"'"'signals_contract'"'"'"'execution_mode'"'"'"'ado_collector'"'"'"'github_collector'"'"'"'jira_collector'"'"'"'sonarqube_coll'']'
+- **Notes:** The script imports a list of modules dynamically. The `--rm` flag ensures the container is removed after the script finishes executing.
+
 ## Diagnosing
 
 ### Watch the logs of running services
@@ -74,6 +88,18 @@ docker exec -it backend bash
 - **Why:** Inspect the real filesystem, env vars and network from inside the container instead of guessing.
 - **Notes:** Needs a TTY, so it cannot run in a plain non-interactive shell — use `docker exec <name> <cmd>` without `-it` there. Slim images often have no `bash`; fall back to `sh`.
 
+### Determine the size of a specific image
+<!-- sig: 7717df2f8708 -->
+
+```bash
+docker image inspect ei-collectors-us31-verify --format '{{.Size}}'
+```
+
+- **What it does:** This command inspects the ei-collectors-us31-verify image and outputs only its size in bytes.
+- **Why:** It provides a quick, machine-readable metric of the image size without needing to run a full container or use other size-related commands.
+- **Example:** docker image inspect ei-collectors-us31-verify --format '{{.Size}}'
+- **Notes:** The output is raw bytes, which may need further processing (like piping to awk) to be human-readable.
+
 ## Housekeeping
 
 ### Reclaim disk from unused images
@@ -86,3 +112,17 @@ docker image prune -f
 - **What it does:** Deletes dangling images (untagged layers) without prompting (`-f`).
 - **Why:** Repeated builds leave gigabytes of orphaned layers behind.
 - **Notes:** `-a` prunes *all* images not used by a container, which means the next build re-downloads everything. `docker system prune` goes further and can remove networks and build cache — check what it lists before confirming.
+
+## Building images
+
+### Build and tag a Docker image from the current directory
+<!-- sig: 5b5b2e3b821d -->
+
+```bash
+docker build -t ei-collectors-us31-verify .
+```
+
+- **What it does:** Builds a Docker image using the Dockerfile in the current directory and tags the resulting image as ei-collectors-us31-verify.
+- **Why:** This command encapsulates the entire build process into a single, traceable step, ensuring the correct tag is applied immediately.
+- **Example:** docker build -t ei-collectors-us31-verify .
+- **Notes:** The redirection '2>&1' in the original execution context ensures stderr is merged into stdout, which is useful for piping the output to another command like 'tail'.
