@@ -45,6 +45,18 @@ gh pr checks
 - **Why:** Faster than opening the browser, and it exits non-zero while checks are failing — usable as a gate in a script.
 - **Notes:** `--watch` polls until the checks finish (blocking; avoid in automation).
 
+### Check the current GitHub CLI authentication status
+<!-- sig: fb8953e0b151 -->
+
+```bash
+gh auth status
+```
+
+- **What it does:** This command queries the GitHub CLI to report the status of the currently configured authentication token.
+- **Why:** It provides immediate feedback on whether the CLI is authenticated and what credentials it is using, which is faster than checking multiple resource types.
+- **Example:** gh auth status
+- **Notes:** The redirection '2>&1' ensures that any standard error output is also captured, which is useful for scripting.
+
 ## Actions
 
 ### List recent workflow runs
@@ -57,3 +69,17 @@ gh run list --limit 5
 - **What it does:** Shows the most recent Actions runs with status, workflow name, branch and run id.
 - **Why:** Entry point for debugging CI: grab the id, then `gh run view <id> --log-failed` to read only the failing step's log.
 - **Notes:** `--workflow ci-cd.yml` and `--branch <name>` narrow it down.
+
+## Repository management
+
+### Create a new private GitHub repository
+<!-- sig: a59184a5e303 -->
+
+```bash
+gh repo create sraj-epam/ei-rd-eff-collectors --private --description 'Delivery metrics Python collectors - extracted from ei-rd-eff-deliverymetrics (US-31), history preserved' '2>&1'
+```
+
+- **What it does:** This command uses the GitHub CLI to create a new repository named sraj-epam/ei-rd-eff-collectors on GitHub. It sets the repository to be private and includes a specific description.
+- **Why:** This is the dedicated tool for programmatically interacting with GitHub resources like repositories, which is cleaner than using the web UI or raw API calls.
+- **Example:** gh repo create sraj-epam/ei-rd-eff-collectors --private --description 'Delivery metrics Python collectors - extracted from ei-rd-eff-deliverymetrics (US-31), history preserved' '2>&1'
+- **Notes:** The '2>&1' redirects standard error to standard output, ensuring any error messages from the CLI are captured in the stream being piped to 'tail -3' in the example context.
