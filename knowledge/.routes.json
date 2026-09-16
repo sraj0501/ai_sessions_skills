@@ -1,5 +1,6 @@
 {
   "awk": "shell.md",
+  "cut": "shell.md",
   "dir": "shell.md",
   "findstr": "shell.md",
   "get-content": "shell.md",
@@ -8,6 +9,8 @@
   "powershell.exe": "python.md",
   "psql": "postgresql.md",
   "python": "python.md",
+  "rev-parse": "git.md",
+  "shasum": "shell.md",
   "sort": "shell.md",
   "sort-object": "shell.md",
   "systemctl": "systemd.md",
