@@ -40,6 +40,7 @@ python3 -m venv .venv
 
 ### Install project dependencies
 <!-- sig: 74f66e114eea -->
+<!-- sig: f66f5a09170a -->
 
 ```bash
 python3 -m pip install -r requirements.txt
@@ -143,6 +144,18 @@ uv run uvicorn src.web_api:app --port 8000 '2>&1'
 - **Why:** This provides a controlled way to run the application server within a specific virtual environment managed by uv, while capturing both standard output and standard error into the same stream.
 - **Example:** uv run uvicorn src.web_api:app --port 8000 '2>&1' to test the API locally.
 - **Notes:** The trailing '2>&1' redirects standard error (2) to standard output (1), ensuring all logs appear together. The subsequent pipe to tail -40 is for viewing only the last 40 lines.
+
+### Run pytest tests quietly and redirect output
+<!-- sig: b01973b18ce5 -->
+
+```bash
+.venv/bin/python -m pytest tests/ -q '2>&1'
+```
+
+- **What it does:** Executes the pytest framework using the virtual environment's Python interpreter against the tests/ directory, running quietly and redirecting stderr to stdout.
+- **Why:** This ensures that both standard output and standard error messages from the tests are captured and treated as a single stream for subsequent piping or logging.
+- **Example:** .venv/bin/python -m pytest tests/ -q '2>&1' | tail -8
+- **Notes:** The single quotes around '2>&1' are crucial to ensure shell expansion happens correctly when passing this argument to the Python subprocess.
 
 ## Static analysis
 
