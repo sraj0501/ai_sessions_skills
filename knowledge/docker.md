@@ -113,6 +113,18 @@ docker image prune -f
 - **Why:** Repeated builds leave gigabytes of orphaned layers behind.
 - **Notes:** `-a` prunes *all* images not used by a container, which means the next build re-downloads everything. `docker system prune` goes further and can remove networks and build cache — check what it lists before confirming.
 
+### Force remove multiple local images
+<!-- sig: 8c32f5247015 -->
+
+```bash
+docker rmi -f ei-collectors-us31-verify ei-collectors-us31-verify2
+```
+
+- **What it does:** Forces the removal (-f) of two specified local Docker images, ei-collectors-us31-verify and ei-collectors-us31-verify2.
+- **Why:** This ensures that dangling or outdated images are completely removed from the local image cache, which is necessary before attempting a clean rebuild or deployment.
+- **Example:** docker rmi -f ei-collectors-us31-verify ei-collectors-us31-verify2
+- **Notes:** The redirection '2>&1' in the original command is for piping stderr to stdout, but the core action is the 'docker rmi' command itself.
+
 ## Building images
 
 ### Build and tag a Docker image from the current directory
