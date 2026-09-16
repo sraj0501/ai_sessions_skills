@@ -232,3 +232,15 @@ powershell.exe -NoProfile -Command "Select-String -Path 'devtrack_client\cli.go'
 - **Why:** This allows quick inspection of how a specific keyword is used throughout a source file without running the application or using a dedicated IDE search.
 - **Example:** powershell.exe -NoProfile -Command "Select-String -Path 'devtrack_client\cli.go' -Pattern 'sage' -Context 5,15"
 - **Notes:** The -NoProfile flag ensures that the PowerShell session starts without loading the user's profile script, making execution predictable.
+
+### Check code quality using ruff linter
+<!-- sig: 2249d6bcbe98 -->
+
+```bash
+.venv/bin/python -m ruff check .
+```
+
+- **What it does:** Executes the ruff linter module via the virtual environment's python interpreter to check all files in the current directory.
+- **Why:** This ensures code adheres to defined style guides and catches potential errors early in the development cycle.
+- **Example:** .venv/bin/python -m ruff check .
+- **Notes:** The '2>&1' redirects stderr to stdout, ensuring that any errors reported by ruff are captured in the standard output stream for subsequent piping or logging.
