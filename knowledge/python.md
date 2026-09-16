@@ -244,3 +244,15 @@ powershell.exe -NoProfile -Command "Select-String -Path 'devtrack_client\cli.go'
 - **Why:** This ensures code adheres to defined style guides and catches potential errors early in the development cycle.
 - **Example:** .venv/bin/python -m ruff check .
 - **Notes:** The '2>&1' redirects stderr to stdout, ensuring that any errors reported by ruff are captured in the standard output stream for subsequent piping or logging.
+
+### Remove specific directory paths from markdown files
+<!-- sig: b53f1a36f50a -->
+
+```bash
+perl -0pi -e 's{cd packages/collectors\n}{}g' README.md
+```
+
+- **What it does:** Uses Perl to read and modify the README.md file in place (-i). It searches for and removes the literal string 'cd packages/collectors\n' globally (-g).
+- **Why:** This cleans up residual build or setup instructions that were mistakenly left in the main README file.
+- **Example:** perl -0pi -e 's{cd packages/collectors\n}{}g' README.md
+- **Notes:** The -0p flag reads the entire file into scalar, allowing the substitution to span newlines. The substitution string must escape the newline character '\n' if it is meant to match a literal newline.

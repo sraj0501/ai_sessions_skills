@@ -4,6 +4,7 @@
   "findstr": "shell.md",
   "get-content": "shell.md",
   "more": "shell.md",
+  "perl": "python.md",
   "powershell.exe": "python.md",
   "psql": "postgresql.md",
   "python": "python.md",
