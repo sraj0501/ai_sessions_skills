@@ -163,6 +163,8 @@ uv run uvicorn src.web_api:app --port 8000 '2>&1'
 <!-- sig: 00aaaefc1e30 -->
 <!-- sig: 8be0244af737 -->
 <!-- sig: 157e4d6fac1d -->
+<!-- sig: 147dc1a80494 -->
+<!-- sig: 6194d95168a4 -->
 
 ```bash
 .venv/bin/python -m pytest tests/ -q '2>&1'
