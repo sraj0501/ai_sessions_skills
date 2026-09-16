@@ -50,6 +50,19 @@ python3 -m pip install -r requirements.txt
 - **Why:** `python3 -m pip` guarantees the pip that belongs to *that* interpreter, avoiding the classic "installed but not importable" mismatch.
 - **Notes:** Add `-q` to quiet the output in automation. On externally-managed Homebrew Python, install into a venv rather than using `--break-system-packages`.
 
+### Upgrade the pip package manager within the virtual environment
+<!-- sig: 22aa7ebbe34a -->
+<!-- sig: 1d67c08405ac -->
+
+```bash
+.venv/bin/python -m pip install -q --upgrade pip '2>&1'
+```
+
+- **What it does:** Executes the pip module using the virtual environment's Python interpreter to quietly upgrade pip itself. The '2>&1' redirects standard error to standard output.
+- **Why:** Ensures that the pip tool used for subsequent installations is up-to-date and has the latest features or bug fixes.
+- **Example:** .venv/bin/python -m pip install -q --upgrade pip '2>&1' before installing dependencies.
+- **Notes:** The output redirection '2>&1' is necessary to capture potential errors that pip might write to stderr, ensuring they are processed by the subsequent pipe or command.
+
 ## Running and testing
 
 ### Run the test suite quietly
@@ -147,6 +160,9 @@ uv run uvicorn src.web_api:app --port 8000 '2>&1'
 
 ### Run pytest tests quietly and redirect output
 <!-- sig: b01973b18ce5 -->
+<!-- sig: 00aaaefc1e30 -->
+<!-- sig: 8be0244af737 -->
+<!-- sig: 157e4d6fac1d -->
 
 ```bash
 .venv/bin/python -m pytest tests/ -q '2>&1'
