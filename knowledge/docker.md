@@ -42,6 +42,7 @@ docker compose build
 ### Execute a Python script within a container
 <!-- sig: 9d7576771b0f -->
 <!-- sig: 85e682b9f7b7 -->
+<!-- sig: 6f3a0fffe324 -->
 
 ```bash
 docker run --rm --entrypoint python ei-collectors-us31-verify2 -c 'import importlib
@@ -99,6 +100,18 @@ docker image inspect ei-collectors-us31-verify --format '{{.Size}}'
 - **Why:** It provides a quick, machine-readable metric of the image size without needing to run a full container or use other size-related commands.
 - **Example:** docker image inspect ei-collectors-us31-verify --format '{{.Size}}'
 - **Notes:** The output is raw bytes, which may need further processing (like piping to awk) to be human-readable.
+
+### Extract the running docker daemon version
+<!-- sig: 4689f2fdefd6 -->
+
+```bash
+docker info --format '{{.ServerVersion}}' '2>&1'
+```
+
+- **What it does:** Retrieves detailed information about the Docker daemon and formats the output to show only the server version string.
+- **Why:** This isolates the version number, which is cleaner for scripting or logging than the full, verbose output of `docker info`.
+- **Example:** docker info --format '{{.ServerVersion}}' '2>&1' to check the daemon version in a CI script.
+- **Notes:** The '2>&1' redirects standard error to standard output, ensuring the version string is captured even if the daemon prints warnings to stderr.
 
 ## Housekeeping
 

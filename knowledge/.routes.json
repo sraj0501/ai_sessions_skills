@@ -6,6 +6,8 @@
   "get-content": "shell.md",
   "more": "shell.md",
   "mv": "shell.md",
+  "open": "shell.md",
+  "orbstack": "orbstack.md",
   "perl": "python.md",
   "powershell.exe": "python.md",
   "psql": "postgresql.md",

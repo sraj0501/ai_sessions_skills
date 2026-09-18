@@ -27,6 +27,7 @@ and set **Files to include** to `knowledge/**/*.md`.
 | [Homebrew](brew.md) | Package management |
 | [systemd](systemd.md) | Linux services |
 | [Agent tools](agent-tools.md) | Agent tools and equivalent commands |
+| [`orbstack.md`](orbstack.md) | OrbStack Tool |
 
 `_skipped.md` records actions the writer judged unsuitable for documentation.
 `.routes.json` stores routing decisions. Capture logs and pending actions are
