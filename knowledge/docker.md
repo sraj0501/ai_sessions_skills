@@ -80,6 +80,8 @@ docker ps -a
 
 ### Get a shell inside a running container
 <!-- sig: 5823b14fb2bc -->
+<!-- sig: 4db04e9306b8 -->
+<!-- sig: 3ae0beb96715 -->
 
 ```bash
 docker exec -it backend bash
@@ -137,6 +139,18 @@ docker rmi -f ei-collectors-us31-verify ei-collectors-us31-verify2
 - **Why:** This ensures that dangling or outdated images are completely removed from the local image cache, which is necessary before attempting a clean rebuild or deployment.
 - **Example:** docker rmi -f ei-collectors-us31-verify ei-collectors-us31-verify2
 - **Notes:** The redirection '2>&1' in the original command is for piping stderr to stdout, but the core action is the 'docker rmi' command itself.
+
+### Forcefully remove a stopped container
+<!-- sig: c68f27ab7787 -->
+
+```bash
+docker rm -f us09-verify
+```
+
+- **What it does:** Stops and removes the container named us09-verify, ignoring standard output and standard error streams.
+- **Why:** This ensures the container is removed even if it is running or has associated output streams that would normally cause the command to fail or print noise.
+- **Example:** docker rm -f us09-verify
+- **Notes:** The redirection to /dev/null is used to suppress all output from the command, making it suitable for scripting.
 
 ## Building images
 

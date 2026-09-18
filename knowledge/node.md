@@ -97,3 +97,15 @@ npx tsc --noEmit
 - **What it does:** Executes the local (or temporarily fetched) package binary — here, a type-check with no emitted output.
 - **Why:** Useful when a repo has no `type-check` script, or to check a single package: `npx tsc -p packages/backend --noEmit`.
 - **Notes:** Add `--no-install` to fail rather than silently downloading a package that is not in the project.
+
+### Execute database migrations for the project
+<!-- sig: 1ed8551ec935 -->
+
+```bash
+DATABASE_URL=postgresql://postgres:devpw@localhost:55433/delivery_metrics NODE_ENV=development npx tsx src/cli/database.ts migration run '2>&1'
+```
+
+- **What it does:** This command sets environment variables for the database connection and execution context, then runs the database migration script using tsx.
+- **Why:** It ensures the migration tool uses the correct development database credentials and environment settings before applying schema changes.
+- **Example:** DATABASE_URL=postgresql://postgres:devpw@localhost:55433/delivery_metrics NODE_ENV=development npx tsx src/cli/database.ts migration run '2>&1'
+- **Notes:** The output is redirected to stderr and then captured, which is useful for debugging migration failures.
