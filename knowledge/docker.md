@@ -142,6 +142,7 @@ docker rmi -f ei-collectors-us31-verify ei-collectors-us31-verify2
 
 ### Forcefully remove a stopped container
 <!-- sig: c68f27ab7787 -->
+<!-- sig: cdbb2a6f4d95 -->
 
 ```bash
 docker rm -f us09-verify
