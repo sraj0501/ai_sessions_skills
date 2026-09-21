@@ -44,6 +44,7 @@ docker compose build
 <!-- sig: 85e682b9f7b7 -->
 <!-- sig: 6f3a0fffe324 -->
 <!-- sig: 07f56341a553 -->
+<!-- sig: 0998247c7418 -->
 
 ```bash
 docker run --rm --entrypoint python ei-collectors-us31-verify2 -c 'import importlib
@@ -79,6 +80,18 @@ docker stop rollup-review-pg >/dev/null
 - **Example:** docker stop rollup-review-pg >/dev/null before running database migrations.
 - **Notes:** The container must be running for 'docker stop' to have an effect. The redirection suppresses the confirmation message.
 
+### Start a stopped container instance
+<!-- sig: 55a32acc05c2 -->
+
+```bash
+docker start rollup-test '2>/dev/null'
+```
+
+- **What it does:** Restarts a container named rollup-test if it exists and is currently stopped. The redirection suppresses standard error output.
+- **Why:** This is used as the first part of a conditional script to attempt restarting a service without failing if the container is already running or if the start command fails for other reasons.
+- **Example:** docker start rollup-test '2>/dev/null' before running the full setup script.
+- **Notes:** The '2>/dev/null' is crucial here to prevent the script from failing or printing noise if the container is already running or if the name is incorrect.
+
 ## Diagnosing
 
 ### Watch the logs of running services
@@ -96,6 +109,7 @@ docker compose logs -f
 <!-- sig: 382985639a8e -->
 <!-- sig: daafc5f28e03 -->
 <!-- sig: b512dcc897c1 -->
+<!-- sig: 8f84cb52b36d -->
 
 ```bash
 docker ps -a
