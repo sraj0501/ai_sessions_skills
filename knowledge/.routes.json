@@ -1,6 +1,7 @@
 {
   "audience": "audience.md",
   "awk": "shell.md",
+  "cmp": "shell.md",
   "contains": "shell.md",
   "cut": "shell.md",
   "diff": "shell.md",
