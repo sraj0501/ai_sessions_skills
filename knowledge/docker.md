@@ -110,6 +110,7 @@ docker compose logs -f
 <!-- sig: daafc5f28e03 -->
 <!-- sig: b512dcc897c1 -->
 <!-- sig: 8f84cb52b36d -->
+<!-- sig: 6543b719d111 -->
 
 ```bash
 docker ps -a
