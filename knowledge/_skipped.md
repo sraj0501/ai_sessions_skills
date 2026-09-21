@@ -36,3 +36,33 @@ A one-off test-harness command that waits for `.runtime/distill.lock` and then t
 <!-- sig: 6228e196e7b0 -->
 
 Used here only for paginating the output of other commands, which is better handled by piping to 'less'.
+
+### Audience
+<!-- sig: 16b23d387852 -->
+
+not worth documenting
+
+### '|---|---|---|'
+<!-- sig: e4b934cab3fb -->
+
+This is a literal string used for formatting a markdown table and does not represent a runnable command.
+
+### '`delivery-progress-2026-09-21.md`'
+<!-- sig: 608b0711111a -->
+
+not worth documenting
+
+### '**Client' / 'stakeholders**'
+<!-- sig: 8084e711b86b -->
+
+This is not a shell command but content being appended to a markdown file.
+
+### Engineering
+<!-- sig: 00fe2bd9700b -->
+
+This is not a standalone shell command but a redirection operation using a here-document to append content to a file.
+
+### '`D-NN`' register of anything found and consciously not fixed. Entries move to Closed, never deleted
+<!-- sig: c592829c79b0 -->
+
+This is not a shell command but content being appended to a markdown file.
