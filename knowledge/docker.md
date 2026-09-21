@@ -54,6 +54,18 @@ mods = ['"'main'"'"'"'config_manager'"'"'"'database_manager'"'"'"'api_database_a
 - **Example:** docker run --rm --entrypoint python ei-collectors-us31-verify2 -c 'import importlib\nmods = ["'main'"'"'"'config_manager'"'"'"'database_manager'"'"'"'api_database_adapter'"'"'"'collector_api_client'"'"'"'data_quality_checker'"'"'"'signals_contract'"'"'"'execution_mode'"'"'"'ado_collector'"'"'"'github_collector'"'"'"'jira_collector'"'"'"'sonarqube_coll'']'
 - **Notes:** The script imports a list of modules dynamically. The `--rm` flag ensures the container is removed after the script finishes executing.
 
+### Check the exposed port for a service
+<!-- sig: 8208edaf206f -->
+
+```bash
+docker port rollup-test '2>&1'
+```
+
+- **What it does:** This command queries the Docker daemon to find the host port mapping for the container named rollup-test. The '2>&1' redirects standard error to standard output.
+- **Why:** It provides a quick, direct way to confirm which host port a running container service is accessible on, which is often needed for local testing setup.
+- **Example:** docker port rollup-test '2>&1' to find the exposed port for the test service.
+- **Notes:** The container 'rollup-test' must be running for this command to succeed. The output will show the host IP and port.
+
 ## Diagnosing
 
 ### Watch the logs of running services
