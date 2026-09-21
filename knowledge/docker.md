@@ -67,6 +67,18 @@ docker port rollup-test '2>&1'
 - **Example:** docker port rollup-test '2>&1' to find the exposed port for the test service.
 - **Notes:** The container 'rollup-test' must be running for this command to succeed. The output will show the host IP and port.
 
+### Gracefully stop a running container
+<!-- sig: c9587ffa3814 -->
+
+```bash
+docker stop rollup-review-pg >/dev/null
+```
+
+- **What it does:** Sends a SIGTERM signal to the container named rollup-review-pg, allowing it to shut down gracefully, and redirects standard output and standard error to null.
+- **Why:** This ensures the container process receives a proper stop signal rather than being abruptly killed, which can prevent data corruption.
+- **Example:** docker stop rollup-review-pg >/dev/null before running database migrations.
+- **Notes:** The container must be running for 'docker stop' to have an effect. The redirection suppresses the confirmation message.
+
 ## Diagnosing
 
 ### Watch the logs of running services

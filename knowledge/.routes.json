@@ -20,6 +20,7 @@
   "python": "python.md",
   "rev-parse": "git.md",
   "rmdir": "shell.md",
+  "run_it": "python.md",
   "shasum": "shell.md",
   "sort": "shell.md",
   "sort-object": "shell.md",
