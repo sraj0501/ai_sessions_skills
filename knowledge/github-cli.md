@@ -7,6 +7,8 @@
 
 ### Open a pull request from the current branch
 <!-- sig: 29e01dec9915 -->
+<!-- sig: 76286d2b24a8 -->
+<!-- sig: a610a9252f8c -->
 
 ```bash
 gh pr create --title "fix: correct KPI-4 denominator" --body "$(cat <<'EOF'
@@ -75,6 +77,7 @@ gh auth status
 
 ### List recent workflow runs
 <!-- sig: 021cefc2c98e -->
+<!-- sig: 48d863f37141 -->
 
 ```bash
 gh run list --limit 5
@@ -97,3 +100,28 @@ gh repo create sraj-epam/ei-rd-eff-collectors --private --description 'Delivery 
 - **Why:** This is the dedicated tool for programmatically interacting with GitHub resources like repositories, which is cleaner than using the web UI or raw API calls.
 - **Example:** gh repo create sraj-epam/ei-rd-eff-collectors --private --description 'Delivery metrics Python collectors - extracted from ei-rd-eff-deliverymetrics (US-31), history preserved' '2>&1'
 - **Notes:** The '2>&1' redirects standard error to standard output, ensuring any error messages from the CLI are captured in the stream being piped to 'tail -3' in the example context.
+
+### Retrieve specific repository metadata fields
+<!-- sig: bcedf92f6dd3 -->
+<!-- sig: ab886217412e -->
+
+```bash
+gh api repos/sraj-epam/ei-rd-eff-deliverymetrics --jq '{has_actions: .has_actions, fork: .fork, default_branch: .default_branch}' '2>&1'
+```
+
+- **What it does:** Uses the GitHub CLI to query the API for the repository sraj-epam/ei-rd-eff-deliverymetrics and filters the output to only include the has_actions, fork, and default_branch fields.
+- **Why:** This allows scripting to quickly check key configuration flags like whether actions are enabled or what the default branch is without parsing the entire JSON response.
+- **Example:** gh api repos/sraj-epam/ei-rd-eff-deliverymetrics --jq '{has_actions: .has_actions, fork: .fork, default_branch: .default_branch}' '2>&1'
+- **Notes:** The '2>&1' redirects stderr to stdout, ensuring any error messages from the API call are captured by the subsequent piping or processing.
+
+### List all secrets available in a repository
+<!-- sig: 6a642b1e6ec1 -->
+
+```bash
+gh secret list --repo sraj-epam/ei-rd-eff-deliverymetrics
+```
+
+- **What it does:** Retrieves a list of all secrets configured for the specified repository, sraj-epam/ei-rd-eff-deliverymetrics.
+- **Why:** This is the dedicated GitHub CLI command for listing repository secrets, which is more direct than using the general API.
+- **Example:** gh secret list --repo sraj-epam/ei-rd-eff-deliverymetrics
+- **Notes:** The output is piped to 'head -10' in the original script, limiting the displayed secrets to the first 10 entries.
