@@ -109,3 +109,15 @@ DATABASE_URL=postgresql://postgres:devpw@localhost:55433/delivery_metrics NODE_E
 - **Why:** It ensures the migration tool uses the correct development database credentials and environment settings before applying schema changes.
 - **Example:** DATABASE_URL=postgresql://postgres:devpw@localhost:55433/delivery_metrics NODE_ENV=development npx tsx src/cli/database.ts migration run '2>&1'
 - **Notes:** The output is redirected to stderr and then captured, which is useful for debugging migration failures.
+
+### Execute database migrations and capture output
+<!-- sig: be54dbd5598d -->
+
+```bash
+npm run db:migrate '2>&1'
+```
+
+- **What it does:** Runs the script defined for 'db:migrate' in the package.json, redirecting both standard output and standard error to the same stream.
+- **Why:** This ensures that any error messages or informational output generated during the migration process are captured together for easier debugging or logging.
+- **Example:** npm run db:migrate '2>&1' when running migrations in a CI environment.
+- **Notes:** The shell redirection '2>&1' is necessary to ensure that both successful output and failure messages are captured by the subsequent piping or redirection.

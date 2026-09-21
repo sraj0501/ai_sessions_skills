@@ -149,6 +149,7 @@ docker image inspect ei-collectors-us31-verify --format '{{.Size}}'
 
 ### Extract the running docker daemon version
 <!-- sig: 4689f2fdefd6 -->
+<!-- sig: 65c9f7e86ab0 -->
 
 ```bash
 docker info --format '{{.ServerVersion}}' '2>&1'
