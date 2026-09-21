@@ -43,6 +43,7 @@ docker compose build
 <!-- sig: 9d7576771b0f -->
 <!-- sig: 85e682b9f7b7 -->
 <!-- sig: 6f3a0fffe324 -->
+<!-- sig: 07f56341a553 -->
 
 ```bash
 docker run --rm --entrypoint python ei-collectors-us31-verify2 -c 'import importlib
@@ -82,6 +83,7 @@ docker compose logs -f
 ### List containers including stopped ones
 <!-- sig: 382985639a8e -->
 <!-- sig: daafc5f28e03 -->
+<!-- sig: b512dcc897c1 -->
 
 ```bash
 docker ps -a
@@ -97,6 +99,7 @@ docker ps -a
 <!-- sig: 3ae0beb96715 -->
 <!-- sig: 79630ff4b48d -->
 <!-- sig: 61d162803d81 -->
+<!-- sig: 904a127b3d3a -->
 
 ```bash
 docker exec -it backend bash
