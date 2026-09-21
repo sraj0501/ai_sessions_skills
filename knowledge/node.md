@@ -61,6 +61,30 @@ npm run dev
 - **Why:** The normal way to get a local URL to click through.
 - **Notes:** Long-running and never exits; start it as a background process and read its output, otherwise it blocks the shell.
 
+### Run specific contract tests in CI mode
+<!-- sig: 7218f214a695 -->
+
+```bash
+CI=true npx vitest run src/__tests__/dashboardV2.contract.test.ts '2>&1'
+```
+
+- **What it does:** Executes the vitest test runner for the specific file src/__tests__/dashboardV2.contract.test.ts, setting the CI environment variable to true and redirecting stderr to stdout.
+- **Why:** This isolates the test run to a single file and ensures it runs under CI conditions, which might change test behavior or environment variables.
+- **Example:** CI=true npx vitest run src/__tests__/dashboardV2.contract.test.ts '2>&1' when running tests in a CI pipeline.
+- **Notes:** The '2>&1' redirects standard error (2) to standard output (1), ensuring all output is captured by the subsequent pipe (if any).
+
+### Run linter against specific shared files
+<!-- sig: 688f4c7f1b1b -->
+
+```bash
+npx eslint packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests__/dashboardV2.contract.test.ts '2>&1'
+```
+
+- **What it does:** Executes the ESLint tool via npx to check the syntax and style of two specific files within the packages/shared directory.
+- **Why:** This isolates linting checks to only the necessary shared components, providing fast feedback during development.
+- **Example:** npx eslint packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests__/dashboardV2.contract.test.ts '2>&1'
+- **Notes:** The '2>&1' redirects standard error (2) to standard output (1), ensuring any linting errors are captured in the main stream.
+
 ## Dependencies
 
 ### Install exactly what the lockfile says
@@ -121,3 +145,15 @@ npm run db:migrate '2>&1'
 - **Why:** This ensures that any error messages or informational output generated during the migration process are captured together for easier debugging or logging.
 - **Example:** npm run db:migrate '2>&1' when running migrations in a CI environment.
 - **Notes:** The shell redirection '2>&1' is necessary to ensure that both successful output and failure messages are captured by the subsequent piping or redirection.
+
+### Format multiple source files and schemas
+<!-- sig: fa9a54e2c977 -->
+
+```bash
+npx prettier --write packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests__/dashboardV2.contract.test.ts packages/shared/src/schemas/dashboard-v2-schema.json '2>&1'
+```
+
+- **What it does:** Runs the Prettier formatter via npx to write changes to specified files, including a TypeScript file, a test file, and a JSON schema.
+- **Why:** This ensures that multiple related files across different types (TS, JSON) are formatted consistently in one pass, which is cleaner than running prettier multiple times.
+- **Example:** npx prettier --write packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests__/dashboardV2.contract.test.ts packages/shared/src/schemas/dashboard-v2-schema.json '2>&1'
+- **Notes:** The '2>&1' redirects stderr to stdout, ensuring that any error messages are captured and passed through the shell pipeline.
