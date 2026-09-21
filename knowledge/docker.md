@@ -69,6 +69,7 @@ docker compose logs -f
 
 ### List containers including stopped ones
 <!-- sig: 382985639a8e -->
+<!-- sig: daafc5f28e03 -->
 
 ```bash
 docker ps -a
