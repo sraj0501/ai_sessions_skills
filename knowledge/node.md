@@ -63,6 +63,7 @@ npm run dev
 
 ### Run specific contract tests in CI mode
 <!-- sig: 7218f214a695 -->
+<!-- sig: 02c0228defc6 -->
 
 ```bash
 CI=true npx vitest run src/__tests__/dashboardV2.contract.test.ts '2>&1'
@@ -148,6 +149,8 @@ npm run db:migrate '2>&1'
 
 ### Format multiple source files and schemas
 <!-- sig: fa9a54e2c977 -->
+<!-- sig: 455adcc63f77 -->
+<!-- sig: 9c81d7bfb586 -->
 
 ```bash
 npx prettier --write packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests__/dashboardV2.contract.test.ts packages/shared/src/schemas/dashboard-v2-schema.json '2>&1'
