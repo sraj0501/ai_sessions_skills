@@ -138,6 +138,7 @@ npm run migrate:rollback --workspace=packages/backend '2>&1'
 
 ### Run a package binary without installing it globally
 <!-- sig: a88ef499b968 -->
+<!-- sig: 67c3b3860e50 -->
 
 ```bash
 npx tsc --noEmit
