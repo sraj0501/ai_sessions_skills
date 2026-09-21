@@ -18,6 +18,7 @@ gh pr create --title "fix: correct KPI-4 denominator" --body "$(cat <<'EOF'
 <!-- sig: ed5d0c10cbac -->
 <!-- sig: 0d8766b7e2e8 -->
 <!-- sig: a2d02f1d5e5a -->
+<!-- sig: c829c53705d8 -->
 
 ```bash
 gh pr list --repo philips-internal/ei-rd-eff-deliverymetrics --state open --limit 30 --json number,title,author,headRefName,isDraft '2>&1'
@@ -43,6 +44,7 @@ EOF
 ### Check the state of a pull request
 <!-- sig: 700e35fa7ae4 -->
 <!-- sig: dafa022455d4 -->
+<!-- sig: 5eaf41d75837 -->
 
 ```bash
 gh pr view --json state,mergeable,reviewDecision
@@ -80,6 +82,7 @@ gh auth status
 ### List recent workflow runs
 <!-- sig: 021cefc2c98e -->
 <!-- sig: 48d863f37141 -->
+<!-- sig: ba67051c5c89 -->
 
 ```bash
 gh run list --limit 5
@@ -88,6 +91,20 @@ gh run list --limit 5
 - **What it does:** Shows the most recent Actions runs with status, workflow name, branch and run id.
 - **Why:** Entry point for debugging CI: grab the id, then `gh run view <id> --log-failed` to read only the failing step's log.
 - **Notes:** `--workflow ci-cd.yml` and `--branch <name>` narrow it down.
+
+### List the five most recent staging workflow runs
+<!-- sig: f9093434afe4 -->
+
+```bash
+gh api repos/sraj-epam/ei-rd-eff-deliverymetrics/actions/permissions '2>&1;'
+echo '=== recent staging runs ===';
+gh run list --repo sraj-epam/ei-rd-eff-deliverymetrics --branch staging --limit 5 --json name,status,conclusion,createdAt '2>&1'
+```
+
+- **What it does:** The command first checks permissions via the API, then prints a header, and finally lists the five most recent runs for the staging branch.
+- **Why:** This sequence provides a quick, consolidated status report on the latest CI/CD executions for the staging environment.
+- **Example:** gh api repos/sraj-epam/ei-rd-eff-deliverymetrics/actions/permissions '2>&1;' && echo '=== recent staging runs ===;' && gh run list --repo sraj-epam/ei-rd-eff-deliverymetrics --branch staging --limit 5 --json name,status,conclusion,createdAt
+- **Notes:** The use of '2>&1' redirects stderr to stdout for both the API call and the run list, ensuring all output is captured together.
 
 ## Repository management
 
