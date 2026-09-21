@@ -10,6 +10,19 @@
 
 ```bash
 gh pr create --title "fix: correct KPI-4 denominator" --body "$(cat <<'EOF'
+
+### List open pull requests for a repository
+<!-- sig: bddc0c7a6fd6 -->
+<!-- sig: ed5d0c10cbac -->
+
+```bash
+gh pr list --repo philips-internal/ei-rd-eff-deliverymetrics --state open --limit 30 --json number,title,author,headRefName,isDraft '2>&1'
+```
+
+- **What it does:** Retrieves a list of open pull requests from the specified repository, limiting the output to 30 items and selecting specific JSON fields.
+- **Why:** This provides a quick, structured overview of the most recent open PRs without needing to paginate through many pages.
+- **Example:** gh pr list --repo philips-internal/ei-rd-eff-deliverymetrics --state open --limit 30 --json number,title,author,headRefName,isDraft '2>&1'
+- **Notes:** The '2>&1' redirects stderr to stdout, ensuring any error messages are captured by the subsequent pipe operation.
 ## Summary
 - what changed and why
 
@@ -25,6 +38,7 @@ EOF
 
 ### Check the state of a pull request
 <!-- sig: 700e35fa7ae4 -->
+<!-- sig: dafa022455d4 -->
 
 ```bash
 gh pr view --json state,mergeable,reviewDecision
