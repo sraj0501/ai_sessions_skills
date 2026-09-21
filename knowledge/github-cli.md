@@ -144,3 +144,15 @@ gh secret list --repo sraj-epam/ei-rd-eff-deliverymetrics
 - **Why:** This is the dedicated GitHub CLI command for listing repository secrets, which is more direct than using the general API.
 - **Example:** gh secret list --repo sraj-epam/ei-rd-eff-deliverymetrics
 - **Notes:** The output is piped to 'head -10' in the original script, limiting the displayed secrets to the first 10 entries.
+
+### View repository metadata for a specific owner and repo
+<!-- sig: bfcabb91fccc -->
+
+```bash
+gh repo view philips-internal/ei-rd-eff-collectors --json name,defaultBranchRef,parent '2>&1'
+```
+
+- **What it does:** Retrieves specific metadata fields (name, default branch reference, and parent repository) for the repository philips-internal/ei-rd-eff-collectors using the GitHub CLI.
+- **Why:** This is used to programmatically check the canonical name and default branch of a remote repository without needing to clone or interact with it via Git commands.
+- **Example:** gh repo view philips-internal/ei-rd-eff-collectors --json name,defaultBranchRef,parent '2>&1'
+- **Notes:** The '2>&1' redirects standard error to standard output, ensuring any error messages are captured by the subsequent pipe or command.
