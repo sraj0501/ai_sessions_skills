@@ -110,6 +110,30 @@ npm install zod
 - **Why:** Prefer the package-manager command over hand-editing `package.json`, so the lockfile stays consistent.
 - **Notes:** Use `-D` for dev-only tooling and `-w <workspace>` to target one package in a monorepo. Prefer a version published at least a week ago and avoid floating ranges (`latest`, `*`) — brand-new releases are where supply-chain attacks land.
 
+### Run database migrations for a specific workspace
+<!-- sig: 368b62f061c2 -->
+
+```bash
+npm run migrate --workspace=packages/backend
+```
+
+- **What it does:** Executes the 'migrate' script defined in the package.json of the packages/backend workspace, redirecting stderr to stdout.
+- **Why:** This ensures that the migration script runs specifically against the backend package while capturing both standard output and standard error for unified logging.
+- **Example:** npm run migrate --workspace=packages/backend
+- **Notes:** The trailing '2>&1' in the original command line redirects stderr (2) to stdout (1), which is useful for piping the output to other tools like 'tail'.
+
+### Roll back database migrations for a specific workspace
+<!-- sig: 08e1cbd9b31a -->
+
+```bash
+npm run migrate:rollback --workspace=packages/backend '2>&1'
+```
+
+- **What it does:** Executes the 'migrate:rollback' script defined in the package.json for the packages/backend workspace, redirecting stderr to stdout.
+- **Why:** This allows rolling back database schema changes in a specific package without affecting others, which is safer than a global rollback.
+- **Example:** npm run migrate:rollback --workspace=packages/backend '2>&1' to revert the last database migration.
+- **Notes:** The trailing '2>&1' ensures that any error messages written to stderr are also captured and passed to the script's standard output stream.
+
 ## One-off tooling
 
 ### Run a package binary without installing it globally

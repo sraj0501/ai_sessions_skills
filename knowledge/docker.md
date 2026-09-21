@@ -127,6 +127,8 @@ docker ps -a
 <!-- sig: 79630ff4b48d -->
 <!-- sig: 61d162803d81 -->
 <!-- sig: 904a127b3d3a -->
+<!-- sig: 78ee9a05a5e1 -->
+<!-- sig: 1b62d9f6fd0d -->
 
 ```bash
 docker exec -it backend bash
@@ -160,6 +162,18 @@ docker info --format '{{.ServerVersion}}' '2>&1'
 - **Why:** This isolates the version number, which is cleaner for scripting or logging than the full, verbose output of `docker info`.
 - **Example:** docker info --format '{{.ServerVersion}}' '2>&1' to check the daemon version in a CI script.
 - **Notes:** The '2>&1' redirects standard error to standard output, ensuring the version string is captured even if the daemon prints warnings to stderr.
+
+### Extract environment variables from a container
+<!-- sig: 4b7bf9d04ac7 -->
+
+```bash
+docker inspect rollup-test --format '{{json .Config.Env}}'
+```
+
+- **What it does:** Retrieves the full JSON representation of the environment variables set for the container named rollup-test. The output is then piped to tr to replace commas with newlines.
+- **Why:** This provides a clean, line-by-line list of all environment variables configured for a specific container instance, which is easier to parse than a single JSON string.
+- **Example:** docker inspect rollup-test --format '{{json .Config.Env}}' | tr ',' '\n'
+- **Notes:** The output format string must correctly reference the desired field, in this case, the environment variables within the container's configuration.
 
 ## Housekeeping
 
