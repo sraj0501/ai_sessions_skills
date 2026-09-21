@@ -16,6 +16,8 @@ gh pr create --title "fix: correct KPI-4 denominator" --body "$(cat <<'EOF'
 ### List open pull requests for a repository
 <!-- sig: bddc0c7a6fd6 -->
 <!-- sig: ed5d0c10cbac -->
+<!-- sig: 0d8766b7e2e8 -->
+<!-- sig: a2d02f1d5e5a -->
 
 ```bash
 gh pr list --repo philips-internal/ei-rd-eff-deliverymetrics --state open --limit 30 --json number,title,author,headRefName,isDraft '2>&1'
