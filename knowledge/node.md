@@ -266,3 +266,31 @@ cd /Users/sraj/git_apps/epam/Work/PHUS-INN/ei-rd-eff-deliverymetrics/packages/fr
 - **Why:** This sequence ensures the correct Node environment is active and the subsequent commands operate within the intended project directory.
 - **Example:** node --version; cd /Users/sraj/git_apps/epam/Work/PHUS-INN/ei-rd-eff-deliverymetrics/packages/frontend
 - **Notes:** The semicolon acts as a command separator, allowing the shell to execute both commands sequentially regardless of the success of the first.
+
+### Count lines from audit reports
+<!-- sig: 59d36ba6d469 -->
+
+```bash
+node /tmp/audit.mjs packages/backend/src > /tmp/audit-backend.txt;
+node /tmp/audit.mjs packages/shared/src > /tmp/audit-shared.txt;
+wc -l /tmp/audit-backend.txt /tmp/audit-shared.txt
+```
+
+- **What it does:** Runs an audit script against the backend and shared source directories, redirecting output to temporary files, and then counts the total lines in both resulting files.
+- **Why:** This sequence automates running a specific audit tool against multiple codebases and aggregates the results into a single line count for quick comparison.
+- **Example:** node /tmp/audit.mjs packages/backend/src > /tmp/audit-backend.txt; node /tmp/audit.mjs packages/shared/src > /tmp/audit-shared.txt; wc -l /tmp/audit-backend.txt /tmp/audit-shared.txt
+- **Notes:** The script assumes the audit tool is available at /tmp/audit.mjs. The output files are created in the current working directory.
+
+### Audit source code in multiple packages
+<!-- sig: 4fab52492f01 -->
+
+```bash
+node /tmp/audit2.mjs 'packages/backend/src';
+echo '==='
+node /tmp/audit2.mjs packages/shared/src
+```
+
+- **What it does:** Executes the audit script /tmp/audit2.mjs against the source code in packages/backend/src, prints a separator, and then runs the script again against packages/shared/src.
+- **Why:** This pattern allows running the same validation tool sequentially against multiple, distinct source directories within a single shell command line.
+- **Example:** node /tmp/audit2.mjs 'packages/backend/src'; echo '===' ; node /tmp/audit2.mjs packages/shared/src
+- **Notes:** The semicolon separates the commands, ensuring the second node execution runs even if the first one fails (unless the failure causes the shell to exit immediately).
