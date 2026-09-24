@@ -152,6 +152,18 @@ m(){' python3 -c 'import sys;p=\'$F\'';s=open(p).read();a=sys.argv[1];assert a i
 - **Example:** m "T23:59:59Z`" "`" after updating a timestamp constant.
 - **Notes:** The function relies on the variable `$F` being set to the path of the file being modified before calling `m`. The output is piped to `rg "Tests "` which filters the test output.
 
+### Execute specific test file with environment variables
+<!-- sig: 5faa124e0b43 -->
+
+```bash
+T=src/pages/__tests__/EIRnDTopLevelKPIDashboard.requests.test.tsx 'run(){' NODE_OPTIONS=--localstorage-file=/tmp/devin-ls.json CI=true npx vitest run '$T' '2>&1'
+```
+
+- **What it does:** Sets a variable T to the path of the test file and executes a shell function that runs vitest against that file. It captures standard error and standard output.
+- **Why:** This pattern allows running a specific test file within a controlled shell function context, ensuring all necessary environment variables like NODE_OPTIONS and CI are set for the test runner.
+- **Example:** T=src/pages/__tests__/EIRnDTopLevelKPIDashboard.requests.test.tsx 'run(){' NODE_OPTIONS=--localstorage-file=/tmp/devin-ls.json CI=true npx vitest run '$T' '2>&1'
+- **Notes:** The entire command is wrapped in a shell function definition and execution, which is necessary to correctly scope the variable T and pass multiple arguments to npx vitest run.
+
 ## Dependencies
 
 ### Install exactly what the lockfile says
