@@ -29,6 +29,7 @@ npm run lint
 
 ### Run the test suite non-interactively
 <!-- sig: 442ddb0eadd9 -->
+<!-- sig: 8f19085695fa -->
 
 ```bash
 CI=true npm run test
@@ -65,6 +66,8 @@ npm run dev
 <!-- sig: 7218f214a695 -->
 <!-- sig: 02c0228defc6 -->
 <!-- sig: d33a6de30f56 -->
+<!-- sig: aa02b81cf793 -->
+<!-- sig: 834cb30e33bc -->
 
 ```bash
 CI=true npx vitest run src/__tests__/dashboardV2.contract.test.ts '2>&1'
@@ -105,6 +108,21 @@ src/utils/__tests__/freshness.test.ts src/components/__tests__/FreshnessIndicato
 - **Why:** This command systematically tests the robustness of the code by introducing controlled faults (mutations) and ensuring the existing test suite catches them.
 - **Example:** run_mutation 'M1 partial-reported-as-fresh' src/utils/freshness.ts " if (failed > 0) { return { severity: 'partial' } if (false && failed > 0) { return { severity: 'partial' }" src/utils/__tests__/freshness.test.ts src/components/__tests__/FreshnessIndicator.test.tsx src/pages/__tests__/LeadershipDashboard.test.tsx
 - **Notes:** The command structure suggests running multiple mutation checks sequentially, passing the mutation ID, the source file, the mutation payload, and a list of test files.
+
+### Run TypeScript compilation checks against source and test files
+<!-- sig: 3454eeee3f86 -->
+<!-- sig: fa79b88c6b7c -->
+
+```bash
+run_ts 'T1 unscoped-options-hidden' src/utils/filterScope.ts '  const unitOk = units.size === 0 ||
+    option.units.length === 0 ||
+    intersects(option.units, units);' '  const unitOk = units.size === 0 || intersects(option.units, units);' src/utils/__tests__/filterScope.test.ts
+```
+
+- **What it does:** Executes the TypeScript compiler check using the specified transformation ('T1 unscoped-options-hidden') against the source file and its corresponding test file.
+- **Why:** This command runs a specific, controlled compilation check to validate type safety and compilation behavior for a particular code change without running the full test suite.
+- **Example:** run_ts 'T1 unscoped-options-hidden' src/utils/filterScope.ts ' const unitOk = units.size === 0 || option.units.length === 0 || intersects(option.units, units);' ' const unitOk = units.size === 0 || intersects(option.units, units);' src/utils/__tests__/filterScope.test.ts
+- **Notes:** The command structure requires passing the transformation name, the source file, the expected source code snippet, the expected test code snippet, and the test file path.
 
 ## Dependencies
 

@@ -11,6 +11,7 @@
   "findstr": "shell.md",
   "get-content": "shell.md",
   "keep": "shell.md",
+  "ln": "shell.md",
   "merge-base": "shell.md",
   "more": "shell.md",
   "mv": "shell.md",
