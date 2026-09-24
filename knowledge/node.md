@@ -185,3 +185,16 @@ npx prettier --write packages/shared/src/types/dashboardV2.ts packages/shared/sr
 - **Why:** This ensures that multiple related files across different types (TS, JSON) are formatted consistently in one pass, which is cleaner than running prettier multiple times.
 - **Example:** npx prettier --write packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests__/dashboardV2.contract.test.ts packages/shared/src/schemas/dashboard-v2-schema.json '2>&1'
 - **Notes:** The '2>&1' redirects stderr to stdout, ensuring that any error messages are captured and passed through the shell pipeline.
+
+### Check node version and change directory
+<!-- sig: 1051abd4091c -->
+
+```bash
+node --version
+cd /Users/sraj/git_apps/epam/Work/PHUS-INN/ei-rd-eff-deliverymetrics/packages/frontend
+```
+
+- **What it does:** First, it prints the installed version of Node.js using the --version flag. Then, it changes the current working directory to the specified frontend package path.
+- **Why:** This sequence ensures the correct Node environment is active and the subsequent commands operate within the intended project directory.
+- **Example:** node --version; cd /Users/sraj/git_apps/epam/Work/PHUS-INN/ei-rd-eff-deliverymetrics/packages/frontend
+- **Notes:** The semicolon acts as a command separator, allowing the shell to execute both commands sequentially regardless of the success of the first.
