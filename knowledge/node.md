@@ -64,6 +64,7 @@ npm run dev
 ### Run specific contract tests in CI mode
 <!-- sig: 7218f214a695 -->
 <!-- sig: 02c0228defc6 -->
+<!-- sig: d33a6de30f56 -->
 
 ```bash
 CI=true npx vitest run src/__tests__/dashboardV2.contract.test.ts '2>&1'
