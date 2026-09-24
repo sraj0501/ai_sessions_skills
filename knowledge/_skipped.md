@@ -81,3 +81,8 @@ This is a conditional shell construct fragment, not a standalone, executable com
 <!-- sig: 21a44a090278 -->
 
 This appears to be a malformed or incomplete snippet from a shell history or interactive session, not a standalone, executable command.
+
+### '!p.endsWith(.d.ts)'
+<!-- sig: fc33824fbf35 -->
+
+This is a shell parameter expansion/filter used within a heredoc context, not a standalone command.
