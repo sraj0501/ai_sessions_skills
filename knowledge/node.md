@@ -86,6 +86,25 @@ npx eslint packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests_
 - **Example:** npx eslint packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests__/dashboardV2.contract.test.ts '2>&1'
 - **Notes:** The '2>&1' redirects standard error (2) to standard output (1), ensuring any linting errors are captured in the main stream.
 
+### Run mutation testing on specific files
+<!-- sig: 5a91f20a7c94 -->
+
+```bash
+run_mutation 'M1 partial-reported-as-fresh' src/utils/freshness.ts "  if (failed > 0) {
+    return {
+      severity: 'partial'
+  }  if (false && failed > 0) {
+    return {
+      severity: 'partial'
+    }"
+src/utils/__tests__/freshness.test.ts src/components/__tests__/FreshnessIndicator.test.tsx src/pages/__tests__/LeadershipDashboard.test.tsx
+```
+
+- **What it does:** Executes mutation testing using the specified mutation identifier ('M1 partial-reported-as-fresh') against the source file src/utils/freshness.ts, and then tests the resulting code against several test files.
+- **Why:** This command systematically tests the robustness of the code by introducing controlled faults (mutations) and ensuring the existing test suite catches them.
+- **Example:** run_mutation 'M1 partial-reported-as-fresh' src/utils/freshness.ts " if (failed > 0) { return { severity: 'partial' } if (false && failed > 0) { return { severity: 'partial' }" src/utils/__tests__/freshness.test.ts src/components/__tests__/FreshnessIndicator.test.tsx src/pages/__tests__/LeadershipDashboard.test.tsx
+- **Notes:** The command structure suggests running multiple mutation checks sequentially, passing the mutation ID, the source file, the mutation payload, and a list of test files.
+
 ## Dependencies
 
 ### Install exactly what the lockfile says
