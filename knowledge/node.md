@@ -83,6 +83,7 @@ CI=true npx vitest run src/__tests__/dashboardV2.contract.test.ts '2>&1'
 
 ### Run linter against specific shared files
 <!-- sig: 688f4c7f1b1b -->
+<!-- sig: b98bcc7c834f -->
 
 ```bash
 npx eslint packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests__/dashboardV2.contract.test.ts '2>&1'
@@ -294,3 +295,23 @@ node /tmp/audit2.mjs packages/shared/src
 - **Why:** This pattern allows running the same validation tool sequentially against multiple, distinct source directories within a single shell command line.
 - **Example:** node /tmp/audit2.mjs 'packages/backend/src'; echo '===' ; node /tmp/audit2.mjs packages/shared/src
 - **Notes:** The semicolon separates the commands, ensuring the second node execution runs even if the first one fails (unless the failure causes the shell to exit immediately).
+
+### Generate a file containing source file paths
+<!-- sig: a6c7a35b52b4 -->
+
+```bash
+node /tmp/reach2.mjs '2>/dev/null' > '/tmp/reach_out.txt'
+cat > /tmp/catA.mjs <<'EOF'
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { dirname, join, resolve, relative } from 'path';
+const ROOT = process.cwd(), SRC = join(ROOT,'src');
+function res_(f,s){if(!s.startsWith('.'))return null;const b=resolve(dirname(f),s);
+ for(const c of [b+'.ts',join(b,'index.ts'),b+'.tsx']) if(existsSync(c)&&statSync(c).isFile()) return c; return null;}
+const RE=/(?:from\s+|import\s*\(|require\s*\()
+EOF
+```
+
+- **What it does:** The first command executes a Node.js script to capture output to /tmp/reach_out.txt. The second command overwrites /tmp/catA.mjs with a multi-line JavaScript snippet.
+- **Why:** This sequence appears to be setting up or generating temporary files containing code or paths for subsequent processing within a build or analysis script.
+- **Example:** node /tmp/reach2.mjs '2>/dev/null' > '/tmp/reach_out.txt' followed by writing the path resolution logic to /tmp/catA.mjs.
+- **Notes:** The first command redirects stderr to /dev/null and stdout to /tmp/reach_out.txt. The second command uses a heredoc to write the content of the JavaScript snippet into /tmp/catA.mjs.
