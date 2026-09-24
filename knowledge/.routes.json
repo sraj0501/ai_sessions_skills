@@ -29,6 +29,7 @@
   "rev-parse": "git.md",
   "rmdir": "shell.md",
   "run_it": "python.md",
+  "set": "shell.md",
   "shasum": "shell.md",
   "sort": "shell.md",
   "sort-object": "shell.md",
