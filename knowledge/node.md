@@ -140,6 +140,18 @@ CI=true npm run test:frontend '2>&1'
 - **Example:** CI=true npm run test:frontend '2>&1' when running tests on a build agent.
 - **Notes:** The '2>&1' redirects standard error (2) to standard output (1), ensuring all output is captured by the subsequent pipe (like 'tail -60').
 
+### Run tests after modifying a specific file
+<!-- sig: 4b0e533e3f04 -->
+
+```bash
+m(){' python3 -c 'import sys;p=\'$F\'';s=open(p).read();a=sys.argv[1];assert a in s,a;open(p,\'w\').write(s.replace(a,sys.argv[2],1))' '$1' '$2;' NODE_OPTIONS=--localstorage-file=/tmp/devin-ls.json CI=true npx vitest run src/services/__tests__/python-api.test.ts '2>&1'
+```
+
+- **What it does:** This complex function modifies a source file by replacing all occurrences of a specified string with another string, and then runs Vitest tests against the affected service.
+- **Why:** It automates the process of making a targeted code change and immediately verifying that the change does not break existing tests.
+- **Example:** m "T23:59:59Z`" "`" after updating a timestamp constant.
+- **Notes:** The function relies on the variable `$F` being set to the path of the file being modified before calling `m`. The output is piped to `rg "Tests "` which filters the test output.
+
 ## Dependencies
 
 ### Install exactly what the lockfile says
