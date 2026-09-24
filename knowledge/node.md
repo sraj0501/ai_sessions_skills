@@ -153,6 +153,18 @@ npm run migrate:rollback --workspace=packages/backend '2>&1'
 - **Example:** npm run migrate:rollback --workspace=packages/backend '2>&1' to revert the last database migration.
 - **Notes:** The trailing '2>&1' ensures that any error messages written to stderr are also captured and passed to the script's standard output stream.
 
+### Execute the shared build script
+<!-- sig: e2225b7fdcc9 -->
+
+```bash
+npm run build:shared '2>&1'
+```
+
+- **What it does:** Runs the build:shared script defined in package.json, redirecting both standard output and standard error to the same stream.
+- **Why:** This command is specifically used to build shared components, ensuring that any output or error messages from the build process are captured together for subsequent piping or logging.
+- **Example:** npm run build:shared '2>&1' when building shared libraries before running type checks.
+- **Notes:** The '2>&1' ensures that both stdout and stderr are captured, which is crucial when piping the output to other tools like 'tail' or 'grep'.
+
 ## One-off tooling
 
 ### Run a package binary without installing it globally

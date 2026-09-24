@@ -18,6 +18,7 @@
   "open": "shell.md",
   "orbstack": "orbstack.md",
   "perl": "python.md",
+  "pg_isready": "postgresql.md",
   "pip": "python.md",
   "powershell.exe": "python.md",
   "progress": "shell.md",
