@@ -7,6 +7,7 @@
 
 ### Type-check the whole workspace
 <!-- sig: 3d954ef2e4cb -->
+<!-- sig: e5bc96a592e7 -->
 
 ```bash
 npm run type-check
