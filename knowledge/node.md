@@ -69,6 +69,8 @@ npm run dev
 <!-- sig: d33a6de30f56 -->
 <!-- sig: aa02b81cf793 -->
 <!-- sig: 834cb30e33bc -->
+<!-- sig: 4b64692ee65a -->
+<!-- sig: 019da5814da5 -->
 
 ```bash
 CI=true npx vitest run src/__tests__/dashboardV2.contract.test.ts '2>&1'
@@ -252,6 +254,7 @@ npx prettier --write packages/shared/src/types/dashboardV2.ts packages/shared/sr
 
 ### Check node version and change directory
 <!-- sig: 1051abd4091c -->
+<!-- sig: f715504ab869 -->
 
 ```bash
 node --version
