@@ -125,6 +125,18 @@ run_ts 'T1 unscoped-options-hidden' src/utils/filterScope.ts '  const unitOk = u
 - **Example:** run_ts 'T1 unscoped-options-hidden' src/utils/filterScope.ts ' const unitOk = units.size === 0 || option.units.length === 0 || intersects(option.units, units);' ' const unitOk = units.size === 0 || intersects(option.units, units);' src/utils/__tests__/filterScope.test.ts
 - **Notes:** The command structure requires passing the transformation name, the source file, the expected source code snippet, the expected test code snippet, and the test file path.
 
+### Run frontend tests in continuous integration mode
+<!-- sig: f5b5ce3c83c7 -->
+
+```bash
+CI=true npm run test:frontend '2>&1'
+```
+
+- **What it does:** Executes the 'test:frontend' script defined in package.json, setting the CI environment variable to true and redirecting stderr to stdout.
+- **Why:** This ensures that the test runner behaves as it would in a CI environment, which often strips or alters error reporting compared to local execution.
+- **Example:** CI=true npm run test:frontend '2>&1' when running tests on a build agent.
+- **Notes:** The '2>&1' redirects standard error (2) to standard output (1), ensuring all output is captured by the subsequent pipe (like 'tail -60').
+
 ## Dependencies
 
 ### Install exactly what the lockfile says
