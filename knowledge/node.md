@@ -208,6 +208,7 @@ npm run db:migrate '2>&1'
 <!-- sig: fa9a54e2c977 -->
 <!-- sig: 455adcc63f77 -->
 <!-- sig: 9c81d7bfb586 -->
+<!-- sig: 7ca2cd185019 -->
 
 ```bash
 npx prettier --write packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests__/dashboardV2.contract.test.ts packages/shared/src/schemas/dashboard-v2-schema.json '2>&1'
