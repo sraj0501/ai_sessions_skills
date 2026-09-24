@@ -10,6 +10,7 @@
   "file": "shell.md",
   "findstr": "shell.md",
   "get-content": "shell.md",
+  "if": "shell.md",
   "keep": "shell.md",
   "ln": "shell.md",
   "merge-base": "shell.md",

@@ -255,6 +255,7 @@ npx prettier --write packages/shared/src/types/dashboardV2.ts packages/shared/sr
 ### Check node version and change directory
 <!-- sig: 1051abd4091c -->
 <!-- sig: f715504ab869 -->
+<!-- sig: eb6f2301c95a -->
 
 ```bash
 node --version

@@ -66,3 +66,18 @@ This is not a standalone shell command but a redirection operation using a here-
 <!-- sig: c592829c79b0 -->
 
 This is not a shell command but content being appended to a markdown file.
+
+### 'lines[j].trim()' === ')' 'j--;' const prev = j '>=' 0 '?' 'lines[j].trim()' :
+<!-- sig: b436813fcb9c -->
+
+This is a JavaScript code snippet, not a shell command.
+
+### if '(!prev.endsWith(*/)'
+<!-- sig: 402a31973b52 -->
+
+This is a conditional shell construct fragment, not a standalone, executable command.
+
+### '!prev.startsWith(//))' '{' 'missing++;' 'byFile[f]' = '(byFile[f]'
+<!-- sig: 21a44a090278 -->
+
+This appears to be a malformed or incomplete snippet from a shell history or interactive session, not a standalone, executable command.
