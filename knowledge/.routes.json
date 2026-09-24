@@ -33,6 +33,7 @@
   "sort": "shell.md",
   "sort-object": "shell.md",
   "systemctl": "systemd.md",
+  "tee": "shell.md",
   "timeout": "shell.md",
   "tr": "shell.md",
   "type": "shell.md",
