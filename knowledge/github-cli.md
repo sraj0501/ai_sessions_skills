@@ -84,6 +84,7 @@ gh auth status
 <!-- sig: 021cefc2c98e -->
 <!-- sig: 48d863f37141 -->
 <!-- sig: ba67051c5c89 -->
+<!-- sig: ed1e2612ebb8 -->
 
 ```bash
 gh run list --limit 5
@@ -136,6 +137,7 @@ gh api repos/sraj-epam/ei-rd-eff-deliverymetrics --jq '{has_actions: .has_action
 
 ### List all secrets available in a repository
 <!-- sig: 6a642b1e6ec1 -->
+<!-- sig: 44b6ecb459de -->
 
 ```bash
 gh secret list --repo sraj-epam/ei-rd-eff-deliverymetrics
