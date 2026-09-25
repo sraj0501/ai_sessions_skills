@@ -84,6 +84,7 @@ CI=true npx vitest run src/__tests__/dashboardV2.contract.test.ts '2>&1'
 ### Run linter against specific shared files
 <!-- sig: 688f4c7f1b1b -->
 <!-- sig: b98bcc7c834f -->
+<!-- sig: 83a98e55fbb4 -->
 
 ```bash
 npx eslint packages/shared/src/types/dashboardV2.ts packages/shared/src/__tests__/dashboardV2.contract.test.ts '2>&1'
@@ -163,6 +164,30 @@ T=src/pages/__tests__/EIRnDTopLevelKPIDashboard.requests.test.tsx 'run(){' NODE_
 - **Why:** This pattern allows running a specific test file within a controlled shell function context, ensuring all necessary environment variables like NODE_OPTIONS and CI are set for the test runner.
 - **Example:** T=src/pages/__tests__/EIRnDTopLevelKPIDashboard.requests.test.tsx 'run(){' NODE_OPTIONS=--localstorage-file=/tmp/devin-ls.json CI=true npx vitest run '$T' '2>&1'
 - **Notes:** The entire command is wrapped in a shell function definition and execution, which is necessary to correctly scope the variable T and pass multiple arguments to npx vitest run.
+
+### Check linting errors for specific files
+<!-- sig: 42b6b4ed29e1 -->
+
+```bash
+a=$(npx eslint src/services/user-profile.service.ts src/services/__tests__/user-profile.mocked.test.ts 2>&1)
+```
+
+- **What it does:** Executes the eslint linter using npx against the specified source and test files, capturing both standard output and standard error into the variable 'a'.
+- **Why:** This captures the raw output of the linter run, which is necessary for subsequent processing like counting warnings or checking for specific error patterns.
+- **Example:** a=$(npx eslint src/services/user-profile.service.ts src/services/__tests__/user-profile.mocked.test.ts 2>&1)
+- **Notes:** The output is captured into the variable 'a', which can then be used in subsequent shell commands for analysis.
+
+### Run linter checks on source files
+<!-- sig: 3637fc94bba9 -->
+
+```bash
+npx eslint src --ext .ts
+```
+
+- **What it does:** Executes the ESLint tool via npx to check for linting errors in all TypeScript files within the src/ directory.
+- **Why:** This provides static analysis feedback on code style and potential errors before committing, complementing unit tests.
+- **Example:** npx eslint src --ext .ts
+- **Notes:** The preceding 'head;' and piping structure suggests this command is part of a larger CI pipeline that filters and displays specific output streams.
 
 ## Dependencies
 

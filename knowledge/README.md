@@ -29,6 +29,7 @@ and set **Files to include** to `knowledge/**/*.md`.
 | [Agent tools](agent-tools.md) | Agent tools and equivalent commands |
 | [`orbstack.md`](orbstack.md) | OrbStack Tool |
 | [`statsync.md`](statsync.md) | Statsync Tool |
+| [`actionlint.md`](actionlint.md) | Action Linting |
 
 `_skipped.md` records actions the writer judged unsuitable for documentation.
 `.routes.json` stores routing decisions. Capture logs and pending actions are

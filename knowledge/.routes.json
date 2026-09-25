@@ -1,4 +1,5 @@
 {
+  "actionlint": "actionlint.md",
   "audience": "audience.md",
   "awk": "shell.md",
   "cmp": "shell.md",
@@ -8,6 +9,7 @@
   "dir": "shell.md",
   "done": "shell.md",
   "engineering": "engineering.md",
+  "eslint": "node.md",
   "file": "shell.md",
   "findstr": "shell.md",
   "get-content": "shell.md",
