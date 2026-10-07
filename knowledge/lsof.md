@@ -7,6 +7,8 @@
 
 ### List processes listening on a specific port
 <!-- sig: ebf9f087c112 -->
+<!-- sig: 088be0b68957 -->
+<!-- sig: 1f53457bd780 -->
 
 ```bash
 lsof -nP -iTCP:8000 -sTCP:LISTEN
