@@ -40,5 +40,6 @@
   "where-object": "shell.md",
   "where.exe": "shell.md",
   "while": "shell.md",
-  "write-output": "shell.md"
+  "write-output": "shell.md",
+  "wsl": "wsl.md"
 }
