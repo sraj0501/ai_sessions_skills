@@ -284,6 +284,7 @@ gh api repos/sraj-epam/ei-rd-eff-deliverymetrics --jq '{has_actions: .has_action
 ### List all secrets available in a repository
 <!-- sig: 6a642b1e6ec1 -->
 <!-- sig: 44b6ecb459de -->
+<!-- sig: 1ee2b40f8f8e -->
 
 ```bash
 gh secret list --repo sraj-epam/ei-rd-eff-deliverymetrics
