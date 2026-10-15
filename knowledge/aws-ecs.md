@@ -155,3 +155,17 @@ aws rds describe-db-log-files --region us-east-1 --db-instance-identifier delive
 - **Why:** This allows quick inspection of the most recent log file activity without downloading the entire list of available log files.
 - **Example:** aws rds describe-db-log-files --region us-east-1 --db-instance-identifier delivery-metrics-staging-restore-rehearsal-20261015-d9ed731 --query 'sort_by(DescribeDBLogFiles,&LastWritten)[-10:].{Name:LogFileName,LastWritten:LastWritten,Size:Size}' --output json
 - **Notes:** The --query uses JMESPath to sort by LastWritten descending and select the last 10 elements, which correspond to the newest entries.
+
+## RDS Parameters
+
+### Retrieve specific SSL parameters from a DB group
+<!-- sig: db33f62f7b51 -->
+
+```bash
+aws rds describe-db-parameters --region us-east-1 --db-parameter-group-name delivery-metrics-staging-pg15 --source user --query 'Parameters[?ParameterName==`rds.force_ssl` || ParameterName==`ssl`].{Name:ParameterName,Value:ParameterValue,ApplyMethod:ApplyMethod,ApplyType:ApplyType,Source:Source}' --output json
+```
+
+- **What it does:** This command queries the AWS RDS service to fetch the current values for the 'rds.force_ssl' and 'ssl' parameters from the specified parameter group.
+- **Why:** It allows targeted inspection of security-related database settings without downloading the entire parameter group configuration.
+- **Example:** aws rds describe-db-parameters --region us-east-1 --db-parameter-group-name delivery-metrics-staging-pg15 --source user --query 'Parameters[?ParameterName==`rds.force_ssl` || ParameterName==`ssl`].{Name:ParameterName,Value:ParameterValue,ApplyMethod:ApplyMethod,ApplyType:ApplyType,Source:Source}' --output json
+- **Notes:** The --query filter ensures only the two specified parameters are returned, and --output json formats the result for easy parsing.
