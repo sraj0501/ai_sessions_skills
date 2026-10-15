@@ -203,6 +203,7 @@ gh api --method POST repos/philips-internal/ei-rd-eff-deliverymetrics/actions/jo
 
 ### Monitor a specific workflow run and log output
 <!-- sig: d7b775f4d00c -->
+<!-- sig: a9020c78a38a -->
 
 ```bash
 gh run watch 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --exit-status --interval 30 > /tmp/release-collector-avw-watch.log 2>&1
@@ -227,6 +228,18 @@ gh api 'repos/philips-internal/ei-rd-eff-deliverymetrics/actions/workflows/ci-cd
 - **Why:** This allows for a quick, scriptable check of the current state of the staging branch and the recent execution history of its associated CI/CD pipeline.
 - **Example:** gh api repos/philips-internal/ei-rd-eff-deliverymetrics/git/ref/heads/staging --jq '{ref,sha:.object.sha}'; gh api 'repos/philips-internal/ei-rd-eff-deliverymetrics/actions/workflows/ci-cd.yml/runs?branch=staging&per_page=3' --jq '[.workflow_runs[]|{id,status,conclusion,event,head_sha,run_started_at,updated_at}]'
 - **Notes:** The first command uses --jq to output the ref and SHA of the staging branch reference. The second command uses ?branch=staging&per_page=3 to limit results to the staging branch and only show three runs.
+
+### Rerun a specific failed workflow run
+<!-- sig: c521844d9ed3 -->
+
+```bash
+gh run rerun 38741610508 --repo philips-internal/ei-rd-eff-deliverymetrics --failed
+```
+
+- **What it does:** This command triggers a rerun of the workflow run identified by ID 38741610508 within the philips-internal/ei-rd-eff-deliverymetrics repository.
+- **Why:** It allows immediate re-execution of a workflow that previously failed, without needing to manually trigger a new run.
+- **Example:** gh run rerun 38741610508 --repo philips-internal/ei-rd-eff-deliverymetrics --failed
+- **Notes:** The --failed flag ensures only failed runs are targeted for rerunning.
 
 ## Repository management
 
