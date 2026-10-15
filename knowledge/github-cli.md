@@ -110,6 +110,21 @@ gh run list --repo sraj-epam/ei-rd-eff-deliverymetrics --branch staging --limit 
 - **Example:** gh api repos/sraj-epam/ei-rd-eff-deliverymetrics/actions/permissions '2>&1;' && echo '=== recent staging runs ===;' && gh run list --repo sraj-epam/ei-rd-eff-deliverymetrics --branch staging --limit 5 --json name,status,conclusion,createdAt
 - **Notes:** The use of '2>&1' redirects stderr to stdout for both the API call and the run list, ensuring all output is captured together.
 
+### Fetch workflow status and branch head commits
+<!-- sig: a36dd8659d91 -->
+
+```bash
+gh api repos/$repo/actions/workflows?per_page=100 --jq '[.workflows[] | {name,path,state}]'
+echo '-- branch heads;'
+gh api repos/$repo/git/ref/heads/staging --jq '{ref,sha:.object.sha}'
+gh api repos/$repo/git/ref/heads/main --jq '{ref,sha:.object.sha}'
+```
+
+- **What it does:** This sequence first retrieves the names, paths, and states of the last 100 workflows for the repository. It then fetches the full reference and SHA for the 'staging' and 'main' branches.
+- **Why:** It provides a comprehensive snapshot of the repository's CI/CD status and the current state of its primary branches in a single execution.
+- **Example:** repo='philips-internal/ei-rd-eff-deliverymetrics'; gh api repos/$repo/actions/workflows?per_page=100 --jq '[.workflows[] | {name,path,state}]'; echo '-- branch heads;'; gh api repos/$repo/git/ref/heads/staging --jq '{ref,sha:.object.sha}'; gh api repos/$repo/git/ref/heads/main --jq '{ref,sha:.object.sha}'
+- **Notes:** The initial command sets the repository variable $repo before executing the subsequent API calls.
+
 ## Repository management
 
 ### Create a new private GitHub repository
