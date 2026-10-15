@@ -177,6 +177,19 @@ tail -5 /tmp/release-collector-avw-watch.log
 - **Example:** gh run watch 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --exit-status --interval 30 > /tmp/release-collector-avw-watch.log 2>&1; echo 'WATCH=$?' >> /tmp/release-collector-avw-watch.log; tail -5 /tmp/release-collector-avw-watch.log
 - **Notes:** The `--interval 30` specifies checking every 30 seconds. The `2>&1` redirects standard error into standard output before logging.
 
+### Fetch staging branch SHA and recent workflow runs
+<!-- sig: 9f6afda45c2b -->
+
+```bash
+gh api repos/philips-internal/ei-rd-eff-deliverymetrics/git/ref/heads/staging --jq '{ref,sha:.object.sha};'
+gh api 'repos/philips-internal/ei-rd-eff-deliverymetrics/actions/workflows/ci-cd.yml/runs?branch=staging&per_page=3' --jq '[.workflow_runs[]|{id,status,conclusion,event,head_sha,run_started_at,updated_at}]'
+```
+
+- **What it does:** The first command retrieves the reference and SHA for the staging branch. The second command fetches the last three workflow runs for the ci-cd.yml workflow on the staging branch, extracting key metadata for each run.
+- **Why:** This allows for a quick, scriptable check of the current state of the staging branch and the recent execution history of its associated CI/CD pipeline.
+- **Example:** gh api repos/philips-internal/ei-rd-eff-deliverymetrics/git/ref/heads/staging --jq '{ref,sha:.object.sha}'; gh api 'repos/philips-internal/ei-rd-eff-deliverymetrics/actions/workflows/ci-cd.yml/runs?branch=staging&per_page=3' --jq '[.workflow_runs[]|{id,status,conclusion,event,head_sha,run_started_at,updated_at}]'
+- **Notes:** The first command uses --jq to output the ref and SHA of the staging branch reference. The second command uses ?branch=staging&per_page=3 to limit results to the staging branch and only show three runs.
+
 ## Repository management
 
 ### Create a new private GitHub repository
