@@ -159,6 +159,7 @@ gh api repos/$repo/actions/runs/38672295422/jobs?per_page=100 --jq '[.jobs[] | {
 ### View details of a specific workflow run
 <!-- sig: 28c28a812a44 -->
 <!-- sig: dcdd09b2467d -->
+<!-- sig: 1c55d10514c2 -->
 
 ```bash
 gh run view 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --log-failed
