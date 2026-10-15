@@ -21,6 +21,7 @@ docker buildx build --platform linux/amd64 --load --target runner -f packages/fr
 ### Build a production image for the Python API
 <!-- sig: c1e3ab505c6d -->
 <!-- sig: 7229439ea7be -->
+<!-- sig: 200581b8030f -->
 
 ```bash
 docker build --platform linux/amd64 -f packages/python-api/Dockerfile.production --target production -t delivery-metrics-python-api:production-context-check .
@@ -35,6 +36,7 @@ docker build --platform linux/amd64 -f packages/python-api/Dockerfile.production
 
 ### Remove specific tagged docker images
 <!-- sig: 6c0332f4df13 -->
+<!-- sig: eae18261b5f0 -->
 
 ```bash
 docker rmi dm-release-frontend-test:$SHA
