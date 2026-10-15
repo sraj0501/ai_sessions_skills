@@ -30,6 +30,18 @@ gh pr list --repo philips-internal/ei-rd-eff-deliverymetrics --state open --limi
 - **Why:** This provides a quick, structured overview of the most recent open PRs without needing to paginate through many pages.
 - **Example:** gh pr list --repo philips-internal/ei-rd-eff-deliverymetrics --state open --limit 30 --json number,title,author,headRefName,isDraft '2>&1'
 - **Notes:** The '2>&1' redirects stderr to stdout, ensuring any error messages are captured by the subsequent pipe operation.
+
+### Update a pull request with labels
+<!-- sig: 9d6986853db1 -->
+
+```bash
+gh pr edit 451 --repo philips-internal/ei-rd-eff-deliverymetrics --add-label chore --add-label needs-review
+```
+
+- **What it does:** Modifies pull request 451 within the philips-internal/ei-rd-eff-deliverymetrics repository by adding the chore and needs-review labels.
+- **Why:** This allows for immediate categorization and routing of the pull request without needing to create a separate issue or comment.
+- **Example:** gh pr edit 451 --repo philips-internal/ei-rd-eff-deliverymetrics --add-label chore --add-label needs-review
+- **Notes:** The `--repo` flag specifies the target repository for the operation.
 ## Summary
 - what changed and why
 
@@ -58,6 +70,7 @@ gh pr view --json state,mergeable,reviewDecision
 
 ### See whether CI is green
 <!-- sig: ab1255430681 -->
+<!-- sig: 46f30a01d36b -->
 
 ```bash
 gh pr checks
@@ -242,3 +255,28 @@ gh repo view philips-internal/ei-rd-eff-collectors --json name,defaultBranchRef,
 - **Why:** This is used to programmatically check the canonical name and default branch of a remote repository without needing to clone or interact with it via Git commands.
 - **Example:** gh repo view philips-internal/ei-rd-eff-collectors --json name,defaultBranchRef,parent '2>&1'
 - **Notes:** The '2>&1' redirects standard error to standard output, ensuring any error messages are captured by the subsequent pipe or command.
+
+### Retrieve staging branch SHA and RDS snapshot details
+<!-- sig: 5fd8f67b820d -->
+
+```bash
+gh api repos/philips-internal/ei-rd-eff-deliverymetrics/git/ref/heads/staging --jq '.object.sha;'
+aws rds describe-db-snapshots --region us-east-1 --db-snapshot-identifier delivery-metrics-staging-pre-deploy-20261015-d9ed731 --query 'DBSnapshots[0].{Status:Status,Source:DBInstanceIdentifier,CreatedAt:SnapshotCreateTime}' --output json
+```
+
+- **What it does:** This command first uses the GitHub CLI to fetch the SHA of the staging branch, and then uses AWS CLI to query the status and source of a specific RDS database snapshot.
+- **Why:** It combines fetching the current state of a Git branch with retrieving metadata about a corresponding database backup for deployment verification.
+- **Example:** gh api repos/philips-internal/ei-rd-eff-deliverymetrics/git/ref/heads/staging --jq '.object.sha;' aws rds describe-db-snapshots --region us-east-1 --db-snapshot-identifier delivery-metrics-staging-pre-deploy-20261015-d9ed731 --query 'DBSnapshots[0].{Status:Status,Source:DBInstanceIdentifier,CreatedAt:SnapshotCreateTime}' --output json
+- **Notes:** The two commands are chained by a semicolon, meaning the second command runs after the first one completes successfully.
+
+### List labels for a specific repository
+<!-- sig: 522dd6e600ee -->
+
+```bash
+gh label list --repo philips-internal/ei-rd-eff-deliverymetrics --limit 100 --json name,color,description
+```
+
+- **What it does:** Retrieves a list of labels associated with the philips-internal/ei-rd-eff-deliverymetrics repository, limiting the output to 100 items.
+- **Why:** This allows programmatic inspection of repository labels, extracting specific metadata like name, color, and description in JSON format.
+- **Example:** gh label list --repo philips-internal/ei-rd-eff-deliverymetrics --limit 100 --json name,color,description
+- **Notes:** The --json flag ensures the output is structured data, which is useful for scripting or automated checks.
