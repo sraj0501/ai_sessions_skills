@@ -18,6 +18,19 @@ docker buildx build --platform linux/amd64 --load --target runner -f packages/fr
 - **Example:** docker buildx build --platform linux/amd64 --load --target runner -f packages/frontend/Dockerfile --build-arg VITE_API_BASE_URL=https://ei-rd-metrics-staging.83fadca.hsp.philips.com --build-arg VITE_AUTH_BASE_URL=https://ei-rd-metrics-staging.83fadca.hsp.philips.com --build-arg VITE_SSO_ENABLED=true --build-arg VITE_SHOW_DEVELOPER_DASHBOARD=false --build-arg VITE_ENVIRONMENT=staging -t dm-release-frontend-test:$SHA .
 - **Notes:** The build context is the current directory (.). The image is tagged with a dynamic SHA derived from HEAD.
 
+### Build a production image for the Python API
+<!-- sig: c1e3ab505c6d -->
+<!-- sig: 7229439ea7be -->
+
+```bash
+docker build --platform linux/amd64 -f packages/python-api/Dockerfile.production --target production -t delivery-metrics-python-api:production-context-check .
+```
+
+- **What it does:** Builds a Docker image using the specified production Dockerfile, targeting the 'production' stage, and tags it as delivery-metrics-python-api:production-context-check.
+- **Why:** This command specifically builds the production variant of the Python API image, ensuring it targets the correct architecture and stage.
+- **Example:** docker build --platform linux/amd64 -f packages/python-api/Dockerfile.production --target production -t delivery-metrics-python-api:production-context-check .
+- **Notes:** The build context is the current directory (.).
+
 ## Managing images
 
 ### Remove specific tagged docker images

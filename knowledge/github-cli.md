@@ -71,6 +71,7 @@ gh pr view --json state,mergeable,reviewDecision
 ### See whether CI is green
 <!-- sig: ab1255430681 -->
 <!-- sig: 46f30a01d36b -->
+<!-- sig: 7f10cf4449d5 -->
 
 ```bash
 gh pr checks
@@ -112,6 +113,8 @@ gh run list --limit 5
 
 ### List the five most recent staging workflow runs
 <!-- sig: f9093434afe4 -->
+<!-- sig: 37d321c3b321 -->
+<!-- sig: 82a67bf10e5d -->
 
 ```bash
 gh api repos/sraj-epam/ei-rd-eff-deliverymetrics/actions/permissions '2>&1;'
@@ -155,6 +158,7 @@ gh api repos/$repo/actions/runs/38672295422/jobs?per_page=100 --jq '[.jobs[] | {
 
 ### View details of a specific workflow run
 <!-- sig: 28c28a812a44 -->
+<!-- sig: dcdd09b2467d -->
 
 ```bash
 gh run view 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --log-failed
