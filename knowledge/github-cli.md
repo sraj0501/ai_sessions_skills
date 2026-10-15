@@ -42,6 +42,19 @@ gh pr edit 451 --repo philips-internal/ei-rd-eff-deliverymetrics --add-label cho
 - **Why:** This allows for immediate categorization and routing of the pull request without needing to create a separate issue or comment.
 - **Example:** gh pr edit 451 --repo philips-internal/ei-rd-eff-deliverymetrics --add-label chore --add-label needs-review
 - **Notes:** The `--repo` flag specifies the target repository for the operation.
+
+### Fetch detailed review thread information for a pull request
+<!-- sig: 4e5a15cd4426 -->
+<!-- sig: 6b410e4de574 -->
+
+```bash
+gh api graphql -f 'query=query { repository(owner:"philips-internal", name:"ei-rd-eff-deliverymetrics") { pullRequest(number:451) { reviewThreads(first:100) { nodes { id isResolved isOutdated comments(first:20) { nodes { databaseId author { login } body path originalLine line } } } } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | {id,isResolved,isOutdated,comments:[.comments.nod'
+```
+
+- **What it does:** This command uses the GitHub CLI to execute a GraphQL query against the API, retrieving review threads and their associated comments for pull request number 451 in the ei-rd-eff-deliverymetrics repository. The output is then piped to jq to format the data.
+- **Why:** It allows for granular data extraction from GitHub that is not easily accessible through standard CLI commands, specifically targeting nested review thread and comment details.
+- **Example:** gh api graphql -f 'query=query { repository(owner:"philips-internal", name:"ei-rd-eff-deliverymetrics") { pullRequest(number:451) { reviewThreads(first:100) { nodes { id isResolved isOutdated comments(first:20) { nodes { databaseId author { login } body path originalLine line } } } } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | {id,isResolved,isOutdated,comments:[.comments.nod'
+- **Notes:** The query is highly specific to the repository and PR number; changing these values will target different data.
 ## Summary
 - what changed and why
 
@@ -72,6 +85,7 @@ gh pr view --json state,mergeable,reviewDecision
 <!-- sig: ab1255430681 -->
 <!-- sig: 46f30a01d36b -->
 <!-- sig: 7f10cf4449d5 -->
+<!-- sig: dbd0fede2fc9 -->
 
 ```bash
 gh pr checks
@@ -160,6 +174,7 @@ gh api repos/$repo/actions/runs/38672295422/jobs?per_page=100 --jq '[.jobs[] | {
 <!-- sig: 28c28a812a44 -->
 <!-- sig: dcdd09b2467d -->
 <!-- sig: 1c55d10514c2 -->
+<!-- sig: 1e3f3a1902aa -->
 
 ```bash
 gh run view 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --log-failed
