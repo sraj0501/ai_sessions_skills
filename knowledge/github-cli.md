@@ -20,6 +20,7 @@ gh pr create --title "fix: correct KPI-4 denominator" --body "$(cat <<'EOF'
 <!-- sig: a2d02f1d5e5a -->
 <!-- sig: c829c53705d8 -->
 <!-- sig: a1878b5611e1 -->
+<!-- sig: 34065926440a -->
 
 ```bash
 gh pr list --repo philips-internal/ei-rd-eff-deliverymetrics --state open --limit 30 --json number,title,author,headRefName,isDraft '2>&1'

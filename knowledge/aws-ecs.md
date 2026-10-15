@@ -21,6 +21,7 @@ aws ecs describe-tasks --region us-east-1 --cluster delivery-metrics-production 
 ### Retrieve detailed status for specific ECS services
 <!-- sig: 334e3aa575f4 -->
 <!-- sig: afbeaf44e01b -->
+<!-- sig: 929a9adaab1d -->
 
 ```bash
 aws ecs describe-services --region us-east-1 --cluster delivery-metrics-production --services delivery-metrics-production-frontend delivery-metrics-production-backend delivery-metrics-production-python-api --query 'services[].{Service:serviceName,TaskDefinition:taskDefinition,Desired:desiredCount,Running:runningCount,Pending:pendingCount,RolloutState:deployments[0].rolloutState}' --output json
@@ -74,6 +75,7 @@ aws rds describe-db-snapshots --region us-east-1 --db-instance-identifier delive
 
 ### Retrieve detailed configuration of a specific database instance
 <!-- sig: 5dad96e83e3e -->
+<!-- sig: fceba157f9ba -->
 
 ```bash
 aws rds describe-db-instances --region us-east-1 --db-instance-identifier delivery-metrics-staging-db --query 'DBInstances[0].{Identifier:DBInstanceIdentifier,Status:DBInstanceStatus,Engine:Engine,EngineVersion:EngineVersion,Class:DBInstanceClass,AllocatedStorageGiB:AllocatedStorage,StorageType:StorageType,Encrypted:StorageEncrypted,MultiAZ:MultiAZ,BackupRetentionDays:BackupRetentionPeriod,LatestRestorableTime:LatestRestorableTime,PreferredBackupWindow:PreferredBackupWindow,PreferredMaintenanceWindow:PreferredMaintenanceWindow,DeletionProtection:DeletionProtect}'
