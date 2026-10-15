@@ -47,6 +47,7 @@ aws rds describe-db-instances --region us-east-1 --db-instance-identifier delive
 
 ### Retrieve the ARN of a running ECS task
 <!-- sig: ff717f528a01 -->
+<!-- sig: aec3bd69ed0d -->
 
 ```bash
 TASK=$(aws ecs list-tasks --region us-east-1 --cluster delivery-metrics-staging --service-name delivery-metrics-staging-backend --desired-status RUNNING --query 'taskArns[0]' --output 'text')

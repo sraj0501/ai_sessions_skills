@@ -21,6 +21,7 @@ brew services restart postgresql@16
 
 ### Install git-filter-repo using homebrew
 <!-- sig: d32569645211 -->
+<!-- sig: 61a1b57cc442 -->
 
 ```bash
 brew install git-filter-repo
