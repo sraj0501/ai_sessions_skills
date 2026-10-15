@@ -18,6 +18,19 @@ aws ecs describe-tasks --region us-east-1 --cluster delivery-metrics-production 
 - **Example:** task_arns=$(aws ecs list-tasks --region us-east-1 --cluster delivery-metrics-production --query taskArns --output text); if [ -n "$task_arns" ]; then aws ecs describe-tasks --region us-east-1 --cluster delivery-metrics-production --tasks $task_arns --query 'tasks[].{TaskArn:taskArn,TaskDefinition:taskDefinitionArn,LastStatus:lastStatus,HealthStatus:healthStatus,StartedAt:startedAt,Containers:containers[].{Name:name,Image:image,ImageDigest:imageDigest,LastStatus:lastStatus,HealthStatus:healthStatus}}' --output json; else echo '[]'; fi
 - **Notes:** The script relies on the output of the first command being successfully captured into the task_arns variable to execute the second command.
 
+### Retrieve detailed status for specific ECS services
+<!-- sig: 334e3aa575f4 -->
+<!-- sig: afbeaf44e01b -->
+
+```bash
+aws ecs describe-services --region us-east-1 --cluster delivery-metrics-production --services delivery-metrics-production-frontend delivery-metrics-production-backend delivery-metrics-production-python-api --query 'services[].{Service:serviceName,TaskDefinition:taskDefinition,Desired:desiredCount,Running:runningCount,Pending:pendingCount,RolloutState:deployments[0].rolloutState}' --output json
+```
+
+- **What it does:** This command queries the Amazon ECS service to fetch detailed metrics for the specified services within the delivery-metrics-production cluster in the us-east-1 region. It filters the output to show service name, task definition, and various count/state metrics.
+- **Why:** It provides a concise, structured view of the operational health and deployment status of multiple critical services simultaneously, which is faster than querying each service individually.
+- **Example:** aws ecs describe-services --region us-east-1 --cluster delivery-metrics-production --services delivery-metrics-production-frontend delivery-metrics-production-backend delivery-metrics-production-python-api --query 'services[].{Service:serviceName,TaskDefinition:taskDefinition,Desired:desiredCount,Running:runningCount,Pending:pendingCount,RolloutState:deployments[0].rolloutState}' --output json
+- **Notes:** The --query parameter uses JMESPath to shape the output, extracting specific fields from the complex service response structure.
+
 ## RDS Snapshots
 
 ### List the ten most recent database snapshots
@@ -46,6 +59,7 @@ aws rds describe-db-instances --region us-east-1 --db-instance-identifier delive
 
 ### Retrieve all tags associated with a specific RDS instance
 <!-- sig: a67300ee1712 -->
+<!-- sig: 01afeff36993 -->
 
 ```bash
 aws rds list-tags-for-resource --region us-east-1 --resource-name arn:aws:rds:us-east-1:545009868739:db:delivery-metrics-staging-db --query TagList --output json
@@ -102,3 +116,15 @@ aws rds restore-db-instance-from-db-snapshot
 - **Why:** It allows for disaster recovery or testing by provisioning a replica of a known good state without affecting the original snapshot.
 - **Example:** aws rds restore-db-instance-from-db-snapshot --region us-east-1 --db-instance-identifier delivery-metrics-staging-restore-rehearsal-20261015-d9ed731 --db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731 --db-instance-class db.t3.micro --availability-zone us-east-1b --db-subnet-group-name delivery-metrics-staging-db-subnet-group --vpc-security-gr
 - **Notes:** The command snippet provided was incomplete; full execution requires specifying VPC security group IDs and other parameters.
+
+### List the ten most recently written log files
+<!-- sig: cd9bed48b6e6 -->
+
+```bash
+aws rds describe-db-log-files --region us-east-1 --db-instance-identifier delivery-metrics-staging-restore-rehearsal-20261015-d9ed731 --query 'sort_by(DescribeDBLogFiles,&LastWritten)[-10:].{Name:LogFileName,LastWritten:LastWritten,Size:Size}' --output json
+```
+
+- **What it does:** Retrieves metadata for the log files associated with the specified RDS instance, filtering to show only the ten most recently written ones.
+- **Why:** This allows quick inspection of the most recent log file activity without downloading the entire list of available log files.
+- **Example:** aws rds describe-db-log-files --region us-east-1 --db-instance-identifier delivery-metrics-staging-restore-rehearsal-20261015-d9ed731 --query 'sort_by(DescribeDBLogFiles,&LastWritten)[-10:].{Name:LogFileName,LastWritten:LastWritten,Size:Size}' --output json
+- **Notes:** The --query uses JMESPath to sort by LastWritten descending and select the last 10 elements, which correspond to the newest entries.
