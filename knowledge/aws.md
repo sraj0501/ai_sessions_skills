@@ -99,3 +99,29 @@ aws ecs describe-services --region us-east-1 --cluster delivery-metrics-producti
 - **What it does:** Retrieves detailed status information for specified ECS services within the delivery-metrics-production cluster in the us-east-1 region. The --query flag filters the output to show key metrics for each service.
 - **Why:** This allows for a quick, targeted check of the operational health and configuration of multiple critical services without needing to parse large JSON responses.
 - **Example:** aws ecs describe-services --region us-east-1 --cluster delivery-metrics-production --services delivery-metrics-production-frontend delivery-metrics-production-backend delivery-metrics-production-python-api --query 'services[].{Service:serviceName,Status:status,Desired:desiredCount,Running:runningCount,Pending:pendingCount,TaskDefinition:taskDefinition,LaunchType:launchType,PlatformVersion:platform}'
+
+## AWS RDS Management
+
+### Wait until the specified RDS snapshot is available
+<!-- sig: 7dbac5522b03 -->
+
+```bash
+aws rds wait db-snapshot-available --region us-east-1 --db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731
+```
+
+- **What it does:** This command polls the AWS RDS service until the snapshot identified as delivery-metrics-staging-pre-release-20261015-d9ed731 reaches the 'available' state in the us-east-1 region.
+- **Why:** It prevents subsequent operations, like restoring the snapshot, from failing due to the snapshot still being in a creation or pending state.
+- **Example:** aws rds wait db-snapshot-available --region us-east-1 --db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731
+- **Notes:** The command will block execution until the state transition is complete or a timeout occurs, depending on the underlying AWS SDK implementation.
+
+### Retrieve detailed information about a specific database snapshot
+<!-- sig: acf7e0d00edb -->
+
+```bash
+aws rds describe-db-snapshots --region us-east-1 --db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731 --query 'DBSnapshots[0].{Identifier:DBSnapshotIdentifier,Source:DBInstanceIdentifier,Status:Status,PercentProgress:PercentProgress,Encrypted:Encrypted,KmsKeyId:KmsKeyId,Engine:Engine,EngineVersion:EngineVersion,AllocatedStorage:AllocatedStorageGiB,CreatedAt}'
+```
+
+- **What it does:** This command queries AWS RDS to fetch detailed metadata for the snapshot identified as delivery-metrics-staging-pre-release-20261015-d9ed731 in the us-east-1 region. The --query flag filters the output to only show specific attributes.
+- **Why:** It allows for a precise inspection of a snapshot's status, source instance, and configuration details without needing to download or view the entire resource description.
+- **Example:** aws rds describe-db-snapshots --region us-east-1 --db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731 --query 'DBSnapshots[0].{Identifier:DBSnapshotIdentifier,Source:DBInstanceIdentifier,Status:Status,PercentProgress:PercentProgress,Encrypted:Encrypted,KmsKeyId:KmsKeyId,Engine:Engine,EngineVersion:EngineVersion,AllocatedStorage:AllocatedStorageGiB,CreatedAt}'
+- **Notes:** The --query uses JMESPath to select the first snapshot found in the response array and project only the specified fields.

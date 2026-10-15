@@ -43,3 +43,43 @@ aws rds describe-db-instances --region us-east-1 --db-instance-identifier delive
 - **Why:** It allows for a quick, programmatic inspection of the current operational state and configuration parameters of a production or staging database without needing to navigate the AWS console.
 - **Example:** aws rds describe-db-instances --region us-east-1 --db-instance-identifier delivery-metrics-staging-db --query 'DBInstances[0].{Identifier:DBInstanceIdentifier,Status:DBInstanceStatus,Engine:Engine,EngineVersion:EngineVersion,Class:DBInstanceClass,AllocatedStorageGiB:AllocatedStorage,StorageType:StorageType,Encrypted:StorageEncrypted,MultiAZ:MultiAZ,BackupRetentionDays:BackupRetentionPeriod,LatestRestorableTime:LatestRestorableTime,PreferredBackupWindow:PreferredBackupWindow,PreferredMaintenanceWindow:PreferredMaintenanceWindow,DeletionProtection:DeletionProtect}'
 - **Notes:** The --query uses JMESPath to select and rename specific fields from the returned DBInstances array, ensuring only relevant data is returned.
+
+### Retrieve all tags associated with a specific RDS instance
+<!-- sig: a67300ee1712 -->
+
+```bash
+aws rds list-tags-for-resource --region us-east-1 --resource-name arn:aws:rds:us-east-1:545009868739:db:delivery-metrics-staging-db --query TagList --output json
+```
+
+- **What it does:** This command queries the AWS RDS service in the us-east-1 region to fetch all key-value tags attached to the resource identified by arn:aws:rds:us-east-1:545009868739:db:delivery-metrics-staging-db.
+- **Why:** It allows programmatic inspection of metadata tags on a database instance without needing to view the console or use a general describe command.
+- **Example:** aws rds list-tags-for-resource --region us-east-1 --resource-name arn:aws:rds:us-east-1:545009868739:db:delivery-metrics-staging-db --query TagList --output json
+- **Notes:** The --query TagList and --output json flags ensure the output is a clean JSON array containing only the tags.
+
+### Generate CLI skeleton for RDS restoration
+<!-- sig: 216b0a54a18d -->
+
+```bash
+aws rds restore-db-instance-from-db-snapshot --generate-cli-skeleton input
+```
+
+- **What it does:** This command generates a template file structure for the restore-db-instance-from-db-snapshot operation.
+- **Why:** It provides a boilerplate structure, ensuring all required parameters for the AWS CLI command are present before actual execution.
+- **Example:** aws rds restore-db-instance-from-db-snapshot --generate-cli-skeleton input
+- **Notes:** The 'input' argument specifies the desired output format for the skeleton file.
+
+### Create a database snapshot for rollback
+<!-- sig: 63920aa7b0ec -->
+
+```bash
+aws rds create-db-snapshot
+--region us-east-1
+--db-instance-identifier delivery-metrics-staging-db
+--db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731
+--tags Key=Project,Value=delivery-metrics Key=Environment,Value=staging Key=Purpose,Value=pre-release-rollback Key=ReleaseCandidate,Value=d9ed731 Key=PreserveUntil,Value=2026-10-29
+```
+
+- **What it does:** This command initiates a snapshot of the specified RDS instance, tagging it with metadata for tracking and management.
+- **Why:** It provides a point-in-time backup of the database instance, which is crucial for disaster recovery or rolling back to a known good state.
+- **Example:** aws rds create-db-snapshot --region us-east-1 --db-instance-identifier delivery-metrics-staging-db --db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731 --tags Key=Project,Value=delivery-metrics Key=Environment,Value=staging Key=Purpose,Value=pre-release-rollback Key=ReleaseCandidate,Value=d9ed731 Key=PreserveUntil,Value=2026-10-29
+- **Notes:** The snapshot identifier must be unique. Tags help organize and automate lifecycle policies for the backup.
