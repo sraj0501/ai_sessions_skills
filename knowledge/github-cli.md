@@ -86,6 +86,8 @@ gh pr view --json state,mergeable,reviewDecision
 <!-- sig: 46f30a01d36b -->
 <!-- sig: 7f10cf4449d5 -->
 <!-- sig: dbd0fede2fc9 -->
+<!-- sig: 1b0dcc897ac2 -->
+<!-- sig: 001428228dcd -->
 
 ```bash
 gh pr checks
@@ -175,6 +177,8 @@ gh api repos/$repo/actions/runs/38672295422/jobs?per_page=100 --jq '[.jobs[] | {
 <!-- sig: dcdd09b2467d -->
 <!-- sig: 1c55d10514c2 -->
 <!-- sig: 1e3f3a1902aa -->
+<!-- sig: 6949b58ec830 -->
+<!-- sig: 7c6dbcc0d44f -->
 
 ```bash
 gh run view 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --log-failed
