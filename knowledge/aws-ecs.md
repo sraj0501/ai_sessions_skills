@@ -198,3 +198,17 @@ aws secretsmanager describe-secret --region us-east-1 --secret-id delivery-metri
 - **Why:** It allows for a quick, targeted inspection of a secret's configuration and lifecycle status without downloading the secret value itself.
 - **Example:** aws secretsmanager describe-secret --region us-east-1 --secret-id delivery-metrics-staging-app --query '{ARN:ARN,Name:Name,VersionIdsToStages:VersionIdsToStages,LastChangedDate:LastChangedDate}' --output json
 - **Notes:** The --query flag uses JMESPath to select specific fields, and --output json ensures the result is machine-readable.
+
+## Authentication
+
+### Authenticate with the AWS CLI
+<!-- sig: e83b366f09b6 -->
+
+```bash
+aws login '2>&1'
+```
+
+- **What it does:** This command initiates the AWS CLI login process, redirecting standard error into standard output.
+- **Why:** It ensures that any error messages generated during the login process are captured and visible in the standard output stream.
+- **Example:** aws login '2>&1' when running in a script where error capture is necessary.
+- **Notes:** The redirection '2>&1' is used to ensure that any output, including errors, is piped correctly to subsequent commands like 'tail'.
