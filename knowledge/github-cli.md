@@ -331,3 +331,14 @@ gh label list --repo philips-internal/ei-rd-eff-deliverymetrics --limit 100 --js
 - **Why:** This allows programmatic inspection of repository labels, extracting specific metadata like name, color, and description in JSON format.
 - **Example:** gh label list --repo philips-internal/ei-rd-eff-deliverymetrics --limit 100 --json name,color,description
 - **Notes:** The --json flag ensures the output is structured data, which is useful for scripting or automated checks.
+
+### List all variables for a specific repository
+<!-- sig: aa76df9a6922 -->
+
+```bash
+gh variable list --repo philips-internal/ei-rd-eff-deliverymetrics
+```
+
+- **What it does:** Retrieves a list of all defined variables associated with the philips-internal/ei-rd-eff-deliverymetrics repository.
+- **Why:** This is the direct way to inspect the configuration variables set within a GitHub repository context.
+- **Example:** gh variable list --repo philips-internal/ei-rd-eff-deliverymetrics

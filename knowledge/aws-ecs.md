@@ -49,6 +49,7 @@ aws rds describe-db-instances --region us-east-1 --db-instance-identifier delive
 ### Retrieve the ARN of a running ECS task
 <!-- sig: ff717f528a01 -->
 <!-- sig: aec3bd69ed0d -->
+<!-- sig: 74559b4a4cbe -->
 
 ```bash
 TASK=$(aws ecs list-tasks --region us-east-1 --cluster delivery-metrics-staging --service-name delivery-metrics-staging-backend --desired-status RUNNING --query 'taskArns[0]' --output 'text')
@@ -58,6 +59,18 @@ TASK=$(aws ecs list-tasks --region us-east-1 --cluster delivery-metrics-staging 
 - **Why:** It dynamically fetches the identifier for a specific running task, allowing subsequent commands to operate on that exact resource without hardcoding the ARN.
 - **Example:** TASK=$(aws ecs list-tasks --region us-east-1 --cluster delivery-metrics-staging --service-name delivery-metrics-staging-backend --desired-status RUNNING --query 'taskArns[0]' --output 'text')
 - **Notes:** The output is stored in the shell variable TASK. If no tasks match the criteria, TASK will be empty.
+
+### Retrieve detailed configuration of a specific task definition
+<!-- sig: c6c226d5e18d -->
+
+```bash
+aws ecs describe-task-definition --region us-east-1 --task-definition '$TD' --query 'taskDefinition.{family:family,revision:revision,containers:containerDefinitions[].{name:name,image:image,secrets:secrets[].{name:name,valueFrom:valueFrom},environment:environment[].name},taskRoleArn:taskRoleArn,executionRoleArn:executionRoleArn}' --output json
+```
+
+- **What it does:** This command queries the AWS ECS service to fetch the full definition details for the task definition named '$TD' within the us-east-1 region. It then uses JMESPath to filter and structure the output into a specific JSON format.
+- **Why:** It provides a structured, concise view of the task definition's components, such as container images, environment variables, and role ARNs, without needing to parse the entire raw response.
+- **Example:** aws ecs describe-task-definition --region us-east-1 --task-definition '$TD' --query 'taskDefinition.{family:family,revision:revision,containers:containerDefinitions[].{name:name,image:image,secrets:secrets[].{name:name,valueFrom:valueFrom},environment:environment[].name},taskRoleArn:taskRoleArn,executionRoleArn:executionRoleArn}' --output json
+- **Notes:** The query filters out sensitive data by only selecting specific fields like 'name', 'image', and 'valueFrom' for secrets, rather than the secret value itself.
 
 ## RDS Snapshots
 
@@ -171,3 +184,17 @@ aws rds describe-db-parameters --region us-east-1 --db-parameter-group-name deli
 - **Why:** It allows targeted inspection of security-related database settings without downloading the entire parameter group configuration.
 - **Example:** aws rds describe-db-parameters --region us-east-1 --db-parameter-group-name delivery-metrics-staging-pg15 --source user --query 'Parameters[?ParameterName==`rds.force_ssl` || ParameterName==`ssl`].{Name:ParameterName,Value:ParameterValue,ApplyMethod:ApplyMethod,ApplyType:ApplyType,Source:Source}' --output json
 - **Notes:** The --query filter ensures only the two specified parameters are returned, and --output json formats the result for easy parsing.
+
+## Secrets Management
+
+### Retrieve specific details about a secret
+<!-- sig: 099de811a64c -->
+
+```bash
+aws secretsmanager describe-secret --region us-east-1 --secret-id delivery-metrics-staging-app --query '{ARN:ARN,Name:Name,VersionIdsToStages:VersionIdsToStages,LastChangedDate:LastChangedDate}' --output json
+```
+
+- **What it does:** This command queries the AWS Secrets Manager service to fetch metadata for the secret named delivery-metrics-staging-app in the us-east-1 region. It filters the output to only include the ARN, Name, VersionIdsToStages, and LastChangedDate.
+- **Why:** It allows for a quick, targeted inspection of a secret's configuration and lifecycle status without downloading the secret value itself.
+- **Example:** aws secretsmanager describe-secret --region us-east-1 --secret-id delivery-metrics-staging-app --query '{ARN:ARN,Name:Name,VersionIdsToStages:VersionIdsToStages,LastChangedDate:LastChangedDate}' --output json
+- **Notes:** The --query flag uses JMESPath to select specific fields, and --output json ensures the result is machine-readable.
