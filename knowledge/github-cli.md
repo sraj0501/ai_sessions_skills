@@ -125,6 +125,58 @@ gh api repos/$repo/git/ref/heads/main --jq '{ref,sha:.object.sha}'
 - **Example:** repo='philips-internal/ei-rd-eff-deliverymetrics'; gh api repos/$repo/actions/workflows?per_page=100 --jq '[.workflows[] | {name,path,state}]'; echo '-- branch heads;'; gh api repos/$repo/git/ref/heads/staging --jq '{ref,sha:.object.sha}'; gh api repos/$repo/git/ref/heads/main --jq '{ref,sha:.object.sha}'
 - **Notes:** The initial command sets the repository variable $repo before executing the subsequent API calls.
 
+### Fetch recent workflow runs and job details
+<!-- sig: f9dab216897d -->
+
+```bash
+gh api repos/$repo/actions/workflows/collector-staging.yml/runs?per_page=5 --jq '[.workflow_runs[] | {id,status,conclusion,event,head_branch,head_sha,run_started_at,updated_at,html_url}]'
+echo '-- jobs'
+gh api repos/$repo/actions/runs/38672295422/jobs?per_page=100 --jq '[.jobs[] | {id,name,status,conclusion,started_at,completed_at,runner_name,steps:[.steps[]|{name,status,conclusion}]}]'
+```
+
+- **What it does:** This sequence first retrieves the five most recent runs for the collector-staging.yml workflow in the specified repository. It then prints a separator and fetches the details for all jobs within a specific run ID.
+- **Why:** It allows for a comprehensive view of both the high-level workflow execution status and the granular status of individual jobs within that execution.
+- **Example:** repo='philips-internal/ei-rd-eff-deliverymetrics'; gh api repos/$repo/actions/workflows/collector-staging.yml/runs?per_page=5 --jq '[.workflow_runs[] | {id,status,conclusion,event,head_branch,head_sha,run_started_at,updated_at,html_url}]'; echo '-- jobs'; gh api repos/$repo/actions/runs/38672295422/jobs?per_page=100 --jq '[.jobs[] | {id,name,status,conclusion,started_at,completed_at,runner_name,steps:[.steps[]|{name,status,conclusion}]}]'
+- **Notes:** The first command uses the workflow file name to target runs, while the third command requires a specific run ID (38672295422 in the example) to list its jobs.
+
+### View details of a specific workflow run
+<!-- sig: 28c28a812a44 -->
+
+```bash
+gh run view 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --log-failed
+```
+
+- **What it does:** Displays the details for workflow run 38672295422 within the philips-internal/ei-rd-eff-deliverymetrics repository. The --log-failed flag ensures that logs from failed steps are shown.
+- **Why:** This allows immediate inspection of a specific, potentially problematic workflow execution without navigating the GitHub UI.
+- **Example:** gh run view 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --log-failed
+- **Notes:** The run ID (38672295422) must correspond to an existing workflow run in the specified repository.
+
+### Rerun a specific workflow job
+<!-- sig: d451f093df38 -->
+
+```bash
+gh api --method POST repos/philips-internal/ei-rd-eff-deliverymetrics/actions/jobs/116219263550/rerun
+```
+
+- **What it does:** Sends a POST request to the GitHub API endpoint to trigger a rerun of the job identified by ID 116219263550 within the specified repository.
+- **Why:** This allows immediate re-execution of a failed or incomplete job without manually triggering the workflow again.
+- **Example:** gh api --method POST repos/philips-internal/ei-rd-eff-deliverymetrics/actions/jobs/116219263550/rerun
+- **Notes:** The job ID (116219263550) must correspond to an existing job within the repository.
+
+### Monitor a specific workflow run and log output
+<!-- sig: d7b775f4d00c -->
+
+```bash
+gh run watch 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --exit-status --interval 30 > /tmp/release-collector-avw-watch.log 2>&1
+echo 'WATCH=$?' >> /tmp/release-collector-avw-watch.log
+tail -5 /tmp/release-collector-avw-watch.log
+```
+
+- **What it does:** This sequence monitors GitHub workflow run 38672295422 in the philips-internal/ei-rd-eff-deliverymetrics repository, logging all output to a file, and then prints the last five lines of that log.
+- **Why:** It allows for continuous, non-interactive monitoring of a specific CI/CD job while capturing its final exit status and output for later inspection.
+- **Example:** gh run watch 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --exit-status --interval 30 > /tmp/release-collector-avw-watch.log 2>&1; echo 'WATCH=$?' >> /tmp/release-collector-avw-watch.log; tail -5 /tmp/release-collector-avw-watch.log
+- **Notes:** The `--interval 30` specifies checking every 30 seconds. The `2>&1` redirects standard error into standard output before logging.
+
 ## Repository management
 
 ### Create a new private GitHub repository

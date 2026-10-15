@@ -31,6 +31,32 @@ aws ecs describe-services --region us-east-1 --cluster delivery-metrics-producti
 - **Example:** aws ecs describe-services --region us-east-1 --cluster delivery-metrics-production --services delivery-metrics-production-frontend delivery-metrics-production-backend delivery-metrics-production-python-api --query 'services[].{Service:serviceName,TaskDefinition:taskDefinition,Desired:desiredCount,Running:runningCount,Pending:pendingCount,RolloutState:deployments[0].rolloutState}' --output json
 - **Notes:** The --query parameter uses JMESPath to shape the output, extracting specific fields from the complex service response structure.
 
+### Inspect specific ECS task details and RDS instance status
+<!-- sig: 4d1786711908 -->
+<!-- sig: 38dfb9bd48ac -->
+
+```bash
+aws ecs describe-tasks --region us-east-1 --cluster delivery-metrics-staging --tasks e736ef481c76464998d19fc971ddfc2b --query 'tasks[0].{Status:lastStatus,Health:healthStatus,TaskDefinition:taskDefinitionArn,ExecuteCommandAgent:containers[0].managedAgents[?name==`ExecuteCommandAgent`]|[0].lastStatus}' --output 'json'
+aws rds describe-db-instances --region us-east-1 --db-instance-identifier delive
+```
+
+- **What it does:** This command first retrieves detailed status information for a specific ECS task in the delivery-metrics-staging cluster. It then immediately queries the status of a specific RDS database instance.
+- **Why:** It allows for a single execution to verify the operational health of both the running application task and its backing database instance.
+- **Example:** aws ecs describe-tasks --region us-east-1 --cluster delivery-metrics-staging --tasks e736ef481c76464998d19fc971ddfc2b --query 'tasks[0].{Status:lastStatus,Health:healthStatus,TaskDefinition:taskDefinitionArn,ExecuteCommandAgent:containers[0].managedAgents[?name==`ExecuteCommandAgent`]|[0].lastStatus}' --output 'json'; aws rds describe-db-instances --region us-east-1 --db-instance-identifier delive
+- **Notes:** The first command uses JMESPath to selectively extract status fields from the task object. The second command is truncated in the input but implies querying a specific RDS instance.
+
+### Retrieve the ARN of a running ECS task
+<!-- sig: ff717f528a01 -->
+
+```bash
+TASK=$(aws ecs list-tasks --region us-east-1 --cluster delivery-metrics-staging --service-name delivery-metrics-staging-backend --desired-status RUNNING --query 'taskArns[0]' --output 'text')
+```
+
+- **What it does:** This command calls the AWS ECS service to list tasks matching specific criteria and extracts the ARN of the first running task found.
+- **Why:** It dynamically fetches the identifier for a specific running task, allowing subsequent commands to operate on that exact resource without hardcoding the ARN.
+- **Example:** TASK=$(aws ecs list-tasks --region us-east-1 --cluster delivery-metrics-staging --service-name delivery-metrics-staging-backend --desired-status RUNNING --query 'taskArns[0]' --output 'text')
+- **Notes:** The output is stored in the shell variable TASK. If no tasks match the criteria, TASK will be empty.
+
 ## RDS Snapshots
 
 ### List the ten most recent database snapshots
