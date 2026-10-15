@@ -83,3 +83,22 @@ aws rds create-db-snapshot
 - **Why:** It provides a point-in-time backup of the database instance, which is crucial for disaster recovery or rolling back to a known good state.
 - **Example:** aws rds create-db-snapshot --region us-east-1 --db-instance-identifier delivery-metrics-staging-db --db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731 --tags Key=Project,Value=delivery-metrics Key=Environment,Value=staging Key=Purpose,Value=pre-release-rollback Key=ReleaseCandidate,Value=d9ed731 Key=PreserveUntil,Value=2026-10-29
 - **Notes:** The snapshot identifier must be unique. Tags help organize and automate lifecycle policies for the backup.
+
+### Restore a database instance from a snapshot
+<!-- sig: b254113a98a4 -->
+
+```bash
+aws rds restore-db-instance-from-db-snapshot
+--region us-east-1
+--db-instance-identifier delivery-metrics-staging-restore-rehearsal-20261015-d9ed731
+--db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731
+--db-instance-class db.t3.micro
+--availability-zone us-east-1b
+--db-subnet-group-name delivery-metrics-staging-db-subnet-group
+--vpc-security-gr
+```
+
+- **What it does:** This command initiates the creation of a new RDS database instance using the configuration and data from a specified database snapshot.
+- **Why:** It allows for disaster recovery or testing by provisioning a replica of a known good state without affecting the original snapshot.
+- **Example:** aws rds restore-db-instance-from-db-snapshot --region us-east-1 --db-instance-identifier delivery-metrics-staging-restore-rehearsal-20261015-d9ed731 --db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731 --db-instance-class db.t3.micro --availability-zone us-east-1b --db-subnet-group-name delivery-metrics-staging-db-subnet-group --vpc-security-gr
+- **Notes:** The command snippet provided was incomplete; full execution requires specifying VPC security group IDs and other parameters.

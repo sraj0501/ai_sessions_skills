@@ -125,3 +125,30 @@ aws rds describe-db-snapshots --region us-east-1 --db-snapshot-identifier delive
 - **Why:** It allows for a precise inspection of a snapshot's status, source instance, and configuration details without needing to download or view the entire resource description.
 - **Example:** aws rds describe-db-snapshots --region us-east-1 --db-snapshot-identifier delivery-metrics-staging-pre-release-20261015-d9ed731 --query 'DBSnapshots[0].{Identifier:DBSnapshotIdentifier,Source:DBInstanceIdentifier,Status:Status,PercentProgress:PercentProgress,Encrypted:Encrypted,KmsKeyId:KmsKeyId,Engine:Engine,EngineVersion:EngineVersion,AllocatedStorage:AllocatedStorageGiB,CreatedAt}'
 - **Notes:** The --query uses JMESPath to select the first snapshot found in the response array and project only the specified fields.
+
+### Wait until the RDS instance is available
+<!-- sig: 5d1b4df9e922 -->
+
+```bash
+aws rds wait db-instance-available --region us-east-1 --db-instance-identifier delivery-metrics-staging-restore-rehearsal-20261015-d9ed731
+```
+
+- **What it does:** This command polls the AWS RDS service until the specified database instance reaches an available state. It requires the instance identifier and the target region.
+- **Why:** It provides a programmatic way to pause execution until a resource, like a restored database, is fully operational, preventing subsequent commands from failing due to resource unavailability.
+- **Example:** aws rds wait db-instance-available --region us-east-1 --db-instance-identifier delivery-metrics-staging-restore-rehearsal-20261015-d9ed731
+- **Notes:** This command is typically used immediately following a restore operation to ensure the database is ready for connection attempts.
+
+### Retrieve detailed information about a specific RDS instance
+<!-- sig: ebd48b3dbf03 -->
+
+```bash
+aws rds describe-db-instances
+--region us-east-1
+--db-instance-identifier delivery-metrics-staging-restore-rehearsal-20261015-d9ed731
+--query DBInstances[0].{Identifier:DBInstanceIdentifier,Arn:DBInstanceArn,Status:DBInstanceStatus,Snapshot:DBSnapshotIdentifier,CreatedAt:InstanceCreateTime,Engine:Engine,EngineVersion:EngineVersion,Class:DBInstanceClass,AvailabilityZone:AvailabilityZone}
+```
+
+- **What it does:** This command queries the AWS RDS service to fetch metadata for the specified database instance identifier. The --query flag filters the resulting JSON to only show specific attributes.
+- **Why:** It allows for programmatic inspection of an RDS instance's current state, configuration, and associated identifiers without needing to use the AWS Console.
+- **Example:** aws rds describe-db-instances --region us-east-1 --db-instance-identifier delivery-metrics-staging-restore-rehearsal-20261015-d9ed731 --query DBInstances[0].{Identifier:DBInstanceIdentifier,Arn:DBInstanceArn,Status:DBInstanceStatus,Snapshot:DBSnapshotIdentifier,CreatedAt:InstanceCreateTime,Engine:Engine,EngineVersion:EngineVersion,Class:DBInstanceClass,AvailabilityZone:AvailabilityZone}
+- **Notes:** The --query parameter uses JMESPath to select and rename fields from the returned list of DBInstances.
