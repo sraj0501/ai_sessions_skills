@@ -179,6 +179,7 @@ gh api repos/$repo/actions/runs/38672295422/jobs?per_page=100 --jq '[.jobs[] | {
 <!-- sig: 1e3f3a1902aa -->
 <!-- sig: 6949b58ec830 -->
 <!-- sig: 7c6dbcc0d44f -->
+<!-- sig: 8a20b4459462 -->
 
 ```bash
 gh run view 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --log-failed
@@ -240,6 +241,18 @@ gh run rerun 38741610508 --repo philips-internal/ei-rd-eff-deliverymetrics --fai
 - **Why:** It allows immediate re-execution of a workflow that previously failed, without needing to manually trigger a new run.
 - **Example:** gh run rerun 38741610508 --repo philips-internal/ei-rd-eff-deliverymetrics --failed
 - **Notes:** The --failed flag ensures only failed runs are targeted for rerunning.
+
+### Extract the ID of a specific job from an action run
+<!-- sig: 6ec8dfb9aeae -->
+
+```bash
+JOB=$(gh api repos/philips-internal/ei-rd-eff-deliverymetrics/actions/runs/38741610508/jobs?per_page=100 --jq '.jobs[] | select(.name=="SonarQube Scan") | .id')
+```
+
+- **What it does:** This command uses the GitHub CLI to query a specific action run for jobs, filters them by the name "SonarQube Scan", and captures the resulting job ID into the JOB shell variable.
+- **Why:** It isolates the unique identifier for a specific job within a large action run, which is necessary for subsequent commands like viewing job logs.
+- **Example:** JOB=$(gh api repos/philips-internal/ei-rd-eff-deliverymetrics/actions/runs/38741610508/jobs?per_page=100 --jq '.jobs[] | select(.name=="SonarQube Scan") | .id')
+- **Notes:** The `--jq` filter is used to process the JSON response from the API call to extract only the desired job ID.
 
 ## Repository management
 
