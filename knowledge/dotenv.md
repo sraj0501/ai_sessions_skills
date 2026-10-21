@@ -10,6 +10,8 @@
 <!-- sig: 14d9ddb485ff -->
 <!-- sig: ebab40874c0a -->
 <!-- sig: 369692a3ac59 -->
+<!-- sig: 873b8149274f -->
+<!-- sig: 215830d0c22b -->
 
 ```bash
 cat >> architecture/00-overview.md <<'EOF'
