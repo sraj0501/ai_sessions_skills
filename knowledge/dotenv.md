@@ -7,6 +7,9 @@
 
 ### Append a markdown section detailing dotenv usage
 <!-- sig: 0ecb860ba828 -->
+<!-- sig: 14d9ddb485ff -->
+<!-- sig: ebab40874c0a -->
+<!-- sig: 369692a3ac59 -->
 
 ```bash
 cat >> architecture/00-overview.md <<'EOF'
