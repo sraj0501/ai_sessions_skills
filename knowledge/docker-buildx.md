@@ -63,3 +63,15 @@ docker images --filter 'reference=dm-release-*-test' -q
 - **Why:** This provides a clean list of specific image IDs that match a naming convention, which is useful for scripting cleanup or verification.
 - **Example:** docker images --filter 'reference=dm-release-*-test' -q
 - **Notes:** The output is a newline-separated list of image IDs, which can be piped to other commands like 'wc -l' to count them.
+
+### Authenticate Docker client against a private registry
+<!-- sig: 47d092cad7d1 -->
+
+```bash
+docker login --username AWS --password-stdin '$registry' '>/dev/null' 'refs=(' '$registry/delivery-metrics-frontend@sha256:2767d0f7057b78b79f81252c5afee1befe65d23e174bae6d53dbad1ff473606d' '$registry/delivery-metrics-backend@sha256:cfb2874bff89897811b381337d6d0b25820c53e19a177e34b1e41131f0a1b1a8' '$registry/delivery-metrics-python-api@sha256:9ac1e3c510a98634d8d5d5b483f837cb5265de5a4e0a4cbfb67f32ab'
+```
+
+- **What it does:** Logs into the specified registry using the AWS username and piping the password via stdin. The subsequent arguments list specific image references.
+- **Why:** This command is used to authenticate the Docker client against a private registry, often required before pushing or pulling specific tagged images.
+- **Example:** docker login --username AWS --password-stdin '545009868739.dkr.ecr.us-east-1.amazonaws.com' '>/dev/null' 'refs=(' '545009868739.dkr.ecr.us-east-1.amazonaws.com/delivery-metrics-frontend@sha256:2767d0f7057b78b79f81252c5afee1befe65d23e174bae6d53dbad1ff473606d' '545009868739.dkr.ecr.us-east-1.amazonaws.com/delivery-metrics-backend@sha256:cfb2874bff89897811b381337d6d0b25820c53e19a177e34b1e4131f0a1b1a8' '545009868739.dkr.ecr.us-east-1.amazonaws.com/delivery-metrics-python-api@sha256:9ac1e3c510a98634d8d5d5b483f837cb5265de5a4e0a4cbfb67f32ab'
+- **Notes:** The password must be provided via stdin, typically piped from a command like 'aws ecr get-login-password'. The 'refs' arguments appear to be used here to specify image digests or tags for subsequent operations.
