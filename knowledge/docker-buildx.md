@@ -23,6 +23,7 @@ docker buildx build --platform linux/amd64 --load --target runner -f packages/fr
 <!-- sig: 7229439ea7be -->
 <!-- sig: 200581b8030f -->
 <!-- sig: 6c6c507b9404 -->
+<!-- sig: 28237fb447df -->
 
 ```bash
 docker build --platform linux/amd64 -f packages/python-api/Dockerfile.production --target production -t delivery-metrics-python-api:production-context-check .
