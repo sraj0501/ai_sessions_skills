@@ -12,6 +12,7 @@
 <!-- sig: 2c38f1399aab -->
 <!-- sig: 04d1ae9a6656 -->
 <!-- sig: e2a10e6f1304 -->
+<!-- sig: 08179e51dafe -->
 
 ```bash
 cat > /tmp/fix_readme.py <<'EOF'
