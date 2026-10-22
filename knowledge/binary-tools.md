@@ -27,6 +27,7 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 
 ### View status and contents of demo directory
 <!-- sig: ebeb88b334cd -->
+<!-- sig: 15959247ba10 -->
 
 ```bash
 head;
