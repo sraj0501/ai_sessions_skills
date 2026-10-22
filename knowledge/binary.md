@@ -46,3 +46,15 @@ s = s.replace('''| `blueprint tui [plan.md]` | Open the terminal UI (needs `text
 - **Why:** It automates a targeted refactoring or documentation update across multiple files without manual editing.
 - **Example:** python3 - <<'EOF' ... (full script execution)
 - **Notes:** The use of '<<'EOF'' ensures that the shell does not perform variable expansion on the content piped into the python script.
+
+### Replace specific text within a file
+<!-- sig: 3bacc617f5be -->
+
+```bash
+cat > /tmp/fix_readme.py <<'EOF'
+```
+
+- **What it does:** This command uses a here-document to write the content of the script into the file /tmp/fix_readme.py.
+- **Why:** It allows for multi-line input to be piped directly into a file without needing multiple echo commands.
+- **Example:** cat > /tmp/fix_readme.py <<'EOF' p='README.md' s=open(p).read() s=s.replace('''Limits, so nothing is oversold: discovery is deterministic''','''### Checking that a standard can be enforced here Editing the standards in the terminal UI (`e`) and saving asks a **local model** (Ollama, `BLUEPRINT_OLLAMA_MODEL`, default `gemma4:latest`) to read a plain-text profile of the repository and say, one rule at a time, whether the rule can apply to this codebase. A rule about `package.json` in a Python project cannot; a rule that asks for ruff can, because ruff can be added. Nothing leaves your machine,''' EOF
+- **Notes:** The single quotes around 'EOF' prevent shell variable expansion within the here-document, ensuring the content is written literally.
