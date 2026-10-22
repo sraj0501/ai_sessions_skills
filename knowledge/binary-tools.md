@@ -8,6 +8,8 @@
 ### Replace specific text within a README file
 <!-- sig: fa830746a5e4 -->
 <!-- sig: fd57bc4867b7 -->
+<!-- sig: 4a2259f9b1c6 -->
+<!-- sig: 2c38f1399aab -->
 
 ```bash
 cat > /tmp/fix_readme.py <<'EOF'

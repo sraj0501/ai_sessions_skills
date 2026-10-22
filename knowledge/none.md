@@ -60,3 +60,15 @@ return root
 - **Why:** It sets up a controlled, temporary environment for testing or demonstration purposes, ensuring the necessary files exist before running tests.
 - **Example:** repo = make_repo(tmp_path) when testing a repository scanner.
 - **Notes:** The function defaults to creating 'config.py' and 'uv.lock' if no 'files' dictionary is provided.
+
+### Replace specific strings within Python files
+<!-- sig: 3fffa17bed8e -->
+
+```bash
+None = None '"""The' standards file plan checks use before any repository supplies its 'own."""' ''"""''"""''"""',1)' 's=s.replace("'"""'"""'"""' workspace = 'Workspace(settings=settings,' plan_path=plan_path, 'manifest_path=manifest_path)' ''"""'"""'"""' workspace = 'Workspace(' settings=settings, plan_path=plan_path, manifest_path=manifest_path, 'store=Store(settings),' base
+```
+
+- **What it does:** This complex command appears to be a snippet from a script that reads a Python file, performs a string replacement operation on its content, and then writes the modified content back to the original file.
+- **Why:** It is used to programmatically patch or update source code files, likely to fix a specific bug or update a standard across multiple files.
+- **Example:** cat > /tmp/fix_data3.py <<'EOF' p='blueprint/store.py' s=open(p).read() s=s.replace(''' def get_json(''',''' def stamp(self, namespace: str, key: str) -> float | None: """When an entry was stored, without reading its value.""" rows = self._run("SELECT created_at FROM cache WHERE namespace = ? AND key = ?", (namespace, key), fetch=True) return float(rows[0][0]) if rows else None def get_json(''',1) open(p,'w').write(s) p='blueprint/tui/data.py' s=open(p).read() s=s.replace(''' validation_cache: dict[str, StandardCheck] = field(default_factory=dict) ''','''
+- **Notes:** The command is heavily obfuscated and appears to be part of a shell redirection block (`cat > ... <<'EOF'`). The string replacement logic is highly specific to the content of the Python files being modified.
