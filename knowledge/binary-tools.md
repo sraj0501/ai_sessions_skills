@@ -15,6 +15,8 @@
 <!-- sig: 08179e51dafe -->
 <!-- sig: b9e4117919c2 -->
 <!-- sig: 5dbc016d4830 -->
+<!-- sig: 7e4ae046306b -->
+<!-- sig: c4fbbfc4770f -->
 
 ```bash
 cat > /tmp/fix_readme.py <<'EOF'
@@ -29,6 +31,24 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 - **Why:** It automates the tedious process of finding and replacing boilerplate text across documentation files.
 - **Example:** cat > /tmp/fix_readme.py <<'EOF' ... (content) ... EOF
 - **Notes:** The use of '<<'EOF'' ensures that the content written to the file is treated as a literal string, preserving internal quotes and variables.
+
+### Replace specific markdown table content
+<!-- sig: eae72a4bd18e -->
+
+```bash
+python3 - <<'EOF'
+p='docs/editing-standards.md'
+s=open(p).read()
+# fields table
+s=s.replace('''| `options` | no | Settings for that check, see below. |''','''| `options` | no | Settings for that check, see below. For a judged rule: `include` and `exclude` path patterns. |\n| `judge` | no | `true`: a local model reads each file against the description. See [Add a rule a model judges](#add-a-rule-a-model-judges). |\n| `block` | no | Only with `judge: true`. The model's findings stop `blueprint gate`. Without it they only advise. |''')
+start=s.index("## Add a rule that is not deterministic")
+en
+```
+
+- **What it does:** This script reads the content of docs/editing-standards.md, performs a string replacement on a specific markdown table section, and then attempts to find the index of a specific heading.
+- **Why:** It automates the tedious task of updating boilerplate text within a documentation file to reflect new feature descriptions.
+- **Example:** python3 - <<'EOF' ... (script content) ... EOF
+- **Notes:** The script uses a here-document (<<'EOF') to pass the multi-line Python code to the interpreter. The replacement string must exactly match the target string.
 
 ## Inspecting state
 

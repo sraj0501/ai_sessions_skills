@@ -64,6 +64,7 @@ return root
 ### Replace specific strings within Python files
 <!-- sig: 3fffa17bed8e -->
 <!-- sig: 2a0c2e7e9650 -->
+<!-- sig: 336363721f76 -->
 
 ```bash
 None = None '"""The' standards file plan checks use before any repository supplies its 'own."""' ''"""''"""''"""',1)' 's=s.replace("'"""'"""'"""' workspace = 'Workspace(settings=settings,' plan_path=plan_path, 'manifest_path=manifest_path)' ''"""'"""'"""' workspace = 'Workspace(' settings=settings, plan_path=plan_path, manifest_path=manifest_path, 'store=Store(settings),' base
