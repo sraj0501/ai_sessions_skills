@@ -9,6 +9,7 @@
 <!-- sig: b67e37b30b91 -->
 <!-- sig: 310352998250 -->
 <!-- sig: 6b62067db5ef -->
+<!-- sig: 3628faa96e4b -->
 
 ```bash
 python3 - <<'EOF'

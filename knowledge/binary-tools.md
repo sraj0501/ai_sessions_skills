@@ -14,6 +14,7 @@
 <!-- sig: e2a10e6f1304 -->
 <!-- sig: 08179e51dafe -->
 <!-- sig: b9e4117919c2 -->
+<!-- sig: 5dbc016d4830 -->
 
 ```bash
 cat > /tmp/fix_readme.py <<'EOF'
@@ -35,6 +36,8 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 <!-- sig: ebeb88b334cd -->
 <!-- sig: 15959247ba10 -->
 <!-- sig: cc70a2950ff7 -->
+<!-- sig: 97e27f3e0f35 -->
+<!-- sig: 1dcb517de2b3 -->
 
 ```bash
 head;
