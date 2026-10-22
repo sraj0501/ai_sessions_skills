@@ -7,6 +7,7 @@
 
 ### Replace specific text within a README file
 <!-- sig: fa830746a5e4 -->
+<!-- sig: fd57bc4867b7 -->
 
 ```bash
 cat > /tmp/fix_readme.py <<'EOF'
@@ -21,3 +22,21 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 - **Why:** It automates the tedious process of finding and replacing boilerplate text across documentation files.
 - **Example:** cat > /tmp/fix_readme.py <<'EOF' ... (content) ... EOF
 - **Notes:** The use of '<<'EOF'' ensures that the content written to the file is treated as a literal string, preserving internal quotes and variables.
+
+## Inspecting state
+
+### View status and contents of demo directory
+<!-- sig: ebeb88b334cd -->
+
+```bash
+head;
+echo '---';
+git status --short demo;
+ls demo;
+cat .gitignore
+```
+
+- **What it does:** This sequence first outputs the head of some input, prints a separator, then shows the short status of the demo directory, lists its contents, and finally displays the .gitignore file.
+- **Why:** It provides a quick, multi-step overview of the state of the 'demo' directory and the repository's ignore rules in one execution.
+- **Example:** 'head;' echo '---;' git status --short demo;' ls demo;' cat .gitignore
+- **Notes:** The initial 'head;' command is likely incomplete or relies on piped input not shown here.
