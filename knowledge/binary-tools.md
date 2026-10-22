@@ -34,6 +34,8 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 
 ### Replace specific markdown table content
 <!-- sig: eae72a4bd18e -->
+<!-- sig: fe0acf64d356 -->
+<!-- sig: bd971819f66b -->
 
 ```bash
 python3 - <<'EOF'
