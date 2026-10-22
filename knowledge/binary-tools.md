@@ -10,6 +10,8 @@
 <!-- sig: fd57bc4867b7 -->
 <!-- sig: 4a2259f9b1c6 -->
 <!-- sig: 2c38f1399aab -->
+<!-- sig: 04d1ae9a6656 -->
+<!-- sig: e2a10e6f1304 -->
 
 ```bash
 cat > /tmp/fix_readme.py <<'EOF'
@@ -30,6 +32,7 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 ### View status and contents of demo directory
 <!-- sig: ebeb88b334cd -->
 <!-- sig: 15959247ba10 -->
+<!-- sig: cc70a2950ff7 -->
 
 ```bash
 head;
