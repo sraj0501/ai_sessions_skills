@@ -24,6 +24,7 @@ docker buildx build --platform linux/amd64 --load --target runner -f packages/fr
 <!-- sig: 200581b8030f -->
 <!-- sig: 6c6c507b9404 -->
 <!-- sig: 28237fb447df -->
+<!-- sig: 998559fd5a15 -->
 
 ```bash
 docker build --platform linux/amd64 -f packages/python-api/Dockerfile.production --target production -t delivery-metrics-python-api:production-context-check .
@@ -79,6 +80,8 @@ docker login --username AWS --password-stdin '$registry' '>/dev/null' 'refs=(' '
 
 ### Remove a specific local image
 <!-- sig: 7d00ab4575a7 -->
+<!-- sig: 8bd327ea3146 -->
+<!-- sig: 98356b27358a -->
 
 ```bash
 docker image rm delivery-metrics-collector:decoupling-test '2>&1'
@@ -104,3 +107,16 @@ for i in $(seq 1 30); do docker exec pipeline-landing-it pg_isready -U pipeline_
 - **Why:** This ensures that the application attempts to connect to the database only after the PostgreSQL service inside the container has fully initialized and is accepting connections.
 - **Example:** docker exec pipeline-landing-it pg_isready -U pipeline_test -d 'pipeline_test;' followed by the loop to wait for readiness.
 - **Notes:** The loop uses the -q flag for quiet mode, and the 'break' command is implied in the original context to exit once ready.
+
+### Execute a container with specific environment and volume mounts
+<!-- sig: 7fa9bca1de95 -->
+
+```bash
+docker run --rm -v /tmp/parquet-it/artifacts:/artifacts -v /tmp/parquet-it/cfg:/cfg --entrypoint python delivery-metrics-collector:parquet-test -c 'import os
+os.environ.update({"PIPELINE_ENVIRONMENT":"local","PIPELINE_OUTPUT_MODE":"parquet","PIPELINE_ARTIFACT_URI":"file:///artifacts","COLLECTOR_CONFIG_PATH":"/cfg/config.yaml"})'
+```
+
+- **What it does:** Runs the delivery-metrics-collector image, mounting local directories for artifacts and configuration, and executes a Python script inside the container.
+- **Why:** This allows the containerized application to access necessary local configuration files and write its output artifacts back to the host filesystem.
+- **Example:** docker run --rm -v /tmp/parquet-it/artifacts:/artifacts -v /tmp/parquet-it/cfg:/cfg --entrypoint python delivery-metrics-collector:parquet-test -c 'import os os.environ.update({"PIPELINE_ENVIRONMENT":"local","PIPELINE_OUTPUT_MODE":"parquet","PIPELINE_ARTIFACT_URI":"file:///artifacts","COLLECTOR_CONFIG_PATH":"/cfg/config.yaml"})'
+- **Notes:** The --rm flag ensures the container is automatically removed after it exits. The volume mounts map host paths to container paths.
