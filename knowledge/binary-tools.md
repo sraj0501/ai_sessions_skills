@@ -39,6 +39,7 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 <!-- sig: bd971819f66b -->
 <!-- sig: f12b5a9b3213 -->
 <!-- sig: 0b2c9726b79b -->
+<!-- sig: ece1f0e3b334 -->
 
 ```bash
 python3 - <<'EOF'
@@ -122,6 +123,7 @@ s=s.replace("The only check today is `type-hints`:","")
 <!-- sig: cc70a2950ff7 -->
 <!-- sig: 97e27f3e0f35 -->
 <!-- sig: 1dcb517de2b3 -->
+<!-- sig: 2dcfc4d1dfc5 -->
 
 ```bash
 head;
