@@ -38,6 +38,7 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 <!-- sig: fe0acf64d356 -->
 <!-- sig: bd971819f66b -->
 <!-- sig: f12b5a9b3213 -->
+<!-- sig: 0b2c9726b79b -->
 
 ```bash
 python3 - <<'EOF'

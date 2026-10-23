@@ -66,6 +66,7 @@ return root
 <!-- sig: 2a0c2e7e9650 -->
 <!-- sig: 336363721f76 -->
 <!-- sig: 2ef136ebdf3a -->
+<!-- sig: d60d57011926 -->
 
 ```bash
 None = None '"""The' standards file plan checks use before any repository supplies its 'own."""' ''"""''"""''"""',1)' 's=s.replace("'"""'"""'"""' workspace = 'Workspace(settings=settings,' plan_path=plan_path, 'manifest_path=manifest_path)' ''"""'"""'"""' workspace = 'Workspace(' settings=settings, plan_path=plan_path, manifest_path=manifest_path, 'store=Store(settings),' base
