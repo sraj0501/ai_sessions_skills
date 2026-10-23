@@ -137,3 +137,22 @@ cat .gitignore
 - **Why:** It provides a quick, multi-step overview of the state of the 'demo' directory and the repository's ignore rules in one execution.
 - **Example:** 'head;' echo '---;' git status --short demo;' ls demo;' cat .gitignore
 - **Notes:** The initial 'head;' command is likely incomplete or relies on piped input not shown here.
+
+## Scripting execution
+
+### Benchmark model performance across configurations
+<!-- sig: b8ac4b052e88 -->
+
+```bash
+python3 - <<'EOF'
+p="README.md"; s=open(p).read()
+row="| `blueprint plan-gate [repo] [--plan F] [--hook]` |"
+s=s.replace(row,"| `blueprint judge-bench [repo] [--models A,B] [--parallel 1,2,4] [--files N]` | Time local models on judged-rule work, one row per model and level of parallelism, with the first (model-loading) call timed apart. Every figure is measured in the run; a failed call is shown as `n/a`, never estimated. See [Choosing a model](docs/editing-standards.md#choosing-a-model-and-parallelism). |
+"+row,1)
+s=s.replace("| `BLUEPRINT_JUDGE_MAX_CHUNKS`","| `BLUEPRINT_JUDGE_CONCURRENCY`
+```
+
+- **What it does:** This script reads README.md, replaces a placeholder row with a benchmark command, and then substitutes a chunk limit placeholder with a concurrency setting.
+- **Why:** It automates the process of generating performance metrics for different model configurations and parallelism levels directly into documentation.
+- **Example:** python3 - <<'EOF' ... (using the provided script structure)
+- **Notes:** The command uses a here-document (<<'EOF') to pass a multi-line script to python3 for execution.
