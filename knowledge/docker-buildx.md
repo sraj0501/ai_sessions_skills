@@ -54,6 +54,7 @@ docker rmi dm-release-python-api-test:$SHA
 
 ### List image IDs matching a specific reference pattern
 <!-- sig: 46b9bde6b678 -->
+<!-- sig: 43cd8e830dc9 -->
 
 ```bash
 docker images --filter 'reference=dm-release-*-test' -q
@@ -75,6 +76,18 @@ docker login --username AWS --password-stdin '$registry' '>/dev/null' 'refs=(' '
 - **Why:** This command is used to authenticate the Docker client against a private registry, often required before pushing or pulling specific tagged images.
 - **Example:** docker login --username AWS --password-stdin '545009868739.dkr.ecr.us-east-1.amazonaws.com' '>/dev/null' 'refs=(' '545009868739.dkr.ecr.us-east-1.amazonaws.com/delivery-metrics-frontend@sha256:2767d0f7057b78b79f81252c5afee1befe65d23e174bae6d53dbad1ff473606d' '545009868739.dkr.ecr.us-east-1.amazonaws.com/delivery-metrics-backend@sha256:cfb2874bff89897811b381337d6d0b25820c53e19a177e34b1e4131f0a1b1a8' '545009868739.dkr.ecr.us-east-1.amazonaws.com/delivery-metrics-python-api@sha256:9ac1e3c510a98634d8d5d5b483f837cb5265de5a4e0a4cbfb67f32ab'
 - **Notes:** The password must be provided via stdin, typically piped from a command like 'aws ecr get-login-password'. The 'refs' arguments appear to be used here to specify image digests or tags for subsequent operations.
+
+### Remove a specific local image
+<!-- sig: 7d00ab4575a7 -->
+
+```bash
+docker image rm delivery-metrics-collector:decoupling-test '2>&1'
+```
+
+- **What it does:** Deletes the local Docker image tagged as delivery-metrics-collector:decoupling-test. The redirection sends standard error to standard output.
+- **Why:** This explicitly cleans up a specific image version that is no longer needed after testing or building.
+- **Example:** docker image rm delivery-metrics-collector:decoupling-test '2>&1' to free up disk space.
+- **Notes:** The '2>&1' redirects stderr to stdout, which is useful if you are piping the output to another command like 'tail'.
 
 ## Containers
 
