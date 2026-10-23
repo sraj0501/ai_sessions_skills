@@ -75,3 +75,19 @@ docker login --username AWS --password-stdin '$registry' '>/dev/null' 'refs=(' '
 - **Why:** This command is used to authenticate the Docker client against a private registry, often required before pushing or pulling specific tagged images.
 - **Example:** docker login --username AWS --password-stdin '545009868739.dkr.ecr.us-east-1.amazonaws.com' '>/dev/null' 'refs=(' '545009868739.dkr.ecr.us-east-1.amazonaws.com/delivery-metrics-frontend@sha256:2767d0f7057b78b79f81252c5afee1befe65d23e174bae6d53dbad1ff473606d' '545009868739.dkr.ecr.us-east-1.amazonaws.com/delivery-metrics-backend@sha256:cfb2874bff89897811b381337d6d0b25820c53e19a177e34b1e4131f0a1b1a8' '545009868739.dkr.ecr.us-east-1.amazonaws.com/delivery-metrics-python-api@sha256:9ac1e3c510a98634d8d5d5b483f837cb5265de5a4e0a4cbfb67f32ab'
 - **Notes:** The password must be provided via stdin, typically piped from a command like 'aws ecr get-login-password'. The 'refs' arguments appear to be used here to specify image digests or tags for subsequent operations.
+
+## Containers
+
+### Wait for PostgreSQL service to become ready
+<!-- sig: 50f64d5d948a -->
+<!-- sig: b69d2a1d01e5 -->
+
+```bash
+docker exec pipeline-landing-it pg_isready -U pipeline_test -d 'pipeline_test;'
+for i in $(seq 1 30); do docker exec pipeline-landing-it pg_isready -U pipeline_test -d pipeline_test -q
+```
+
+- **What it does:** The first command checks the readiness of the PostgreSQL instance inside the container. The loop then repeatedly checks the readiness of the 'pipeline_test' database for up to 30 attempts.
+- **Why:** This ensures that the application attempts to connect to the database only after the PostgreSQL service inside the container has fully initialized and is accepting connections.
+- **Example:** docker exec pipeline-landing-it pg_isready -U pipeline_test -d 'pipeline_test;' followed by the loop to wait for readiness.
+- **Notes:** The loop uses the -q flag for quiet mode, and the 'break' command is implied in the original context to exit once ready.
