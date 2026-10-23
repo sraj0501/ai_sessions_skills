@@ -69,6 +69,51 @@ s=s.replace('''Edit the plan, not the code: {location.path}. Do not edit {root.n
 - **Example:** python3 - <<'EOF' p="blueprint/plan_gate.py"; s=open(p).read() s=s.replace("old string", "new string") print(s) EOF
 - **Notes:** The use of '<<'EOF'' ensures that the input stream is treated as a literal block, preventing shell expansion of variables within the script content.
 
+### Replace specific text within a documentation file
+<!-- sig: 1394d4adac12 -->
+
+```bash
+python3 - <<'EOF'
+p="docs/editing-standards.md"; s=open(p).read()
+s=s.replace("A deterministic rule names a built-in check. The check reads each Python file's syntax tree, so the same code always gives the same answer and no model is involved.","A deterministic rule names a built-in check. `type-hints` and `docstrings` read each Python file's syntax tree, so the same code always gives the same answer and no model is involved. `ruff` and `mypy` run those tools over the files and report what they find, so they give the answer the tool gives.",1)
+s=s.replace("The only check today is `type-hints`:","")
+```
+
+- **What it does:** This script reads the content of docs/editing-standards.md, performs two string replacements on the content, and implicitly writes the modified content back (though the final write operation is missing in the provided snippet).
+- **Why:** It allows for targeted, programmatic updates to documentation content without manually editing the file, ensuring consistency across changes.
+- **Example:** python3 - <<'EOF' p="docs/editing-standards.md"; s=open(p).read() s=s.replace("old text", "new text", 1) print(s) EOF
+- **Notes:** The provided snippet reads the file but does not explicitly write the modified string `s` back to `docs/editing-standards.md`.
+
+### Update documentation file content
+<!-- sig: 0f0f3edff5f2 -->
+
+```bash
+python3 - <<'EOF'
+p="docs/editing-standards.md"; s=open(p).read()
+s=s.replace("A deterministic rule names a built-in check. The check reads each Python file's syntax tree, so the same code always gives the same answer and no model is involved.","A deterministic rule names a built-in check. `type-hints` and `docstrings` read each Python file's syntax tree, so the same code always gives the same answer and no model is involved. `ruff` and `mypy` run those tools over the files and report what they find, so they give the answer the tool gives.",1)
+s=s.replace("The only check today is `type-hints`:","")
+```
+
+- **What it does:** This script reads the content of docs/editing-standards.md, performs two string replacements to update specific text blocks, and implicitly writes the modified content back to the file (though the final write operation is missing in the provided snippet).
+- **Why:** It automates the tedious process of updating documentation standards across multiple instances of specific text within a reference file.
+- **Example:** python3 - <<'EOF' p="docs/editing-standards.md"; s=open(p).read() s=s.replace("old text", "new text",1) s=s.replace("another old", "another new") EOF
+- **Notes:** The provided snippet reads the file but does not show the final step of writing the modified string 's' back to 'docs/editing-standards.md'.
+
+### Replace specific text within a markdown file
+<!-- sig: 7b8289ba460e -->
+
+```bash
+python3 - <<'EOF'
+p="docs/editing-standards.md"; s=open(p).read()
+s=s.replace("A deterministic rule names a built-in check. The check reads each Python file's syntax tree, so the same code always gives the same answer and no model is involved.","A deterministic rule names a built-in check. `type-hints` and `docstrings` read each Python file's syntax tree, so the same code always gives the same answer and no model is involved. `ruff` and `mypy` run those tools over the files and report what they find, so they give the answer the tool gives.",1)
+s=s.replace("The only check today is `type-hints`:","")
+```
+
+- **What it does:** This script reads the content of docs/editing-standards.md, performs two string replacements using the .replace() method, and then implicitly discards the modified content as it is not written back to the file.
+- **Why:** It allows for complex, multi-step text substitution within a file using Python's string manipulation capabilities, which is more robust than simple shell sed commands for this specific task.
+- **Example:** python3 - <<'EOF' p="docs/editing-standards.md"; s=open(p).read() s=s.replace("old text", "new text", 1) EOF
+- **Notes:** The script reads the file but does not write the modified string 's' back to 'docs/editing-standards.md', so the changes will not persist unless an explicit write operation is added.
+
 ## Inspecting state
 
 ### View status and contents of demo directory

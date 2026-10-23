@@ -63,3 +63,34 @@ cat > /tmp/fix_readme.py <<'EOF'
 - **Why:** It allows for multi-line input to be piped directly into a file without needing multiple echo commands.
 - **Example:** cat > /tmp/fix_readme.py <<'EOF' p='README.md' s=open(p).read() s=s.replace('''Limits, so nothing is oversold: discovery is deterministic''','''### Checking that a standard can be enforced here Editing the standards in the terminal UI (`e`) and saving asks a **local model** (Ollama, `BLUEPRINT_OLLAMA_MODEL`, default `gemma4:latest`) to read a plain-text profile of the repository and say, one rule at a time, whether the rule can apply to this codebase. A rule about `package.json` in a Python project cannot; a rule that asks for ruff can, because ruff can be added. Nothing leaves your machine,''' EOF
 - **Notes:** The single quotes around 'EOF' prevent shell variable expansion within the here-document, ensuring the content is written literally.
+
+### Replace specific text within a documentation file
+<!-- sig: 1d85a336635a -->
+
+```bash
+python3 - <<'EOF'
+p="docs/editing-standards.md"; s=open(p).read()
+s=s.replace("A deterministic rule names a built-in check. The check reads each Python file's syntax tree, so the same code always gives the same answer and no model is involved.","A deterministic rule names a built-in check. `type-hints` and `docstrings` read each Python file's syntax tree, so the same code always gives the same answer and no model is involved. `ruff` and `mypy` run those tools over the files and report what they find, so they give the answer the tool gives.",1)
+s=s.replace("The only check today is `type-hints`:","")
+EOF
+```
+
+- **What it does:** This script reads the content of docs/editing-standards.md, performs two string replacements using the .replace() method, and then implicitly exits without writing the modified content back to the file.
+- **Why:** It allows for complex, multi-step text substitution within a file using Python's string manipulation capabilities, which is more robust than simple shell substitution for complex patterns.
+- **Example:** python3 - <<'EOF' p="docs/editing-standards.md"; s=open(p).read() s=s.replace("old text", "new text", 1) EOF
+- **Notes:** The script reads the file but does not write the modified content back to docs/editing-standards.md. The final line of the script is incomplete in the provided snippet.
+
+### Update documentation standards regarding code checks
+<!-- sig: fd10a907e2ce -->
+
+```bash
+python3 - <<'EOF'
+p="docs/editing-standards.md"; s=open(p).read()
+s=s.replace("A deterministic rule names a built-in check. The check reads each Python file's syntax tree, so the same code always gives the same answer and no model is involved.","A deterministic rule names a built-in check. `type-hints` and `docstrings` read each Python file's syntax tree, so the same code always gives the same answer and no model is involved. `ruff` and `mypy` run those tools over the files and report what they find, so they give the answer the tool gives.",1)
+s=s.replace("The only check today is `type-hints`:","Check' the 'repo'
+```
+
+- **What it does:** This script reads the docs/editing-standards.md file and performs two string replacements to update the description of deterministic code checks.
+- **Why:** It automates the tedious process of updating documentation to reflect the inclusion of `ruff` and `mypy` alongside `type-hints` and `docstrings`.
+- **Example:** python3 - <<'EOF' p="docs/editing-standards.md"; s=open(p).read() s=s.replace("A deterministic rule names a built-in check. The check reads each Python file's syntax tree, so the same code always gives the same answer and no model is involved.","A deterministic rule names a built-in check. `type-hints` and `docstrings` read each Python file's syntax tree, so the same code always gives the same answer and no model is involved. `ruff` and `mypy` run those tools over the files and report what they find, so they give the answer the tool gives.",1) s=s.replace("The only check today is `type-hints`:","Check' the 'repo's' Python code against the standards that name a code check '(`type-hints`).","Check' the 'repo's' Python code against the standards that name a code check '(`type-hints`,' '`docstr`
+- **Notes:** The script uses a here-document (`<<'EOF'`) to pass the multi-line Python code block directly to the python3 interpreter.
