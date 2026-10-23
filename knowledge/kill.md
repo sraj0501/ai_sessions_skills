@@ -7,6 +7,8 @@
 
 ### Gracefully terminate a specific process
 <!-- sig: 765f7a6fbd4b -->
+<!-- sig: 786e5925b544 -->
+<!-- sig: 94a4ab5d1928 -->
 
 ```bash
 kill -TERM 21665
