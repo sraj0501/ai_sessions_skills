@@ -37,6 +37,7 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 <!-- sig: eae72a4bd18e -->
 <!-- sig: fe0acf64d356 -->
 <!-- sig: bd971819f66b -->
+<!-- sig: f12b5a9b3213 -->
 
 ```bash
 python3 - <<'EOF'
@@ -52,6 +53,20 @@ en
 - **Why:** It automates the tedious task of updating boilerplate text within a documentation file to reflect new feature descriptions.
 - **Example:** python3 - <<'EOF' ... (script content) ... EOF
 - **Notes:** The script uses a here-document (<<'EOF') to pass the multi-line Python code to the interpreter. The replacement string must exactly match the target string.
+
+### Modify content within a Python script
+<!-- sig: 59e00c79d909 -->
+
+```bash
+python3 - <<'EOF'
+p="blueprint/plan_gate.py"; s=open(p).read()
+s=s.replace('''Edit the plan, not the code: {location.path}. Do not edit {root.name}'s standards file to get past a rule.
+```
+
+- **What it does:** This command executes a Python script via standard input, reading the contents of blueprint/plan_gate.py, performing string replacements on the content, and then writing the modified content back to the same file.
+- **Why:** It allows for in-place, programmatic modification of a configuration or source file without needing external text processing tools like sed or awk.
+- **Example:** python3 - <<'EOF' p="blueprint/plan_gate.py"; s=open(p).read() s=s.replace("old string", "new string") print(s) EOF
+- **Notes:** The use of '<<'EOF'' ensures that the input stream is treated as a literal block, preventing shell expansion of variables within the script content.
 
 ## Inspecting state
 
