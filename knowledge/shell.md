@@ -619,6 +619,7 @@ cp /tmp/recs.jsonl .runtime/pending.jsonl
 <!-- sig: c51cb700dbfd -->
 <!-- sig: d75e64617e68 -->
 <!-- sig: e2a0c2eb09b6 -->
+<!-- sig: acff56557f5e -->
 
 ```bash
 Get-Content -Raw 'C:\Users\sraj\.codex\skills\session-skills\SKILL.md'
