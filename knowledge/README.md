@@ -98,6 +98,8 @@ and set **Files to include** to `knowledge/**/*.md`.
 | [`foreach-object.md`](foreach-object.md) | Foreach Object |
 | [`godot-tools.md`](godot-tools.md) | Godot Tools |
 | [`codex.md`](codex.md) | Codex |
+| [`python.exe.md`](python.exe.md) | Python.Exe |
+| [`test-path.md`](test-path.md) | Test Path |
 
 `_skipped.md` records actions the writer judged unsuitable for documentation.
 `.routes.json` stores routing decisions. Capture logs and pending actions are
