@@ -73,6 +73,12 @@ For local, offline writing, pull any instruct model; `doctor.py` will report
 ollama pull qwen2.5-coder     # or keep whatever you already have
 ```
 
+Copy [`.env.example`](.env.example) to `.env` next to `config.json` and set
+`AI_SKILLS_OLLAMA_MODEL` to the model you pulled. You can also set
+`AI_SKILLS_OLLAMA_URL` for a different Ollama server. The private `.env` file
+is ignored by Git. Process environment values take precedence. For a separate
+config file, place `.env` beside it or set `AI_SKILLS_ENV_FILE` to its path.
+
 Re-running the installer is safe and never duplicates entries. See
 [`tool/README.md`](tool/README.md) for `--only`, `--kb`, `--dry-run`,
 uninstall, and the per-platform path table.
@@ -115,10 +121,37 @@ with guesses. If the detached renderer fails, run `playback.py finalize` to
 retry from the local event spool.
 
 Playback events never enter the command knowledge writer and are never
-deduplicated or summarized by a local model. Its raw spool is under `.runtime/`
-and its Markdown files are under `playbacks/`; both are gitignored because
-commands and outputs can contain sensitive material. The normal knowledge
+deduplicated or summarized by a local model. Each recording keeps its raw
+events, rendered `playback.md`, indexes, and later reasoning together under
+`.runtime/playback/PLAYBACK_ID/`. This directory is gitignored because
+commands and outputs can contain sensitive material. Run
+`python tool/bin/playback.py migrate` once to move Markdown files from an
+older top-level `playbacks/` folder. The normal knowledge
 workflow resumes when playback stops.
+
+To compress and back up local runtime evidence, use:
+
+```bash
+python tool/bin/runtime_backup.py backup
+python tool/bin/runtime_backup.py verify backups/ARCHIVE.zip
+python tool/bin/runtime_backup.py restore backups/ARCHIVE.zip --target RESTORED_RUNTIME
+```
+
+On Windows, use `py -3` in place of `python` if needed. Archives go to the
+gitignored `backups/` directory by default; `--output-dir` can point to another
+drive or private backup location. Each ZIP includes playback events, rendered
+Markdown, later reasoning, the WAL, and pending recovery data. Logs and
+rebuildable SQLite text and embedding indexes are omitted. `verify` checks a
+SHA-256 manifest; `restore` verifies it again, creates a new directory, and
+refuses to overwrite an existing runtime. To restore the default `.runtime/`
+path, that path must be absent first. To inspect a backup while keeping your
+current runtime, restore to a different `--target`.
+
+Creating a ZIP does not remove the source files or save space in `.runtime/`
+by itself. Copy the archive outside this checkout before retiring any source
+data; the tool does not prune runtime files or old archives. The ZIP is not
+encrypted and may contain credentials or private output, so store it in a
+protected location and do not publish it to Git or team sync.
 
 Browse the [knowledge index](knowledge/README.md), or search complete entries:
 
@@ -148,6 +181,14 @@ configuration. Live app discovery still needs verification. Other MCP clients
 can launch `python tool/bin/search_mcp.py` over stdio. Command search reads
 completed Markdown entries, while playback tools read exact local recordings.
 Neither reads the separate WAL.
+Set `AI_SKILLS_EMBED_MODEL` in private `.env` to a locally installed Ollama
+embedding model (for example, `nomic-embed-text:latest`). Knowledge search and
+playback questions require that model; an unavailable model produces an error.
+The first semantic knowledge search embeds existing Markdown entries into an
+ignored SQLite cache. Later searches embed only new or changed entries. The
+cache is omitted from backups and rebuilds on the next semantic search after
+restore. Signature comments are removed from text before embedding. Direct
+`search.py` queries still read Markdown and use keyword matching.
 
 For an HTTP-based harness such as Open WebUI, run the same read-only functions
 as an OpenAPI server and connect its `/openapi.json` URL:
@@ -166,31 +207,83 @@ For any OpenAI-compatible Chat Completions endpoint, use the same client.
 For example, with a local Ollama server:
 
 ```bash
-python tool/bin/ask.py --url http://localhost:11434/v1/chat/completions --model qwen3.5:9b "How do I review staged changes?"
+python tool/bin/ask.py "How do I review staged changes?"
 ```
+
+`ask.py` searches command knowledge locally, then sends up to three short
+entries in one text-only model request. Small models need no tool calling. Use
+`--max-entries 1` to reduce context or `--tools` for a model that can drive
+the search tool itself.
 
 To discuss a recorded resolution and ask follow-up questions:
 
 ```bash
-python tool/bin/playback_chat.py --url http://localhost:11434/v1/chat/completions --model qwen3.5:9b --interactive
+python tool/bin/playback_chat.py --interactive
 ```
 
 For Open WebUI, use `--url http://HOST:PORT/api/chat/completions --model MODEL`
 with either client.
-`--api-key-env ENV_NAME` reads a Bearer token from the environment.
+These clients use `AI_SKILLS_CHAT_URL`, `AI_SKILLS_CHAT_MODEL` (or the Ollama
+writer model), and optional `AI_SKILLS_CHAT_API_KEY` from `.env`. Explicit
+`--url`, `--model`, and `--api-key-env` flags override those defaults.
 
 Use `--id PLAYBACK_ID` to select an older recording; otherwise the current or
-last playback is used. An initial question can follow the options. With no
-question, the model walks through every recorded step. The record remains
-unchanged; explanations cite step numbers. Raw outputs may contain private
-data. A cloud harness that reads playback will receive those raw steps in its
-model context; use a local model when the recording must stay on the machine.
+last playback is used. An initial question can follow the options. The terminal
+client reads up to five steps per model request, prints each explanation as it finishes,
+and continues until all steps are covered. Each step sent to the model contains
+the command (or a bounded patch excerpt), a few observed output lines, any
+recorded observation or decision, and the next recorded action. Earlier pages
+are not carried into later requests. When no reasoning was recorded, the step
+says `Inference: Not recorded`. For a small
+local context, use `--page-size 2`; use `--start` and
+`--end` to explain only a step range. Interactive follow-ups use local text
+retrieval, sending at most five relevant steps per question. To ask one question
+without a walkthrough, use:
+
+```bash
+python tool/bin/playback_chat.py --id PLAYBACK_ID "What fixed the issue?"
+```
+
+The client builds incremental SQLite text and embedding indexes under the local
+playback runtime on first use. It refreshes changed events and keeps exact JSON
+events and full raw output as the source of truth. Embeddings come from the required local Ollama
+model, even when the answer model is in the cloud. Each model
+request receives at most five compact step excerpts and a bounded prompt; long
+outputs stay in the recording. Use `--max-evidence-steps 2` for smaller models.
+Questions need enough matching evidence; if necessary, inspect the exact step
+with `playback_query.py read ID --start N`.
+
+Older playbacks may have no recorded observation or decision notes. To add
+model-generated inferences later, run:
+
+```bash
+python tool/bin/playback_reason.py --id PLAYBACK_ID --model LOCAL_MODEL
+python tool/bin/playback_reason.py --id PLAYBACK_ID --ollama-cloud --model CLOUD_MODEL
+```
+
+On Windows, replace `python` with `py -3` if needed. The command sends one
+compact step at a time, saves each result under the ignored playback runtime,
+and can resume after interruption. Use `--start N --end M` to limit the range.
+Generated text is labelled `Reconstructed later`; it is an interpretation of
+recorded evidence, not the original agent's private reasoning. Existing
+recorded or generated reasoning triggers a warning and is skipped. To replace
+it in playback prompts, explicitly pass `--overwrite`. Original event files
+and their notes are never changed.
+
+For Ollama cloud, set `OLLAMA_API_KEY` in your private `.env`, then run
+`python tool/bin/playback_chat.py --ollama-cloud --model CLOUD_MODEL --id PLAYBACK_ID "question"`.
+A signed-in local Ollama server can also route a cloud model using its local URL
+and `--model`. Cloud requests send the selected playback excerpts to Ollama;
+use a local model when recorded output must stay on the machine.
 
 The chat client makes tool calls through the standard protocol and returns local
 results to the model. A model server alone does not capture coding actions;
-its coding harness must deliver tool events. Search needs no separate index or UI.
+its coding harness must deliver tool events. Search needs no UI.
 
-All keywords must match. Headings and commands rank above matches in prose.
+`search.py` remains a direct keyword CLI: all keywords must match, and headings
+and commands rank above prose. `ask.py` and MCP/HTTP search combine local
+embeddings with exact-text ranking. Their vectors are cached under `.runtime/`
+and ignored by Git.
 In VS Code, use **Ctrl+Shift+F** with **Files to include: `knowledge/**/*.md`**.
 New topics are written to `knowledge/` and added to its index automatically.
 

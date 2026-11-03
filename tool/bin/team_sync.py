@@ -32,8 +32,8 @@ def team_root() -> Path:
 
 
 def settings(server: str | None) -> tuple[str, str]:
-    url = (server or os.environ.get("AI_SKILLS_TEAM_URL") or cfg.get("team.url") or "").rstrip("/")
-    token = os.environ.get("AI_SKILLS_TEAM_TOKEN", "")
+    url = (server or cfg.env("AI_SKILLS_TEAM_URL") or cfg.get("team.url") or "").rstrip("/")
+    token = cfg.env("AI_SKILLS_TEAM_TOKEN")
     parsed = urlsplit(url)
     if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path:
         raise ValueError("configure a server origin in AI_SKILLS_TEAM_URL or team.url")

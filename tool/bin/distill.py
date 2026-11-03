@@ -311,8 +311,12 @@ def run_http(backend: dict, prompt: str, timeout: int, runtime: Path,
         # depending on how well the model follows instructions.
         payload["format"] = schema
     body = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    token = cfg.env(backend.get("api_key_env") or "AI_SKILLS_OLLAMA_API_KEY")
+    if token:
+        headers["Authorization"] = "Bearer " + token
     request = urllib.request.Request(backend["url"], data=body,
-                                     headers={"Content-Type": "application/json"})
+                                     headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             reply = json.loads(response.read().decode("utf-8"))

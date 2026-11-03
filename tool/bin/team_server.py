@@ -10,7 +10,6 @@ import argparse
 import hashlib
 import hmac
 import json
-import os
 import sys
 import threading
 import re
@@ -19,6 +18,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cfg
 import wal_review
 import wal_team
 
@@ -152,14 +152,14 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.verb == "serve":
-            if os.environ.get("AI_SKILLS_TEAM_TOKENS"):
-                token = json.loads(os.environ["AI_SKILLS_TEAM_TOKENS"])
+            if cfg.env("AI_SKILLS_TEAM_TOKENS"):
+                token = json.loads(cfg.env("AI_SKILLS_TEAM_TOKENS"))
                 if not isinstance(token, dict) or not token or any(
                         not isinstance(k, str) or not k or not isinstance(v, str) or len(v) < 32
                         for k, v in token.items()) or len(set(token.values())) != len(token):
                     raise ValueError("AI_SKILLS_TEAM_TOKENS must map machine IDs to 32+ character tokens")
             else:
-                token = os.environ.get("AI_SKILLS_TEAM_TOKEN", "")
+                token = cfg.env("AI_SKILLS_TEAM_TOKEN")
                 if len(token) < 32:
                     raise ValueError("AI_SKILLS_TEAM_TOKEN must contain at least 32 characters")
             if args.host not in ("127.0.0.1", "localhost", "::1"):

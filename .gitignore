@@ -1,5 +1,15 @@
 .runtime/
+backups/
 .DS_Store
 __pycache__/
 *.pyc
 playbacks/
+**/text-index.sqlite3*
+**/vector-index.sqlite3*
+**/knowledge-vectors.sqlite3*
+.env
+.env.*
+!.env.example
+
+
+*.vscode

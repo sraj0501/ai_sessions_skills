@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 from urllib import request, error
@@ -39,12 +40,44 @@ git diff --staged
 
 
 class TestSearchTools(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        class EmbedHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                values = payload["input"]
+                vectors = [[float("staged" in text.lower()),
+                            float("git" in text.lower()), 1.0]
+                           for text in values]
+                body = json.dumps({"embeddings": vectors}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                pass
+
+        cls.embed_server = ThreadingHTTPServer(("127.0.0.1", 0), EmbedHandler)
+        cls.embed_thread = threading.Thread(target=cls.embed_server.serve_forever,
+                                            daemon=True)
+        cls.embed_thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.embed_server.shutdown()
+        cls.embed_server.server_close()
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         root = Path(self.temp.name)
         (root / "git.md").write_text(ENTRY, encoding="utf-8")
-        self.env = patch.dict(os.environ, {"AI_SKILLS_KB": str(root)})
+        self.env = patch.dict(os.environ, {
+            "AI_SKILLS_KB": str(root), "AI_SKILLS_EMBED_MODEL": "test-embedding",
+            "AI_SKILLS_EMBED_URL": "http://127.0.0.1:%d/api/embed" %
+            self.embed_server.server_address[1]})
         self.env.start()
         self.addCleanup(self.env.stop)
 
@@ -53,6 +86,7 @@ class TestSearchTools(unittest.TestCase):
         self.assertEqual(result["total"], 1)
         self.assertEqual(result["matches"][0]["commands"], ["git diff --staged"])
         self.assertIn("Review before committing", result["matches"][0]["entry"])
+        self.assertNotIn("<!-- sig:", result["matches"][0]["entry"])
         self.assertTrue(result["matches"][0]["source"].endswith("git.md"))
         self.assertEqual(search_mcp.lookup("git staged", topic="docker")["total"], 0)
 
@@ -90,9 +124,21 @@ class TestSearchTools(unittest.TestCase):
         second = {"role": "assistant", "content": "Use git diff --staged."}
         backend = ChatBackend("http://local", "local")
         with patch.object(backend, "complete", side_effect=[first, second]) as mock_chat:
-            reply = ask.answer("How to review staged changes?", backend)
+            reply = ask.answer_with_tools("How to review staged changes?", backend)
         self.assertIn("git diff --staged", reply)
         self.assertIn("git diff --staged", mock_chat.call_args.args[0][-1]["content"])
+
+    def test_small_model_command_answer_searches_before_one_text_call(self):
+        backend = ChatBackend("http://local", "local")
+        found = {"matches": [{"source": "git.md", "line": 12,
+                               "entry": "Review staged changes: git diff --staged"}]}
+        with patch.object(ask, "lookup", return_value=found), \
+                patch.object(backend, "complete", return_value={"content": "Use git diff --staged."}) as mocked:
+            self.assertEqual(ask.answer("Review staged changes", backend),
+                             "Use git diff --staged.")
+        self.assertEqual(mocked.call_count, 1)
+        self.assertEqual(mocked.call_args.args[1], [])
+        self.assertIn("git.md:12", mocked.call_args.args[0][1]["content"])
 
     def test_openai_tool_result_keeps_call_id(self):
         backend = ChatBackend("http://local/v1/chat/completions", "local")
@@ -108,7 +154,7 @@ class TestSearchTools(unittest.TestCase):
         with patch.object(backend, "complete", side_effect=[
                 {"role": "assistant", "content": None, "tool_calls": [call]},
                 {"role": "assistant", "content": "Use git diff --staged."}]) as mocked:
-            reply = ask.answer("How to review staged changes?", backend)
+            reply = ask.answer_with_tools("How to review staged changes?", backend)
         self.assertIn("git diff --staged", reply)
         self.assertEqual(mocked.call_args.args[0][-1]["tool_call_id"], "call_7")
         self.assertIn("Review before committing", mocked.call_args.args[0][-1]["content"])

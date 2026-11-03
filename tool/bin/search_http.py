@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import hmac
 import json
-import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -13,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from search_mcp import call_tool
+import cfg
 
 
 def specification() -> dict:
@@ -41,7 +41,7 @@ def specification() -> dict:
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
-        token = os.environ.get("AI_SKILLS_SEARCH_TOKEN", "")
+        token = cfg.env("AI_SKILLS_SEARCH_TOKEN")
         if token and not hmac.compare_digest(self.headers.get("Authorization", ""),
                                              "Bearer " + token):
             self.send_json({"error": "unauthorized"}, 401)
@@ -94,7 +94,7 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8766)
     args = parser.parse_args()
-    if args.host not in ("127.0.0.1", "localhost") and not os.environ.get(
+    if args.host not in ("127.0.0.1", "localhost") and not cfg.env(
             "AI_SKILLS_SEARCH_TOKEN"):
         parser.error("non-loopback binding requires AI_SKILLS_SEARCH_TOKEN")
     server = ThreadingHTTPServer((args.host, args.port), Handler)

@@ -8,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cfg
+import kb
 import search
 import playback_query
 
@@ -17,7 +18,7 @@ TOOL = {
     "description": (
         "Search the user's documented command knowledge. Use for questions about "
         "commands, CLI workflows, or prior solutions. Returns exact commands, "
-        "explanations, and source file locations. Read-only; no model or network call."
+        "explanations, and source file locations. Uses a required local embedding model."
     ),
     "inputSchema": {
         "type": "object",
@@ -74,14 +75,14 @@ def lookup(query: str, topic: str = "", limit: int = 5) -> dict:
         raise ValueError("topic must be a string")
     if type(limit) is not int or not 1 <= limit <= 20:
         raise ValueError("limit must be an integer from 1 to 20")
-    matches = search.search_with_team(cfg.kb_dir(), query, topic)
+    matches = search.semantic_search_with_team(cfg.kb_dir(), query, topic, limit)
     return {
         "query": query,
         "total": len(matches),
         "matches": [{
             "heading": item["heading"],
             "commands": item["commands"],
-            "entry": item["body"],
+            "entry": kb.SIG_RE.sub("", item["body"]),
             "source": str(item["path"]),
             "line": item["line"],
         } for item in matches[:limit]],

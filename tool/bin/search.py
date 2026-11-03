@@ -9,6 +9,74 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cfg
 import kb
 import team_sync
+import vector_cache
+
+
+def entries(root: Path, topic: str = "") -> list[dict]:
+    """Read all entries for semantic retrieval, retaining exact source lines."""
+    matches = []
+    for path in sorted(root.glob("*.md")):
+        if path.name.startswith("_") or path.name == "README.md":
+            continue
+        if topic and topic.casefold() not in path.stem.casefold():
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for entry in kb.parse("\n".join(lines)):
+            matches.append(dict(path=path, line=entry.start + 1, heading=entry.heading,
+                                commands=entry.commands,
+                                body="\n".join(lines[entry.start:entry.end])))
+    return matches
+
+
+def _team_paths(root: Path) -> list[Path]:
+    team = team_sync.team_root()
+    revision = team_sync.installed_revision(team)
+    return ([team / "revisions" / revision] if revision else []) + [root]
+
+
+def entries_with_team(root: Path, topic: str = "") -> list[dict]:
+    seen = set()
+    results = []
+    for path in _team_paths(root):
+        for item in entries(path, topic):
+            sigs = tuple(kb.SIG_RE.findall(item["body"]))
+            key = sigs[0] if sigs else (item["heading"], tuple(item["commands"]))
+            if key not in seen:
+                seen.add(key)
+                results.append(item)
+    return results
+
+
+def semantic_search_with_team(root: Path, query: str, topic: str = "",
+                              limit: int = 5) -> list[dict]:
+    """Required embeddings with keyword ranking for exact command matches."""
+    candidates = entries_with_team(root, topic)
+    if not candidates:
+        return []
+    keyed = {f"{item['path'].resolve()}:{item['line']}": item for item in candidates}
+    words = [word for word in query.casefold().split() if word not in
+             {"how", "what", "where", "when", "why", "the", "and", "for", "with",
+              "can", "you", "does", "this", "that", "from"}]
+    def lexical_score(key: str) -> tuple[int, int]:
+        item = keyed[key]
+        heading = item["heading"].casefold()
+        commands = " ".join(item["commands"]).casefold()
+        body = item["body"].casefold()
+        coverage = sum(word in (heading + " " + commands + " " + body)
+                       for word in words)
+        score = sum(3 * (word in heading) + 2 * (word in commands) +
+                    (word in body) for word in words)
+        return coverage, score
+    lexical = sorted((key for key in keyed if words and
+                      lexical_score(key)[0] >= min(2, len(words))),
+                     key=lambda key: (tuple(-value for value in lexical_score(key)), key))
+    records = [(key, item["path"].stem + "\n" + item["heading"] + "\n" +
+                "\n".join(item["commands"]) + "\n" +
+                kb.SIG_RE.sub("", item["body"]))
+               for key, item in keyed.items()]
+    ranked = vector_cache.rank(cfg.runtime_dir() / "knowledge-vectors.sqlite3",
+                               records, query, limit, lexical)
+    return [keyed[key] for key in ranked]
 
 
 def search(root: Path, query: str, topic: str = "") -> list[dict]:

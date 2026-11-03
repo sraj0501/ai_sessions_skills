@@ -4,16 +4,20 @@ import io
 import json
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
 import capture
+import cfg
 import playback
 import playback_worker
 import playback_query
 import playback_chat
+import playback_index
+import playback_reason
 from chat_backend import ChatBackend
 import search_mcp
 
@@ -25,7 +29,25 @@ class PlaybackTests(unittest.TestCase):
         base = Path(self.temp.name)
         self.addCleanup(patch.stopall)
         patch("cfg.runtime_dir", return_value=base / "runtime").start()
-        patch("playback.output_dir", return_value=base / "playbacks").start()
+
+    def test_rendered_file_lives_with_recording_and_legacy_layout_migrates(self):
+        base = Path(self.temp.name)
+        state = playback.start("Move layout", "thread-1", "codex")
+        self.assertEqual(Path(state["output"]), playback.root() / state["id"] / "playback.md")
+        legacy = base / "playbacks" / (state["id"] + "_move-layout.md")
+        legacy.parent.mkdir()
+        legacy.write_text("# preserved playback\n", encoding="utf-8")
+        state["status"] = "complete"
+        state["output"] = str(legacy)
+        playback.write_state(state)
+        with patch.object(cfg, "TOOL_ROOT", base / "tool"):
+            self.assertEqual(playback.migrate_layout(), (1, 0))
+        destination = playback.root() / state["id"] / "playback.md"
+        self.assertEqual(destination.read_text(encoding="utf-8"), "# preserved playback\n")
+        self.assertFalse(legacy.exists())
+        self.assertFalse(legacy.parent.exists())
+        self.assertEqual(playback.read_state()["output"], str(destination))
+        self.assertEqual(playback_query._recording(state["id"])[0]["output"], str(destination))
 
     def test_repeated_commands_outputs_and_agent_evaluations(self):
         state = playback.start("Fix timeout", "thread-1", "codex")
@@ -118,7 +140,8 @@ class PlaybackTests(unittest.TestCase):
     def test_chat_playback_calls_exact_timeline_and_keeps_history(self):
         state = playback.start("Debug issue", "thread-1", "codex")
         playback.spool({"type": "tool", "payload": {"tool_name": "exec",
-                        "tool_input": {"command": "echo evidence"}, "output": "evidence"}}, state)
+                        "tool_input": {"command": "echo evidence"},
+                        "output": "evidence\n" + "irrelevant detail\n" * 100}}, state)
         called = {"role": "assistant", "content": "", "tool_calls": [{"id": "call_1",
             "function": {"name": "read_resolution_playback",
                          "arguments": {"id": state["id"], "start": 1}}}]}
@@ -135,6 +158,8 @@ class PlaybackTests(unittest.TestCase):
         self.assertEqual(later, ["It came from echo."])
         self.assertTrue(any("echo evidence" in item.get("content", "") for item in
                             mocked.call_args.args[0] if item.get("role") == "tool"))
+        self.assertFalse(any("irrelevant detail" in item.get("content", "") for item in
+                             mocked.call_args.args[0] if item.get("role") == "tool"))
 
     def test_full_walkthrough_reads_all_pages_before_answering(self):
         state = playback.start("Long investigation", "thread-1", "codex")
@@ -144,14 +169,251 @@ class PlaybackTests(unittest.TestCase):
         no_tool = {"role": "assistant", "content": "draft"}
         final = {"role": "assistant", "content": "All 11 steps."}
         backend = ChatBackend("http://local", "local")
-        with patch.object(backend, "complete", side_effect=[no_tool, no_tool, final]) as mocked:
+        with patch.object(backend, "complete", side_effect=[no_tool, no_tool, no_tool, final]) as mocked:
             answers, history = playback_chat.conversation(
                 state["id"], ["Walk through every step"], backend,
                 all_steps=True)
         self.assertEqual(answers, ["All 11 steps."])
-        self.assertEqual(mocked.call_count, 3)
+        self.assertEqual(mocked.call_count, 4)
         self.assertTrue(any("finding 10" in item.get("content", "")
                             for item in history if item.get("role") == "user"))
+
+    def test_local_walkthrough_renders_five_step_pages_without_history_growth(self):
+        state = playback.start("Long investigation", "thread-1", "codex")
+        for number in range(11):
+            playback.note("observation", f"finding {number}", "thread-1")
+        backend = ChatBackend("http://local", "local")
+        replies = [{"role": "assistant", "content": f"Page {i}"} for i in range(3)]
+        progress = []
+        with patch.object(backend, "complete", side_effect=replies) as mocked:
+            pages = list(playback_chat.walkthrough_pages(
+                state["id"], "Explain every step", backend, on_page=lambda *a: progress.append(a)))
+        self.assertEqual([(a, b) for a, b, _, _ in pages], [(1, 5), (6, 10), (11, 11)])
+        self.assertEqual(progress, [(1, 5, 11), (6, 10, 11), (11, 11, 11)])
+        self.assertEqual([page[3] for page in pages], ["Page 0", "Page 1", "Page 2"])
+        self.assertEqual(mocked.call_count, 3)
+        for args, _ in mocked.call_args_list:
+            self.assertEqual(args[1], [])
+            self.assertEqual(len(args[0]), 2)
+        second_request = mocked.call_args_list[1].args[0][1]["content"]
+        self.assertIn("finding 5", second_request)
+        self.assertNotIn("finding 0", second_request)
+
+    def test_local_walkthrough_can_limit_range_and_page_size(self):
+        state = playback.start("Limited investigation", "thread-1", "codex")
+        for number in range(7):
+            playback.note("observation", f"finding {number}", "thread-1")
+        backend = ChatBackend("http://local", "local")
+        with patch.object(backend, "complete", return_value={"content": "done"}) as mocked:
+            pages = list(playback_chat.walkthrough_pages(
+                state["id"], "Explain", backend, page_size=2, start=3, end=6))
+        self.assertEqual([(a, b) for a, b, _, _ in pages], [(3, 4), (5, 6)])
+        self.assertEqual(mocked.call_count, 2)
+
+    def test_local_walkthrough_shrinks_pages_with_large_recorded_output(self):
+        state = playback.start("Large output", "thread-1", "codex")
+        playback.note("observation", "first", "thread-1")
+        playback.note("observation", "x" * 33000, "thread-1")
+        playback.note("observation", "last", "thread-1")
+        backend = ChatBackend("http://local", "local")
+        with patch.object(backend, "complete", return_value={"content": "done"}) as mocked:
+            pages = list(playback_chat.walkthrough_pages(state["id"], "Explain", backend))
+        self.assertEqual([(a, b) for a, b, _, _ in pages], [(1, 3)])
+        prompt = mocked.call_args.args[0][1]["content"]
+        self.assertIn("characters omitted", prompt)
+        self.assertLess(len(prompt), 10000)
+
+    def test_text_index_refreshes_and_question_uses_selected_steps(self):
+        state = playback.start("Find failure", "thread-1", "codex")
+        playback.note("observation", "ordinary setup", "thread-1")
+        playback.note("observation", "database timeout after retry", "thread-1")
+        playback.note("outcome", "database connection fixed", "thread-1")
+        first = playback_index.indexed_steps(state["id"])
+        self.assertEqual(len(first), 3)
+        self.assertTrue((playback.root() / state["id"] / "text-index.sqlite3").is_file())
+        self.assertEqual(playback_index.indexed_steps(state["id"]), first)
+        backend = ChatBackend("http://local", "local")
+        with patch.object(backend, "complete", return_value={"content": "Steps 2 and 3."}) as mocked, \
+                patch("playback_chat.vector_cache.rank", return_value=["2", "3"]):
+            answer = playback_chat.answer_from_index(state["id"], "database timeout", backend, 2)
+        self.assertEqual(answer, "Steps 2 and 3.")
+        prompt = mocked.call_args.args[0][1]["content"]
+        self.assertIn("database timeout", prompt)
+        self.assertNotIn("ordinary setup", prompt)
+        playback.note("decision", "verify again", "thread-1")
+        self.assertEqual(len(playback_index.indexed_steps(state["id"])), 4)
+
+    def test_chat_uses_compact_result_and_recorded_reasoning(self):
+        state = playback.start("Check service", "thread-1", "codex")
+        raw = "first line\n" + "unrelated listing\n" * 200 + "connection refused\n"
+        playback.spool({"type": "tool", "payload": {"tool_name": "exec",
+                        "tool_input": {"command": "curl localhost:8080"},
+                        "output": raw}}, state)
+        playback.note("observation", "The service refused the request.", "thread-1")
+        playback.note("decision", "Check the process next.", "thread-1")
+        playback.spool({"type": "tool", "payload": {"tool_name": "exec",
+                        "tool_input": {"command": "service status"},
+                        "output": "inactive"}}, state)
+        indexed = playback_index.indexed_steps(state["id"])
+        first = indexed[0][1]
+        self.assertIn("Command: curl localhost:8080", first)
+        self.assertIn("connection refused", first)
+        self.assertIn("Check the process next.", first)
+        self.assertIn("Next recorded action: Command: service status", first)
+        self.assertNotIn("unrelated listing", first)
+        self.assertNotIn("unrelated listing", playback_index.compact_timeline(state["id"])["steps"][0]["text"])
+        self.assertEqual(playback_query.timeline(state["id"])["steps"][0]["payload"]["output"], raw)
+        backend = ChatBackend("http://local", "local")
+        with patch.object(backend, "complete", return_value={"content": "Step 1."}) as mocked, \
+                patch("playback_chat.vector_cache.rank", return_value=["1"]):
+            playback_chat.answer_from_index(state["id"], "Why check the process?", backend)
+        sent = mocked.call_args.args[0][1]["content"]
+        self.assertIn("Check the process next.", sent)
+        self.assertNotIn("unrelated listing", sent)
+        playback.note("decision", "Verify the process state again.", "thread-1")
+        self.assertIn("Verify the process state again.", playback_index.indexed_steps(state["id"])[-2][1])
+
+    def test_no_recorded_reasoning_is_not_invented(self):
+        state = playback.start("No notes", "thread-1", "codex")
+        playback.spool({"type": "tool", "payload": {"tool_name": "exec",
+                        "tool_input": {"command": "git status"},
+                        "output": "clean"}}, state)
+        first = playback_index.indexed_steps(state["id"])[0][1]
+        self.assertIn("Inference: Not recorded", first)
+        self.assertIn("Next recorded action: None recorded", first)
+
+    def test_reasoning_generation_saves_and_resumes_without_overwriting(self):
+        state = playback.start("Reconstruct", "thread-1", "codex")
+        playback.spool({"type": "tool", "payload": {"tool_name": "exec",
+                        "tool_input": {"command": "run check"}, "output": "failed"}}, state)
+        playback.spool({"type": "tool", "payload": {"tool_name": "exec",
+                        "tool_input": {"command": "inspect service"}, "output": "inactive"}}, state)
+        backend = ChatBackend("http://local", "local")
+        reports = []
+        with patch.object(backend, "complete", side_effect=[
+                {"content": "Failure suggests checking the service."},
+                {"content": "The service appears inactive."}]) as mocked:
+            self.assertEqual(playback_reason.generate(state["id"], backend, report=reports.append),
+                             (2, 0))
+        self.assertEqual(mocked.call_count, 2)
+        self.assertIn("Reconstructed later: Failure suggests checking the service.",
+                      playback_index.indexed_steps(state["id"])[0][1])
+        with patch.object(backend, "complete") as mocked:
+            self.assertEqual(playback_reason.generate(state["id"], backend, report=reports.append),
+                             (0, 2))
+            mocked.assert_not_called()
+        self.assertTrue(any("WARNING" in line and "--overwrite" in line for line in reports))
+        with patch.object(backend, "complete", return_value={"content": "Revised inference."}):
+            self.assertEqual(playback_reason.generate(state["id"], backend, start=1, end=1,
+                                                      overwrite=True, report=reports.append), (1, 0))
+        self.assertIn("Reconstructed later: Revised inference.",
+                      playback_index.indexed_steps(state["id"])[0][1])
+        self.assertTrue(any("WARNING: --overwrite" in line for line in reports))
+
+    def test_recorded_reasoning_is_skipped_and_raw_event_stays_unchanged(self):
+        state = playback.start("Recorded", "thread-1", "codex")
+        path = playback.spool({"type": "tool", "payload": {"tool_name": "exec",
+                              "tool_input": {"command": "test"}, "output": "failed"}}, state)
+        playback.note("decision", "Inspect the failure.", "thread-1")
+        original = path.read_bytes()
+        backend = ChatBackend("http://local", "local")
+        with patch.object(backend, "complete") as mocked:
+            self.assertEqual(playback_reason.generate(state["id"], backend, report=lambda _: None),
+                             (0, 1))
+            mocked.assert_not_called()
+        with patch.object(backend, "complete", return_value={"content": "A later interpretation."}):
+            playback_reason.generate(state["id"], backend, overwrite=True, report=lambda _: None)
+        self.assertEqual(path.read_bytes(), original)
+        self.assertIn("Reconstructed later: A later interpretation.",
+                      playback_index.indexed_steps(state["id"])[0][1])
+        self.assertNotIn("Inspect the failure.", playback_index.indexed_steps(state["id"])[1][1])
+        self.assertEqual(playback_query.timeline(state["id"])["steps"][1]["text"],
+                         "Inspect the failure.")
+
+    def test_reasoning_cloud_flag_selects_cloud_endpoint(self):
+        state = playback.start("Cloud reasoning", "thread-1", "codex")
+        playback.spool({"type": "tool", "payload": {"tool_name": "exec",
+                        "tool_input": {"command": "check"}, "output": "failed"}}, state)
+        argv = ["playback_reason.py", "--id", state["id"], "--ollama-cloud",
+                "--model", "example:cloud"]
+        with patch.object(sys, "argv", argv), patch("playback_reason.ChatBackend") as backend, \
+                patch("playback_reason.generate", return_value=(1, 0)):
+            with patch.object(sys, "stdout", io.StringIO()):
+                playback_reason.main()
+        backend.assert_called_once_with("https://ollama.com/v1/chat/completions",
+                                        "example:cloud", "OLLAMA_API_KEY")
+
+    def test_cloud_flag_selects_hosted_endpoint_and_key_name(self):
+        state = playback.start("Cloud question", "thread-1", "codex")
+        playback.note("outcome", "fixed", "thread-1")
+        argv = ["playback_chat.py", "--id", state["id"], "--ask", "--ollama-cloud",
+                "--model", "example:cloud", "What fixed it?"]
+        with patch.object(sys, "argv", argv), patch("playback_chat.ChatBackend") as backend, \
+                patch("playback_chat.answer_from_index", return_value="Step 1"):
+            with patch.object(sys, "stdout", io.StringIO()):
+                playback_chat.main()
+        backend.assert_called_once_with("https://ollama.com/v1/chat/completions",
+                                        "example:cloud", "OLLAMA_API_KEY")
+
+    def test_question_without_ask_answers_once_instead_of_walkthrough(self):
+        state = playback.start("Configure app using env", "thread-1", "codex")
+        playback.note("outcome", "env settings loaded and verified", "thread-1")
+        argv = ["playback_chat.py", "--id", state["id"], "--ollama-cloud",
+                "--model=example:cloud", "What fixed the issue?"]
+        with patch.object(sys, "argv", argv), patch("playback_chat.ChatBackend"), \
+                patch("playback_chat.answer_from_index", return_value="The env loader fixed it.") as ask, \
+                patch("playback_chat.walkthrough_pages") as walk, \
+                patch.object(sys, "stdout", io.StringIO()) as output:
+            playback_chat.main()
+        ask.assert_called_once()
+        walk.assert_not_called()
+        self.assertIn("The env loader fixed it.", output.getvalue())
+
+    def test_generic_fix_question_selects_changes_and_verification(self):
+        state = playback.start("Configure app using env", "thread-1", "codex")
+        playback.note("observation", "unrelated setup", "thread-1")
+        playback.spool({"type": "tool", "payload": {"tool_name": "apply_patch",
+                        "tool_input": {"command": "*** Begin Patch\n*** Update File: tool/bin/cfg.py @@\n+load env settings\n*** End Patch"},
+                        "output": "Success"}}, state)
+        playback.spool({"type": "tool", "payload": {"tool_name": "exec",
+                        "tool_input": {"command": "run tests"},
+                        "output": "test_env ... ok\nRan 1 test\n\nOK\n"}}, state)
+        steps = playback_index.indexed_steps(state["id"])
+        selected = playback_index.relevant_steps(steps, "What fixed the issue?", 2,
+                                                 state["title"])
+        self.assertEqual([number for number, _ in selected], [2, 3])
+
+    def test_blocked_model_request_can_be_interrupted_without_waiting(self):
+        entered = threading.Event()
+        release = threading.Event()
+        backend = ChatBackend("http://local", "local")
+
+        def blocked(*_args):
+            entered.set()
+            release.wait(5)
+            return {"content": "late response"}
+
+        with patch.object(backend, "complete", side_effect=blocked), \
+                patch("playback_chat.queue.Queue.get", side_effect=KeyboardInterrupt):
+            try:
+                with self.assertRaises(KeyboardInterrupt):
+                    playback_chat.interruptible_complete(backend, [], [])
+                self.assertTrue(entered.wait(1))
+                self.assertTrue(any(t.name == "playback-chat-request" and t.daemon
+                                    for t in threading.enumerate()))
+            finally:
+                release.set()
+
+    def test_ctrl_c_exits_playback_cleanly(self):
+        state = playback.start("Interrupted", "thread-1", "codex")
+        argv = ["playback_chat.py", "--id", state["id"], "What happened?"]
+        with patch.object(sys, "argv", argv), \
+                patch("playback_chat.answer_from_index", side_effect=KeyboardInterrupt), \
+                patch.object(sys, "stderr", io.StringIO()) as error:
+            with self.assertRaises(SystemExit) as exited:
+                playback_chat.main()
+        self.assertEqual(exited.exception.code, 130)
+        self.assertIn("Playback cancelled.", error.getvalue())
 
 
 if __name__ == "__main__":

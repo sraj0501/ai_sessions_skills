@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 import time
 import uuid
@@ -52,14 +51,52 @@ def write_state(state: dict) -> None:
     temp.replace(state_path())
 
 
-def output_dir() -> Path:
-    configured = cfg.get("playback.output_dir", "playbacks")
-    path = Path(configured).expanduser()
-    return path if path.is_absolute() else cfg.TOOL_ROOT.parent / path
+def output_path(ident: str) -> Path:
+    return root() / ident / "playback.md"
 
 
-def _slug(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:60] or "resolution"
+def migrate_layout() -> tuple[int, int]:
+    """Move legacy rendered Markdown beside its raw events without losing data."""
+    moved = 0
+    skipped = 0
+    legacy_root = (cfg.TOOL_ROOT.parent / "playbacks").resolve()
+    for archive in sorted(root().glob("*/state.json")):
+        state = json.loads(archive.read_text(encoding="utf-8"))
+        ident = state.get("id")
+        if ident != archive.parent.name or state.get("status") != "complete":
+            skipped += 1
+            continue
+        destination = output_path(ident)
+        source = Path(state.get("output", ""))
+        if source == destination:
+            continue
+        if source.parent.resolve() != legacy_root:
+            skipped += 1
+            continue
+        if source.is_file() and destination.exists():
+            raise ValueError(f"destination already exists: {destination}")
+        if source.is_file():
+            source.replace(destination)
+        elif not destination.is_file():
+            skipped += 1
+            continue
+        state["output"] = str(destination)
+        temp = archive.with_suffix(".tmp")
+        temp.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        temp.replace(archive)
+        active = read_state()
+        if active and active.get("id") == ident:
+            active["output"] = str(destination)
+            temp_active = state_path().with_suffix(".tmp")
+            temp_active.write_text(json.dumps(active, ensure_ascii=False), encoding="utf-8")
+            temp_active.replace(state_path())
+        moved += 1
+    if legacy_root.is_dir():
+        try:
+            legacy_root.rmdir()  # only succeeds when the old folder is empty
+        except OSError:
+            pass
+    return moved, skipped
 
 
 def start(title: str, session: str = "", harness: str = "") -> dict:
@@ -73,7 +110,7 @@ def start(title: str, session: str = "", harness: str = "") -> dict:
     state = {"id": ident, "title": title or "Issue resolution", "status": "recording",
              "session": session or session_hint(), "harness": harness,
              "cwd": str(Path.cwd().resolve()), "started": now.isoformat(),
-             "output": str(output_dir() / (ident + "_" + _slug(title) + ".md"))}
+             "output": str(output_path(ident))}
     (root() / ident / "events").mkdir(parents=True, exist_ok=False)
     write_state(state)
     return state
@@ -173,8 +210,12 @@ def main(argv: list[str]) -> int:
             write_state(state)
         run(state["id"])
         state = read_state()
+    elif verb == "migrate":
+        moved, skipped = migrate_layout()
+        print(f"migrated {moved} playback file(s); skipped {skipped}")
+        state = read_state() or {"status": "inactive"}
     else:
-        raise ValueError("usage: playback.py start [title]|note KIND TEXT|stop|status|finalize")
+        raise ValueError("usage: playback.py start [title]|note KIND TEXT|stop|status|finalize|migrate")
     print(state["status"])
     if state.get("session"):
         print("session  " + state["session"])

@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import json
-import os
 from urllib import request
+
+import cfg
 
 
 class ChatBackend:
@@ -21,7 +22,7 @@ class ChatBackend:
                               "stream": False}).encode("utf-8")
         headers = {"Content-Type": "application/json"}
         if self.api_key_env:
-            token = os.environ.get(self.api_key_env)
+            token = cfg.env(self.api_key_env)
             if not token:
                 raise ValueError("missing API key environment variable: " + self.api_key_env)
             headers["Authorization"] = "Bearer " + token

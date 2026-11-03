@@ -14,6 +14,9 @@ Config file resolution (first hit wins):
     3. <tool>/../config.json            (repo layout: tool/ next to the KB)
     4. built-in defaults below
 
+Environment values come from the process first, then AI_SKILLS_ENV_FILE or
+the .env next to the selected config file (or repository config.json).
+
 `kb_dir` may be relative, in which case it resolves against the directory
 holding the config file.
 
@@ -75,7 +78,7 @@ DEFAULTS: dict = {
             "ollama": {
                 "bin": "ollama",
                 "url": "http://localhost:11434/api/generate",
-                "model": "gemma4:latest",
+                "model": "gemma4:12b",
                 "args": [],
                 # temperature 0: a reference manual wants the most likely
                 # description, not a creative one, and it makes runs repeatable.
@@ -300,14 +303,67 @@ def config_path() -> Path | None:
     return None
 
 
+def env_file() -> Path:
+    """Private environment file, independent of the caller's working directory."""
+    override = os.environ.get("AI_SKILLS_ENV_FILE")
+    if override:
+        return Path(override).expanduser()
+    path = config_path()
+    return (path.parent if path else TOOL_ROOT.parent) / ".env"
+
+
+def env(name: str, default: str = "") -> str:
+    """Read a process value or a simple KEY=VALUE entry from the private .env."""
+    if name in os.environ:
+        return os.environ[name]
+    try:
+        lines = env_file().read_text(encoding="utf-8-sig").splitlines()
+    except FileNotFoundError:
+        return default
+    values = {}
+    for line in lines:
+        line = line.strip()
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key, value = key.strip(), value.strip()
+        if not key.isidentifier():
+            continue
+        if value.startswith(('"', "'")) and value.endswith(value[0]):
+            value = value[1:-1]
+        else:
+            value = value.split(" #", 1)[0].rstrip()
+        values[key] = value
+    return values.get(name, default)
+
+
 def load() -> dict:
     path = config_path()
-    if not path:
-        return copy.deepcopy(DEFAULTS)
     try:
-        return _merge(DEFAULTS, json.loads(path.read_text(encoding="utf-8")))
+        result = _merge(DEFAULTS, json.loads(path.read_text(encoding="utf-8"))) if path else copy.deepcopy(DEFAULTS)
     except Exception:
-        return copy.deepcopy(DEFAULTS)
+        result = copy.deepcopy(DEFAULTS)
+    for group in ("text_backends", "backends"):
+        for name, spec in result.get("writer", {}).get(group, {}).items():
+            prefix = "AI_SKILLS_" + name.upper().replace("-", "_")
+            model = env(prefix + "_MODEL")
+            if model:
+                spec["model"] = model
+            if name == "ollama" and group == "text_backends":
+                url = env("AI_SKILLS_OLLAMA_URL")
+                if url:
+                    spec["url"] = url
+    return result
+
+
+def chat_settings() -> tuple[str, str, str]:
+    """Defaults for the two OpenAI-compatible chat clients."""
+    writer = load()["writer"]["text_backends"]["ollama"]
+    return (env("AI_SKILLS_CHAT_URL", "http://localhost:11434/v1/chat/completions"),
+            env("AI_SKILLS_CHAT_MODEL", writer.get("model") or ""),
+            "AI_SKILLS_CHAT_API_KEY" if env("AI_SKILLS_CHAT_API_KEY") else "")
 
 
 def kb_dir() -> Path:
