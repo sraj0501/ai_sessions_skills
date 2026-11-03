@@ -8,6 +8,7 @@
 ### Verify existence of paths before listing files
 <!-- sig: cd50a535359f -->
 <!-- sig: f22c0947823d -->
+<!-- sig: 98e58ada405d -->
 
 ```bash
 Test-Path -LiteralPath "['vscode', 'cli']"

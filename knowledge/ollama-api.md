@@ -21,3 +21,17 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 - **Why:** It automates the tedious process of finding and replacing boilerplate text across documentation files using Python's string manipulation capabilities.
 - **Example:** cat > /tmp/fix_readme.py <<'EOF' ... (content as above) ... EOF
 - **Notes:** The content being replaced and the replacement text are multi-line strings, requiring careful escaping within the Python code block.
+
+## API interactions
+
+### Generate an embedding for a text string via a local API
+<!-- sig: 0e295d35ce7f -->
+
+```bash
+Invoke-RestMethod -Uri http://127.0.0.1:11434/api/embed -Method Post -ContentType application/json -Body '{"model":"nomic-embed-text:latest","input":"test"}'
+```
+
+- **What it does:** Sends a POST request to a local Ollama instance to generate a vector embedding for the string 'test' using the nomic-embed-text model.
+- **Why:** Allows for programmatic interaction with local machine learning models to retrieve vector representations of text data.
+- **Example:** Invoke-RestMethod -Uri http://127.0.0.1:11434/api/embed -Method Post -ContentType application/json -Body '{"model":"nomic-embed-text:latest","input":"test"}'
+- **Notes:** The body must be a valid JSON string. Ensure the local service is running on port 11434 before execution.
