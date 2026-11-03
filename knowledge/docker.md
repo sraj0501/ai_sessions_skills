@@ -39,6 +39,83 @@ docker compose build
 - **Why:** Needed after changing a Dockerfile or the dependency manifests it copies; source-only changes usually just need a restart.
 - **Notes:** `--no-cache` forces a full rebuild when a cached layer is stale.
 
+### Execute a Python script within a container
+<!-- sig: 9d7576771b0f -->
+<!-- sig: 85e682b9f7b7 -->
+<!-- sig: 6f3a0fffe324 -->
+<!-- sig: 07f56341a553 -->
+<!-- sig: 0998247c7418 -->
+
+```bash
+docker run --rm --entrypoint python ei-collectors-us31-verify2 -c 'import importlib
+mods = ['"'main'"'"'"'config_manager'"'"'"'database_manager'"'"'"'api_database_adapter'"'"'"'collector_api_client'"'"'"'data_quality_checker'"'"'"'signals_contract'"'"'"'execution_mode'"'"'"'ado_collector'"'"'"'github_collector'"'"'"'jira_collector'"'"'"'sonarqube_coll'
+```
+
+- **What it does:** Runs a specified Docker image, overriding the default entrypoint to use Python, and executes a complex Python script provided via the -c flag.
+- **Why:** This method allows running a specific, isolated Python script against a defined environment without needing to build a custom image for the task.
+- **Example:** docker run --rm --entrypoint python ei-collectors-us31-verify2 -c 'import importlib\nmods = ["'main'"'"'"'config_manager'"'"'"'database_manager'"'"'"'api_database_adapter'"'"'"'collector_api_client'"'"'"'data_quality_checker'"'"'"'signals_contract'"'"'"'execution_mode'"'"'"'ado_collector'"'"'"'github_collector'"'"'"'jira_collector'"'"'"'sonarqube_coll'']'
+- **Notes:** The script imports a list of modules dynamically. The `--rm` flag ensures the container is removed after the script finishes executing.
+
+### Check the exposed port for a service
+<!-- sig: 8208edaf206f -->
+
+```bash
+docker port rollup-test '2>&1'
+```
+
+- **What it does:** This command queries the Docker daemon to find the host port mapping for the container named rollup-test. The '2>&1' redirects standard error to standard output.
+- **Why:** It provides a quick, direct way to confirm which host port a running container service is accessible on, which is often needed for local testing setup.
+- **Example:** docker port rollup-test '2>&1' to find the exposed port for the test service.
+- **Notes:** The container 'rollup-test' must be running for this command to succeed. The output will show the host IP and port.
+
+### Gracefully stop a running container
+<!-- sig: c9587ffa3814 -->
+
+```bash
+docker stop rollup-review-pg >/dev/null
+```
+
+- **What it does:** Sends a SIGTERM signal to the container named rollup-review-pg, allowing it to shut down gracefully, and redirects standard output and standard error to null.
+- **Why:** This ensures the container process receives a proper stop signal rather than being abruptly killed, which can prevent data corruption.
+- **Example:** docker stop rollup-review-pg >/dev/null before running database migrations.
+- **Notes:** The container must be running for 'docker stop' to have an effect. The redirection suppresses the confirmation message.
+
+### Start a stopped container instance
+<!-- sig: 55a32acc05c2 -->
+
+```bash
+docker start rollup-test '2>/dev/null'
+```
+
+- **What it does:** Restarts a container named rollup-test if it exists and is currently stopped. The redirection suppresses standard error output.
+- **Why:** This is used as the first part of a conditional script to attempt restarting a service without failing if the container is already running or if the start command fails for other reasons.
+- **Example:** docker start rollup-test '2>/dev/null' before running the full setup script.
+- **Notes:** The '2>/dev/null' is crucial here to prevent the script from failing or printing noise if the container is already running or if the name is incorrect.
+
+### Start necessary services in detached mode
+<!-- sig: 181f5fbe3435 -->
+
+```bash
+docker-compose up -d postgres redis
+```
+
+- **What it does:** Starts the services defined for postgres and redis in the docker-compose.yml file in the background (-d).
+- **Why:** This command ensures that the required database and caching services are running reliably in the background before application code attempts to connect to them.
+- **Example:** docker-compose up -d postgres redis to bring up the entire local development environment.
+- **Notes:** The surrounding shell logic handles error checking and piping, but this core command starts the services detached.
+
+### List running services in the current stack
+<!-- sig: e158b49558d8 -->
+
+```bash
+docker compose ps
+```
+
+- **What it does:** Displays the current state of all services defined in the docker-compose.yml file for the active project.
+- **Why:** Provides a quick overview of which containers are running, their status, and their ports without needing to inspect each one individually.
+- **Example:** docker compose ps on the development environment stack.
+- **Notes:** This command only shows services defined in the compose file; it does not list all containers on the host.
+
 ## Diagnosing
 
 ### Watch the logs of running services
@@ -54,6 +131,13 @@ docker compose logs -f
 
 ### List containers including stopped ones
 <!-- sig: 382985639a8e -->
+<!-- sig: daafc5f28e03 -->
+<!-- sig: b512dcc897c1 -->
+<!-- sig: 8f84cb52b36d -->
+<!-- sig: 6543b719d111 -->
+<!-- sig: 41245aef0116 -->
+<!-- sig: c378547534cf -->
+<!-- sig: 9ec7bdb2536c -->
 
 ```bash
 docker ps -a
@@ -65,6 +149,19 @@ docker ps -a
 
 ### Get a shell inside a running container
 <!-- sig: 5823b14fb2bc -->
+<!-- sig: 4db04e9306b8 -->
+<!-- sig: 3ae0beb96715 -->
+<!-- sig: 79630ff4b48d -->
+<!-- sig: 61d162803d81 -->
+<!-- sig: 904a127b3d3a -->
+<!-- sig: 78ee9a05a5e1 -->
+<!-- sig: 1b62d9f6fd0d -->
+<!-- sig: 1e6903ec2a28 -->
+<!-- sig: 44a1a591287e -->
+<!-- sig: c7f04439cca9 -->
+<!-- sig: 12df4fdf6ecd -->
+<!-- sig: 73e96915d70f -->
+<!-- sig: 3cb59a4a1753 -->
 
 ```bash
 docker exec -it backend bash
@@ -73,6 +170,55 @@ docker exec -it backend bash
 - **What it does:** Runs a command in an existing container with an interactive TTY (`-it`).
 - **Why:** Inspect the real filesystem, env vars and network from inside the container instead of guessing.
 - **Notes:** Needs a TTY, so it cannot run in a plain non-interactive shell — use `docker exec <name> <cmd>` without `-it` there. Slim images often have no `bash`; fall back to `sh`.
+
+### Determine the size of a specific image
+<!-- sig: 7717df2f8708 -->
+
+```bash
+docker image inspect ei-collectors-us31-verify --format '{{.Size}}'
+```
+
+- **What it does:** This command inspects the ei-collectors-us31-verify image and outputs only its size in bytes.
+- **Why:** It provides a quick, machine-readable metric of the image size without needing to run a full container or use other size-related commands.
+- **Example:** docker image inspect ei-collectors-us31-verify --format '{{.Size}}'
+- **Notes:** The output is raw bytes, which may need further processing (like piping to awk) to be human-readable.
+
+### Extract the running docker daemon version
+<!-- sig: 4689f2fdefd6 -->
+<!-- sig: 65c9f7e86ab0 -->
+
+```bash
+docker info --format '{{.ServerVersion}}' '2>&1'
+```
+
+- **What it does:** Retrieves detailed information about the Docker daemon and formats the output to show only the server version string.
+- **Why:** This isolates the version number, which is cleaner for scripting or logging than the full, verbose output of `docker info`.
+- **Example:** docker info --format '{{.ServerVersion}}' '2>&1' to check the daemon version in a CI script.
+- **Notes:** The '2>&1' redirects standard error to standard output, ensuring the version string is captured even if the daemon prints warnings to stderr.
+
+### Extract environment variables from a container
+<!-- sig: 4b7bf9d04ac7 -->
+
+```bash
+docker inspect rollup-test --format '{{json .Config.Env}}'
+```
+
+- **What it does:** Retrieves the full JSON representation of the environment variables set for the container named rollup-test. The output is then piped to tr to replace commas with newlines.
+- **Why:** This provides a clean, line-by-line list of all environment variables configured for a specific container instance, which is easier to parse than a single JSON string.
+- **Example:** docker inspect rollup-test --format '{{json .Config.Env}}' | tr ',' '\n'
+- **Notes:** The output format string must correctly reference the desired field, in this case, the environment variables within the container's configuration.
+
+### Extract all environment variables from a container
+<!-- sig: 882f28138eea -->
+
+```bash
+docker inspect sys_db_postgres --format '{{range .Config.Env}}{{println .}}{{end}}'
+```
+
+- **What it does:** This command uses docker inspect to query the sys_db_postgres container and formats the output to list every environment variable defined in its configuration.
+- **Why:** It is a precise way to dump the entire set of environment variables set within a running container, which is necessary for debugging configuration issues.
+- **Example:** PW=$(docker inspect sys_db_postgres --format '{{range .Config.Env}}{{println .}}{{end}}')
+- **Notes:** The output is a multi-line string containing each environment variable on a new line, which is then captured into the variable PW.
 
 ## Housekeeping
 
@@ -86,3 +232,43 @@ docker image prune -f
 - **What it does:** Deletes dangling images (untagged layers) without prompting (`-f`).
 - **Why:** Repeated builds leave gigabytes of orphaned layers behind.
 - **Notes:** `-a` prunes *all* images not used by a container, which means the next build re-downloads everything. `docker system prune` goes further and can remove networks and build cache — check what it lists before confirming.
+
+### Force remove multiple local images
+<!-- sig: 8c32f5247015 -->
+
+```bash
+docker rmi -f ei-collectors-us31-verify ei-collectors-us31-verify2
+```
+
+- **What it does:** Forces the removal (-f) of two specified local Docker images, ei-collectors-us31-verify and ei-collectors-us31-verify2.
+- **Why:** This ensures that dangling or outdated images are completely removed from the local image cache, which is necessary before attempting a clean rebuild or deployment.
+- **Example:** docker rmi -f ei-collectors-us31-verify ei-collectors-us31-verify2
+- **Notes:** The redirection '2>&1' in the original command is for piping stderr to stdout, but the core action is the 'docker rmi' command itself.
+
+### Forcefully remove a stopped container
+<!-- sig: c68f27ab7787 -->
+<!-- sig: cdbb2a6f4d95 -->
+
+```bash
+docker rm -f us09-verify
+```
+
+- **What it does:** Stops and removes the container named us09-verify, ignoring standard output and standard error streams.
+- **Why:** This ensures the container is removed even if it is running or has associated output streams that would normally cause the command to fail or print noise.
+- **Example:** docker rm -f us09-verify
+- **Notes:** The redirection to /dev/null is used to suppress all output from the command, making it suitable for scripting.
+
+## Building images
+
+### Build and tag a Docker image from the current directory
+<!-- sig: 5b5b2e3b821d -->
+<!-- sig: 86faba8c28ec -->
+
+```bash
+docker build -t ei-collectors-us31-verify .
+```
+
+- **What it does:** Builds a Docker image using the Dockerfile in the current directory and tags the resulting image as ei-collectors-us31-verify.
+- **Why:** This command encapsulates the entire build process into a single, traceable step, ensuring the correct tag is applied immediately.
+- **Example:** docker build -t ei-collectors-us31-verify .
+- **Notes:** The redirection '2>&1' in the original execution context ensures stderr is merged into stdout, which is useful for piping the output to another command like 'tail'.
