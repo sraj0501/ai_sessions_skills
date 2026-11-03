@@ -116,7 +116,40 @@ def poll(runtime=None, codex_home=None):
                     pending.add(item_id)
                     continue
                 pending.discard(item_id)
+                import playback_capture
+                played = False
+                if item.get("status") in ("completed", "failed") and item.get("type") == "commandExecution":
+                    for action in item.get("commandActions", []):
+                        command = action.get("command") if isinstance(action, dict) else None
+                        if isinstance(command, str) and command.strip():
+                            played = playback_capture.capture({
+                                "tool_name": "exec_command", "tool_input": {"command": command},
+                                "tool_response": item, "session_id": thread,
+                                "cwd": item.get("cwd", ""),
+                                "exit_code": item.get("exitCode", 1 if item.get("status") == "failed" else 0),
+                            }, "codex-ide") or played
+                if played:
+                    continue
+                wal_by_command = {}
+                if item.get("status") in ("completed", "failed") and item.get("type") == "commandExecution":
+                    import wal
+                    for action in item.get("commandActions", []):
+                        command = action.get("command") if isinstance(action, dict) else None
+                        if isinstance(command, str) and command.strip():
+                            event = wal.append({
+                                "tool_name": "exec_command", "tool_input": {"command": command},
+                                "tool_response": item, "session_id": thread,
+                                "cwd": item.get("cwd", ""),
+                                "exit_code": item.get("exitCode", 1 if item.get("status") == "failed" else 0),
+                            }, "codex-ide", source="ide-history")
+                            wal_by_command.setdefault(command, event)
                 parsed = records(item, thread)
+                for record in parsed:
+                    event = wal_by_command.get(record.get("full_command"))
+                    if event:
+                        record["wal_event_id"] = event["event_id"]
+                        record["wal_machine_id"] = event["machine_id"]
+                        record["normalizer_version"] = 1
                 if parsed:
                     capture.enqueue(parsed)
                     count += len(parsed)

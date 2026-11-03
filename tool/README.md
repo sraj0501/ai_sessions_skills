@@ -89,8 +89,8 @@ file works on any OS.
 | Harness | Capture mechanism | File written |
 |---|---|---|
 | Devin CLI | `PostToolUse` / `SessionStart` / `SessionEnd` hooks | `~/.config/devin/config.json` (merged) |
-| Claude Code | `PostToolUse`, `PostToolUseFailure`, session hooks | `~/.claude/settings.json` (merged) |
-| Codex CLI | `PostToolUse` + session hooks, `[features] hooks = true` | `~/.codex/hooks.json`, `~/.codex/config.toml` |
+| Claude Code CLI and desktop Code | `PostToolUse`, `PostToolUseFailure`, session hooks | `~/.claude/settings.json` (merged) |
+| Codex CLI and local ChatGPT Work/Codex | `PostToolUse` + session hooks, `[features] hooks = true` | `~/.codex/hooks.json`, `~/.codex/config.toml` |
 | Copilot CLI | `postToolUse` + session hooks (harness name via `env`) | `~/.copilot/hooks/ai-session-skills.json` |
 | Cursor | `afterShellExecution`, `postToolUse`, session hooks | `~/.cursor/hooks.json` (merged) |
 | OpenCode | plugin (`tool.execute.before/after`, `session.idle`) | `~/.config/opencode/plugin/ai-session-skills.js` |
@@ -175,16 +175,18 @@ python3 tool/bin/capture.py --sig 'git fetch upstream && git merge upstream/stag
 So `git commit -m "fix a"` and `git commit -m "fix b"` are one action, while
 `npm run test` and `npm run build` stay distinct. Seen signatures are dropped
 at capture time — they never reach the queue and the writer is never invoked
-for them. The source of truth is the `<!-- sig: ... -->` markers in the
-markdown; `.runtime/seen.txt` is a cache that `bin/sync_seen.py` rebuilds from
-them. Deleting a sig marker makes that action get documented again.
+for them, but every delivered event is first retained in the WAL. The raw
+evidence source of truth is `.runtime/wal/`; `<!-- sig: ... -->` markers in
+Markdown drive the current dedupe view. `.runtime/seen.txt` is a cache that
+`bin/sync_seen.py` rebuilds from those markers.
 
 ### Why it cannot disturb your agent
 
 - The capture hook prints nothing to stdout, so nothing enters the agent's
   context and no tokens are spent.
-- It catches every exception and always exits 0, so it can never block or fail
-  a tool call.
+- A successful hook return means the raw event was durably published. A WAL
+  failure returns nonzero so capture is not falsely acknowledged; the harness
+  decides whether that interrupts its tool call.
 - Watcher and writer run in their own process groups and survive session exit.
 - The writer is a separate agent session with a recursion guard
   (`AI_SKILLS_DISTILLER=1`), so it never captures itself.
@@ -204,6 +206,7 @@ on Windows). Resolution order: `$AI_SKILLS_CONFIG` → user config →
 | Key | Default | Meaning |
 |---|---|---|
 | `kb_dir` | `..` | Knowledge base location (relative to the config file) |
+| `wal_dir` | `.runtime/wal` via runtime | Optional external WAL location, relative to the config file |
 | `auto_commit` / `auto_push` | `true` / `false` | Commit each batch locally; never push |
 | `watcher.poll_seconds` | `45` | Queue poll interval |
 | `watcher.quiet_seconds` | `120` | Agent-idle time before writing |
@@ -434,10 +437,29 @@ Environment overrides:
 
 ## Operating it
 
+### Resolution playback
+
+Run `python3 tool/bin/playback.py start "issue title"` before a troubleshooting
+session. The agent records its visible intent, observation, decision, and
+verified outcome with `playback.py note KIND "text"`. Run `playback.py stop`
+after verification; `playback.py status` shows the output path. `stop` returns
+after saving the state and starts detached rendering. `playback.py finalize`
+retries rendering if needed. Use `--session ID` throughout when the harness
+does not expose a session ID in the environment, and optionally `--harness NAME`
+at start to restrict the recording.
+
+Playback stores every matching tool event in order, including repeated full
+commands, tool output, exit status, and file actions. The agent's evaluations
+are preserved verbatim as notes. Missing evidence is labelled `Not recorded`.
+Playback does not use the knowledge writer, dedupe, or a local model. The event
+spool in `.runtime/playback/` and Markdown in `playbacks/` are local and
+gitignored; never commit them because they may contain private data.
+
 ### VS Code command capture
 
-`capture.codex_ide: true` enables a fallback for IDE sessions whose hooks do
-not fire. The watcher reads completed `commandExecution` items from Codex's
+`capture.codex_ide: true` enables an opt-in fallback for IDE sessions whose hooks do
+not fire. It is disabled by default because polling alongside working hooks
+would record the same command twice in the WAL. The watcher reads completed `commandExecution` items from Codex's
 local SQLite history in read-only mode and records them as `codex-ide` in the
 session log. It reads original commands, not chat messages or tool output.
 CLI and subagent sessions are excluded; ordinary hook capture still serves
@@ -465,6 +487,49 @@ Browse `knowledge/README.md`, or search entries with
 to narrow or expand results. The search reads the Markdown directly, so there
 is no separate search index to rebuild.
 
+### Agent-callable search
+
+`python tool/install_search.py` registers the read-only search and playback
+MCP server at user scope in detected Codex, Claude Code, Claude Desktop Chat,
+Copilot CLI, Cursor, and OpenCode installations. It exposes
+`search_command_knowledge`, `list_resolution_playbacks`, and
+`read_resolution_playback`. Use `--only`
+or `--dry-run` as needed. Restart the harness and ask it to search a command;
+Claude Code can also show the connection with `/mcp`, and Codex with
+`codex mcp list`. The stdio server is `tool/bin/search_mcp.py` and uses only
+Python's standard library. It returns full completed entries with source
+paths and line numbers. Command search does not read the WAL. Playback tools
+return exact raw recorded events and output, which may contain private data.
+
+Other MCP-compatible local harnesses can start the same stdio server with
+their own MCP configuration. HTTP-based harnesses can use the same functions
+via `python tool/bin/search_http.py`, a read-only OpenAPI server. Open WebUI
+can connect its `http://127.0.0.1:8766/openapi.json` specification when the
+backend can reach that address. The default bind is loopback. For a
+non-loopback bind, set `AI_SKILLS_SEARCH_TOKEN` and configure Bearer
+authentication in the client.
+
+`python tool/bin/ask.py --url URL --model MODEL "How do I ...?"`
+uses the OpenAI-compatible Chat Completions function-calling protocol with
+the same search core. Ollama's local URL is
+`http://localhost:11434/v1/chat/completions`; Open WebUI's is
+`http://HOST:PORT/api/chat/completions`.
+`--api-key-env ENV_NAME` reads a Bearer token without
+putting it in source or command arguments.
+
+`python tool/bin/playback_chat.py --url URL --model MODEL --interactive`
+opens a chat conversation about the current or last resolution playback. Use
+`--id ID` for an earlier recording. The default prompt walks through each
+recorded step. A read-only timeline tool returns original event payloads in
+pages with stable step numbers; follow `next_start` to retrieve the full
+record. Session metadata is archived per recording under `.runtime/playback/`
+so earlier playbacks remain discoverable after a new recording starts. The
+model's answers are explanations of evidence, not modifications or
+distillation of playback. Raw output can contain private data: run this only
+with a trusted model endpoint. A cloud harness sends retrieved steps to its
+model. A model server cannot record shell actions on its own; the coding
+harness must emit the capture events.
+
 ```bash
 python3 tool/bin/doctor.py                 # platform, wiring, backend, queue, live test
 python3 tool/bin/log.py                    # what was captured, and what was skipped
@@ -478,8 +543,55 @@ python3 tool/bin/sync_seen.py              # rebuild the dedupe cache
 ls <kb>/.runtime/failed/                   # batches that never completed
 ```
 
-`.runtime/` holds the queue, dedupe cache, logs, watcher pidfile and parked
-batches. It is gitignored and safe to delete.
+`.runtime/` holds the queue, dedupe cache, logs, watcher pidfile, parked
+batches, and the immutable WAL in `.runtime/wal/`. It is gitignored. **Back up
+the WAL before removing this directory**: deleting it loses the raw evidence
+needed for rebuild and later model review.
+
+### WAL, review, and team exchange
+
+Every eligible hook event is written as a checksummed, immutable local event
+file before normal signature filtering and deduplication. The WAL preserves
+the original payload, available output and exit status, repeats, failures,
+and context delivered by the harness. A hook returns nonzero if durable WAL
+publication fails. Playback remains a separate workflow.
+
+```bash
+python3 tool/bin/wal.py inspect
+python3 tool/bin/wal.py verify
+python3 tool/bin/wal_rebuild.py --output /path/to/proposal --writer stub
+python3 tool/bin/wal_rebuild.py --output /path/to/model-proposal --writer model
+python3 tool/bin/wal_review.py diff --current /path/to/knowledge --proposal /path/to/model-proposal
+python3 tool/bin/wal_review.py promote --current /path/to/knowledge --proposal /path/to/model-proposal --approved-sha SHA_FROM_DIFF
+```
+
+The model rebuild uses the configured text backend and passes recorded
+evidence to the entry prompt. It writes a fresh directory and a provenance
+manifest; it never overwrites a trial. Promotion overlays proposal Markdown
+after an explicit digest check and backs up replaced files. Older knowledge
+that predates the WAL remains in current files unless a proposal replaces
+those files, so inspect the diff before promotion.
+
+For team consolidation, select event IDs in a local text file, one per line.
+The exported bundle omits raw payloads, outputs, task text, and playback.
+It rejects common secret and absolute path patterns, but **review the bundle manually before
+sending it**. Keep bundles and inboxes under gitignored `.runtime/` or outside
+the repository. Use `wal_team.py export --allow ids.txt --output
+.runtime/team/bundle.json` on each client, then `ingest --bundle
+.runtime/team/bundle.json --inbox .runtime/team/inbox` centrally.
+`report --inbox .runtime/team/inbox` groups candidates by signature for meaning
+review; `propose --inbox .runtime/team/inbox --output .runtime/team/proposal
+--writer model` drafts a separate
+central knowledge view. Ingest retries are idempotent. Publish only reviewed
+Markdown through one central repository workflow; there is no automatic push.
+
+The local WAL can contain secrets and private output. Keep it out of Git and
+back it up to protected encrypted storage under a retention policy. The tool
+does not prune or upload it, and a machine ID must not be copied to another
+installation. Set `AI_SKILLS_WAL` to an external directory, or configure
+`wal_dir` relative to the config file, if the log must survive loss of the
+knowledge-base directory. Keep that directory access controlled and backed up.
+The [design and limits](../WAL_DESIGN.md) explain the contract.
 
 A watcher reads `watcher.*` timings once at startup, so new timings apply to
 the next watcher — stop the running one if you need them immediately.

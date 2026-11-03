@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Harness-agnostic action capture for ai-session-skills.
 
-Reads a tool-call event from stdin (JSON) or from the command line, reduces the
-action to a stable *signature*, and appends only never-seen-before signatures to
-`<kb>/.runtime/pending.jsonl`.
+Reads a tool-call event from stdin (JSON) or from the command line, durably
+records it in the WAL, reduces the action to a stable *signature*, and appends
+only never-seen-before signatures to `<kb>/.runtime/pending.jsonl`.
 
 It does not care which agent harness produced the event. Rather than
 enumerating harnesses, it duck-types the payload: it looks for a tool name
@@ -13,9 +13,9 @@ Copilot CLI (`bash`, camelCase keys), OpenCode (`bash` via plugin), Cursor and
 anything else that passes a tool name plus arguments.
 
 Design constraints (in priority order):
-  1. Never block the agent   -> always exits 0, catches every exception.
+  1. Acknowledge capture only after the WAL event is durable.
   2. Never spend tokens      -> prints nothing on stdout in hook mode.
-  3. Never grow unboundedly  -> signature dedupe + pending cap.
+  3. Bound the derived queue -> signature dedupe + pending cap.
 
 Usage:
     capture.py --harness claude              # hook mode, payload on stdin
@@ -239,6 +239,9 @@ def _succeeded(payload: dict) -> bool:
                 "result", "output", "response"):
         node = payload.get(key)
         if isinstance(node, dict):
+            for code_key in ("exit_code", "exitCode", "status_code"):
+                if isinstance(node.get(code_key), int):
+                    return node[code_key] == 0
             if "success" in node:
                 return bool(node["success"])
             for rk in ("result_type", "resultType", "status", "type"):
@@ -449,26 +452,39 @@ def main() -> int:
     # Recursion guard: the writer is itself an agent session.
     if os.environ.get("AI_SKILLS_DISTILLER"):
         return 0
-    if cfg.capture_off():
-        return 0
 
     if opts["command"]:
-        payload = {"tool_name": "exec", "tool_input": {"command": opts["command"]}}
+        payloads = [{"tool_name": "exec", "tool_input": {"command": opts["command"]}}]
     else:
         raw = sys.stdin.read()
-        payload = json.loads(raw) if raw.strip() else {}
-        if isinstance(payload, list) and payload:
-            payload = payload[0]
+        parsed = json.loads(raw) if raw.strip() else {}
+        payloads = parsed if isinstance(parsed, list) else [parsed]
 
-    records = records_from_payload(payload, opts["harness"])
-    if not records:
-        # Worth logging: it answers "why was that command not captured?".
-        attempted = _first(_as_dict(_first(payload, TOOL_INPUT_KEYS)) or payload,
-                           COMMAND_KEYS)
-        if attempted:
-            cfg.session_log("ignored", detail=str(attempted)[:160],
-                            harness=opts["harness"])
-    added = enqueue(records)
+    added = 0
+    for payload in payloads:
+        if not isinstance(payload, dict):
+            raise ValueError("capture payload must be a JSON object")
+        # Playback keeps the original event before the ordinary KB path.
+        import playback_capture
+        if playback_capture.capture(payload, opts["harness"]):
+            continue
+        if cfg.capture_off():
+            continue
+
+        import wal
+        event = wal.append(payload, opts["harness"])
+        records = records_from_payload(payload, opts["harness"])
+        for record in records:
+            record["wal_event_id"] = event["event_id"]
+            record["wal_machine_id"] = event["machine_id"]
+            record["normalizer_version"] = 1
+        if not records:
+            attempted = _first(_as_dict(_first(payload, TOOL_INPUT_KEYS)) or payload,
+                               COMMAND_KEYS)
+            if attempted:
+                cfg.session_log("ignored", detail=str(attempted)[:160],
+                                harness=opts["harness"])
+        added += enqueue(records)
     if opts["verbose"]:
         print("captured %d new action(s)" % added)
     return 0
@@ -477,5 +493,7 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception:  # never block the agent, never surface an error
-        sys.exit(0)
+    except Exception as exc:
+        # A failed durable append must never be acknowledged as captured.
+        print("capture failed: %s" % exc, file=sys.stderr)
+        sys.exit(1)

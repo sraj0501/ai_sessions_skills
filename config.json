@@ -19,8 +19,8 @@
   },
 
   "capture": {
-    "codex_ide": true,
-    "codex_sources": ["vscode", "cli"],
+    "codex_ide": false,
+    "codex_sources": ["vscode"],
     "max_pending_records": 400,
     "skip_binaries": []
   },

@@ -16,6 +16,7 @@ identically on Windows, macOS and Linux.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import subprocess
@@ -30,6 +31,25 @@ import kb       # noqa: E402
 import procs    # noqa: E402
 
 SIG_RE = re.compile(r"<!--\s*sig:\s*([0-9a-f]{6,40})\s*-->")
+WRITER_VERSION = 1
+
+
+def writer_provenance(runtime: Path, record: dict, backend: dict,
+                      mode: str, outcome: str) -> None:
+    prompt = cfg.TOOL_ROOT / "prompts" / ("ENTRY_PROMPT.md" if mode == "text"
+                                         else "DISTILL_PROMPT.md")
+    item = {"schema": 1, "timestamp": time.time(),
+            "machine_id": record.get("wal_machine_id"),
+            "event_id": record.get("wal_event_id"), "sig": record.get("sig"),
+            "normalizer_version": record.get("normalizer_version"),
+            "writer_version": WRITER_VERSION, "writer_mode": mode,
+            "backend": backend.get("name"), "model": backend.get("model"),
+            "prompt_sha256": hashlib.sha256(prompt.read_bytes()).hexdigest(),
+            "outcome": outcome}
+    with (runtime / "writer-provenance.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(item, ensure_ascii=False) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
 
 
 def log(runtime: Path, message: str) -> None:
@@ -128,6 +148,14 @@ def entry_prompt(record: dict, existing_sections: list[str] | None = None) -> st
     if record.get("ok") is False:
         lines.append("This command FAILED when it was run. Document it anyway and "
                      "note the likely failure mode.")
+    if record.get("wal_evidence") is not None:
+        lines.append("\nRecorded WAL evidence (null means unavailable; do not infer "
+                     "missing output or private reasoning):\n```json\n%s\n```" %
+                     json.dumps(record["wal_evidence"], ensure_ascii=False))
+    if record.get("team_variants"):
+        lines.append("\nReviewed team command variants for this action (preserve distinct "
+                     "useful examples):\n```json\n%s\n```" %
+                     json.dumps(record["team_variants"], ensure_ascii=False))
     lines.append("\nReply with the JSON object now.")
     return "\n".join(lines)
 
@@ -465,6 +493,7 @@ def distill_text(kb_dir: Path, runtime: Path, records: list[dict], backend: dict
             failed.append(record)
         else:
             done_sigs.add(record.get("sig"))
+            writer_provenance(runtime, record, backend, "text", outcome)
     log(runtime, "distilled: %(new)d new, %(merged)d merged, %(skipped)d skipped, "
                  "%(duplicate)d already known, %(failed)d failed" % tally)
     return sum(tally.values()) - tally["failed"], failed
@@ -626,6 +655,10 @@ def main() -> int:
                 log(runtime, "gave up after %d attempts; batch parked in "
                              "failed/batch-%s.jsonl and signatures released" % (attempt, stamp))
             return 0
+
+        if mode == "agent":
+            for record in records:
+                writer_provenance(runtime, record, backend, "agent", "documented")
 
         batch.unlink(missing_ok=True)
         attempts_file.unlink(missing_ok=True)

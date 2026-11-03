@@ -26,6 +26,8 @@ Get-ChildItem -Force -LiteralPath 'D:\git\_apps\games' | Select-Object Name,Full
 <!-- sig: 43c4c93e7df7 -->
 <!-- sig: 306f044b3015 -->
 <!-- sig: 49c449cb41d7 -->
+<!-- sig: 1a639f9ab1f6 -->
+<!-- sig: 29c84a884a77 -->
 
 ```bash
 Select-Object 'Mode,Length,LastWriteTime,Name;'

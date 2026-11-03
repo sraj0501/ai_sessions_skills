@@ -1,171 +1,111 @@
-# Project Memory: Playback Next Steps
+# Project Memory: Resolution Playback
 
-## Status
+## Purpose
 
-Playback is planned but not implemented. It is a separate, manually activated
-feature and must not change the normal command-knowledge workflow.
+Playback is a manually activated teaching record of one issue resolution. It
+preserves every observed command and tool action in execution order, their
+outputs when supplied by the harness, and the primary agent's recorded visible
+evaluations. The resulting Markdown
+should let a junior developer understand what was tested, what the evidence
+showed, why the next step followed, and how the fix was verified.
 
-## Product contract
+Playback is separate from the command knowledge base. Its events bypass
+signature normalization, deduplication, the watcher writer, and all model
+distillation. The normal knowledge workflow operates when playback is inactive.
 
-- `playback start [title]` starts playback for the invoking agent thread only.
-- `playback status` reports `inactive`, `recording`, `processing`, `complete`,
-  or `failed` and shows the output path when available.
-- `playback stop` stops recording immediately, queues asynchronous
-  finalization, and returns without waiting for a local model.
-- Playback control commands are excluded from the recorded timeline.
-- When playback is inactive, no playback instructions, recording, worker, or
-  local-model processing runs. Existing knowledge capture is unchanged.
-- Normal `session.py start/stop` controls for the knowledge pipeline remain
-  independent from playback controls.
+## Current implementation
 
-## Fidelity contract
+- `tool/bin/playback.py`: `start`, `note`, `stop`, `status`, and `finalize`.
+- `tool/bin/playback_capture.py`: stores the original matching hook payload.
+- `tool/bin/playback_worker.py`: renders a local Markdown timeline after stop.
+- `tool/bin/capture.py`: sends matching events to playback before knowledge
+  normalization, then skips knowledge capture for those events.
+- `tool/bin/ide_capture.py`: sends completed Codex IDE command items to playback
+  when hook delivery is unavailable.
+- `tool/skill/BODY.md`: tells the primary agent to record visible intent,
+  observation, decision, and outcome notes verbatim during playback.
+- `tool/bin/playback_query.py`: lists stored recordings and returns exact
+  ordered event pages with stable step numbers. Per-recording state is kept
+  under `.runtime/playback/<id>/state.json` after newer sessions begin.
+- `tool/bin/search_mcp.py`: read-only MCP tools for command knowledge search,
+  playback discovery, and exact playback reading. `tool/install_search.py`
+  registers the server at user scope with detected local coding harnesses and
+  Claude Desktop Chat.
+- `tool/bin/search_http.py`: HTTP OpenAPI view over the same read-only search
+  and playback functions for harnesses that cannot launch stdio MCP.
+- `tool/bin/chat_backend.py`, `ask.py`, and `playback_chat.py`: a single
+  OpenAI-compatible Chat Completions function-calling client for model servers;
+  playback retains conversation history for follow-up questions.
 
-The primary, capable model is the authoritative author of playback meaning.
-While playback is active, it must provide short, visible summaries around
-consequential actions:
+The raw event spool is in `.runtime/playback/`; finished files are in
+`playbacks/`. Both locations are gitignored because exact commands and outputs
+may contain private data. Playback files are never committed automatically.
 
-1. **Intent:** why the next command or tool action is being run.
-2. **Observation:** what the result showed.
-3. **Decision:** what was concluded and what should happen next.
-4. **Outcome:** how the issue was fixed and how the fix was verified.
+## Fidelity rules
 
-Private chain-of-thought is neither available nor recorded. Playback captures
-the primary model's visible reasoning summaries verbatim. Ollama, llama.cpp,
-or another local model may organize and label that text, but must not invent,
-paraphrase, or fill missing reasoning. Every rendered reasoning statement must
-reference a source event and be validated as an exact transcript substring.
-Missing reasoning is rendered as `Not recorded`.
+- Never normalize, truncate, or deduplicate playback commands or outputs.
+- Preserve repeated actions and the order in which they occurred.
+- Treat primary agent notes as the only source for evaluation and reasoning.
+  Private chain of thought is unavailable; never invent or paraphrase it.
+- Mark missing output, intent, observation, decision, or outcome as
+  `Not recorded` where applicable.
+- Keep playback control commands out of the timeline.
+- Bind a recording to the invoking session when a session ID is available.
 
-Harnesses that cannot expose visible assistant messages may provide a clearly
-labelled command-only playback, but must not claim full-fidelity reasoning.
+## Remaining verification and improvements
 
-## Recorded content
+- **TODO — live harness embedding test remains open.** Install the updated
+  hooks and skill, restart each harness, trust hooks where required, resolve a
+  reproducible failing issue, and compare the agent session against the
+  rendered playback event by event. Check full output, stable session ID,
+  verbatim intent/observation/decision/outcome notes, failed commands, repeated
+  commands, and the verified fix. The Codex IDE history format is internal and
+  may omit visible agent messages or command output.
+- Capture visible agent messages automatically where a harness exposes them,
+  while excluding private reasoning records. Manual `note` commands currently
+  supply the primary agent's evaluation.
+- Strengthen concurrent start/stop and late-hook handling beyond the current
+  unique-file spool and atomic file replacement.
+- Keep the current event transcript complete even if a future renderer offers
+  navigation, grouping, or teaching annotations.
+- Playback query tools are read-only. Model explanations are derived from
+  retrieved steps and do not alter the event log or rendered transcript.
+- A model server is not a coding harness. The chat client can read existing
+  playback through a compatible chat endpoint; recording new actions requires
+  the calling harness to deliver capture events. Local coding harnesses can
+  use MCP or HTTP OpenAPI to query playback.
 
-Each playback preserves:
+Tests: `tool/tests/test_playback.py` and `tool/tests/test_portable.py`.
+The protocol-based playback client has a real Ollama tool-calling smoke check in
+`tool/tests/smoke_chat_playback.py`; it passed with `qwen3.5:9b` on this
+machine. That verifies reading and explaining a synthetic recording, not
+delivery of capture events from a live coding harness.
 
-- Complete original commands, without signature normalization or truncation.
-- Repeated commands and their exact execution order.
-- Timestamp, harness, session, project, working directory, and exit status.
-- Concise command-result evidence.
-- Material patch, file-edit, search, and other tool events.
-- Primary-authored intent, observation, decision, outcome, and verification.
+## Locked knowledge log and team decisions
 
-The durable result is one Markdown file per playback, for example:
+The accepted contract and implementation status are in
+[WAL_DESIGN.md](WAL_DESIGN.md). This applies to the reusable command knowledge
+base, not to resolution playback.
 
-```text
-playbacks/2026-09-09_21-14-03_fix-authentication-timeout.md
-```
+- Append each harness-delivered tool event to a durable, immutable local log
+  **before** filtering, normalization, signature deduplication, or writing.
+  Keep repeats, failures, skipped actions, original payloads, full commands,
+  results, task context, and visible evaluations when supplied. Mark missing
+  evidence as missing; never invent private reasoning.
+- Treat the event log as the source of truth and Markdown knowledge as a
+  rebuildable view. Retain stable event IDs, schema and provenance. A selected
+  future model and versioned prompt may reevaluate the same evidence and
+  propose a new view. Regenerated prose need not be identical, and omitted
+  hook data or events captured before the log exists cannot be recovered.
+- Keep raw logs local, access controlled, backed up, and outside Git. Submit
+  only policy-approved, sanitized, idempotent candidate envelopes to the team.
+  A central processor deduplicates by signature **and meaning** and publishes
+  reviewed knowledge through one writer. Individual clients pull that view.
+- Keep playback complete and separate. Its events never pass through the
+  reusable knowledge writer or any distillation step.
 
-The file contains metadata, a short authoritative outcome, and a chronological
-timeline. Each timeline entry contains only the fields needed to understand
-the progression: `Why`, exact `Command` or tool action, `Result`, `Understood`,
-and `Next`.
-
-Playback files should be local and gitignored by default because exact commands
-and outputs may contain credentials or sensitive paths. They must never be
-automatically committed or pushed.
-
-## Asynchronous architecture
-
-```text
-existing post-tool hook
-        |
-        +-- existing knowledge capture (unchanged)
-        |
-        +-- fast playback event spool, only when active
-                        |
-                        +-- detached playback worker
-                                |
-                                +-- Ollama / llama.cpp formatting
-                                |
-                                +-- one Markdown playback file
-```
-
-The hook hot path performs no model call. It writes a small immutable event to
-`.runtime/playback-spool/` and exits. Unique event files avoid a contested
-append lock; harness ordinals determine order when available, with timestamp
-and process sequence as fallbacks.
-
-The detached worker performs transcript association, local-model formatting,
-validation, retries, and final rendering. If the local model is unavailable,
-the main thread remains unaffected and raw events remain queued. After the
-retry limit, the worker may produce a deterministic command-only playback with
-unavailable fields explicitly marked.
-
-## Session behavior
-
-- Starting playback binds it to the invoking harness session. Other active
-  agent sessions remain unaffected.
-- Only the bound session's events are accepted.
-- Stopping moves the recording to `processing`; it does not synchronously
-  render the file.
-- A short settling period may capture the primary model's closing visible
-  summary before finalization.
-- Interrupted sessions retain their spool and can be resumed, finalized as
-  partial, or explicitly discarded later.
-
-## Local-model role
-
-Refactor the existing local writer transport into a shared module and support:
-
-- Ollama's local HTTP API.
-- llama.cpp's OpenAI-compatible local server.
-- A configurable generic local HTTP endpoint.
-
-Use deterministic generation and validated structured output. The local model
-may classify or arrange primary-authored text, but final prose must remain
-extractive. Semantic summaries that are not authored by the primary model are
-not accepted.
-
-## Planned implementation
-
-### New files
-
-- `tool/bin/playback.py`: manual CLI and playback state transitions.
-- `tool/bin/playback_capture.py`: fast, lossless event spooling.
-- `tool/bin/playback_worker.py`: detached processing and final rendering.
-- `tool/bin/local_model.py`: shared Ollama, llama.cpp, and local HTTP client.
-- `tool/prompts/PLAYBACK_EVENT_PROMPT.md`: extractive event classification.
-- `tool/prompts/PLAYBACK_SUMMARY_PROMPT.md`: extractive final organization.
-- `tool/tests/test_playback.py`: lifecycle, fidelity, and concurrency tests.
-
-### Existing files to update
-
-- `tool/bin/capture.py`: spool original playback payloads before knowledge
-  normalization, truncation, and deduplication.
-- `tool/bin/session.py`: supervise the playback worker without coupling the two
-  feature lifecycles.
-- `tool/bin/ide_capture.py`: read ordered visible agent messages and supported
-  tool results; never ingest private `reasoning` records.
-- `tool/bin/cfg.py`: add playback paths, limits, and local backend settings.
-- `tool/bin/doctor.py`: report playback state, queue, worker, and model health.
-- `tool/install.py`: install the playback-aware skill and required hooks.
-- `tool/skill/BODY.md` and `tool/README.md`: document activation, fidelity,
-  privacy, failure behavior, and commands.
-
-## Implementation order
-
-1. Add playback configuration, state machine, CLI, and session binding.
-2. Add lossless event spooling before the existing knowledge normalization.
-3. Add deterministic command-only rendering and crash recovery.
-4. Add detached worker lifecycle with immediate `start` and `stop` returns.
-5. Extract local-model transport and add Ollama and llama.cpp backends.
-6. Add primary-authored reasoning capture and exact-substring validation.
-7. Add Codex visible-transcript enrichment, followed by other harness adapters.
-8. Update installation, diagnostics, documentation, and installed skill text.
-9. Run unit tests and Windows/POSIX smoke tests.
-
-## Acceptance criteria
-
-- Playback changes model behavior only between `playback start` and
-  `playback stop` in the bound thread.
-- No Ollama or llama.cpp call occurs on the main hook or agent execution path.
-- Starting and stopping return immediately after state changes are persisted.
-- Commands are complete, ordered, repeated when actually repeated, and not
-  passed through knowledge deduplication.
-- Every reasoning claim is verbatim primary-model text with a source event.
-- Missing reasoning is disclosed instead of inferred by a smaller model.
-- Concurrent hooks and worker restarts cannot lose or reorder recorded events.
-- A completed recording produces exactly one durable Markdown artifact.
-- Existing knowledge capture, routing, distillation, pause controls, and files
-  behave exactly as before.
+The immutable local WAL, offline/model rebuild, review overlay, and explicit
+sanitized team candidate exchange are implemented. The queue still discards
+known signatures, but the WAL retains the original evidence. Live harness
+fidelity, a hosted sync service, and fully automatic semantic merging remain
+open.

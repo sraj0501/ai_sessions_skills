@@ -111,6 +111,53 @@ class TestHarnessLayout(unittest.TestCase):
             self.assertIn(spec["style"], ("devin", "claude", "plain"), harness)
 
 
+class TestPrimaryHooks(unittest.TestCase):
+    def test_codex_captures_all_tool_names_on_windows_with_history_fallback_enabled(self):
+        sys.path.insert(0, str(BIN.parent))
+        import install
+        with patch.object(install.cfg, "IS_WINDOWS", True), \
+                patch.object(install.cfg, "get", return_value=True):
+            groups = install.codex_patch()["hooks"]["PostToolUse"]
+        self.assertEqual(len(groups), 1)
+        self.assertNotIn("matcher", groups[0])
+        self.assertIn("capture", groups[0]["hooks"][0]["command"])
+
+    def test_claude_covers_powershell_and_failed_commands(self):
+        sys.path.insert(0, str(BIN.parent))
+        import install
+        hooks = install.claude_patch()["hooks"]
+        for event in ("PostToolUse", "PostToolUseFailure"):
+            self.assertIn("PowerShell", hooks[event][0]["matcher"])
+            self.assertIn("exec_command", hooks[event][0]["matcher"])
+
+    def test_nested_exit_code_marks_failed_shell_command(self):
+        rows = capture.records_from_payload({
+            "tool_name": "exec_command", "tool_input": {"command": "git status"},
+            "tool_response": {"exit_code": 1, "output": "fatal"},
+        }, "codex")
+        self.assertEqual(len(rows), 1)
+        self.assertFalse(rows[0]["ok"])
+
+    @unittest.skipUnless(os.name == "nt", "Windows GUI interpreter probe")
+    def test_windows_hook_command_receives_stdin_without_console(self):
+        sys.path.insert(0, str(BIN.parent))
+        import install
+        import wal
+        with tempfile.TemporaryDirectory() as tmp:
+            env = dict(os.environ, AI_SKILLS_KB=tmp)
+            env.pop("AI_SKILLS_CAPTURE_OFF", None)
+            payload = {"tool_name": "exec_command", "tool_input": {"command": "echo hook-probe"},
+                       "tool_response": {"exit_code": 0, "output": "hook-probe"}}
+            done = subprocess.run(install.hook_cmd("capture", "codex"),
+                                  input=json.dumps(payload), capture_output=True,
+                                  text=True, shell=True, env=env, timeout=15)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertEqual(done.stdout, "")
+            events = list(wal.events(Path(tmp) / ".runtime" / "wal"))
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[0]["payload"], payload)
+
+
 class TestHookLauncher(unittest.TestCase):
     def test_launcher_extension_matches_platform(self):
         suffix = ".cmd" if os.name == "nt" else ".sh"

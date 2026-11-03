@@ -36,7 +36,9 @@ DESCRIPTION = (
     "user asks how to do a CLI/git/docker/npm/python/shell task (\"how do I pull from "
     "upstream and merge\", \"what is the command for...\"), asks about their documented "
     "workflow, or wants to inspect/force/pause the capture pipeline (\"what did you "
-    "capture\", \"distill now\", \"session skills status\")."
+    "capture\", \"distill now\", \"session skills status\"), or asks to record or "
+    "review a full issue-resolution playback with every command, output, observation, "
+    "decision, and verified outcome for teaching."
 )
 
 
@@ -165,9 +167,9 @@ def claude_patch() -> dict:
     return {"hooks": {
         "SessionStart": [{"matcher": "", "hooks": [
             {"type": "command", "command": hook_cmd("session", "start", "claude"), "timeout": 5}]}],
-        "PostToolUse": [{"matcher": "Bash|Grep|Glob|Edit|MultiEdit|Write|NotebookEdit",
+        "PostToolUse": [{"matcher": "Bash|PowerShell|Grep|Glob|Edit|MultiEdit|Write|NotebookEdit|exec_command|apply_patch",
                          "hooks": [capture]}],
-        "PostToolUseFailure": [{"matcher": "Bash", "hooks": [dict(capture)]}],
+        "PostToolUseFailure": [{"matcher": "Bash|PowerShell|exec_command", "hooks": [dict(capture)]}],
         "SessionEnd": [{"matcher": "", "hooks": [
             {"type": "command", "command": hook_cmd("session", "end", "claude"), "timeout": 5}]}],
     }}
@@ -182,15 +184,13 @@ def codex_patch() -> dict:
             {"type": "command", "command": hook_cmd("session", "end", "codex"),
              "timeout": 5}]}],
     }
-    # Codex's Windows hook host can allocate a visible console for every
-    # command before our windowless child starts. When the read-only Codex
-    # history poller is enabled, use it as the per-command capture source.
-    if not (cfg.IS_WINDOWS and cfg.get("capture.codex_ide", False) is True):
-        hooks["PostToolUse"] = [{
-            "matcher": "Bash|Shell|Grep|Glob|Edit|Write|apply_patch",
-            "hooks": [{"type": "command", "command": hook_cmd("capture", "codex"),
-                       "timeout": 10}],
-        }]
+    # Tool names vary across Codex CLI, desktop Work, and native wrappers.
+    # Capture handles unsupported tools as WAL-only evidence, so a missing
+    # matcher is safer than silently missing exec_command or future tools.
+    hooks["PostToolUse"] = [{
+        "hooks": [{"type": "command", "command": hook_cmd("capture", "codex"),
+                   "timeout": 10}],
+    }]
     return {
         "description": "ai-session-skills capture",
         "hooks": hooks,

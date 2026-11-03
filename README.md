@@ -1,5 +1,8 @@
 # ai_session_skills
 
+See the [current capabilities wiki](WIKI.md) for what is implemented, what
+remains unverified, and what is planned.
+
 A personal, cross-project **command knowledge base** that writes itself.
 
 Every distinct action performed by a coding agent — shell commands, searches,
@@ -7,11 +10,18 @@ edits — is captured, deduplicated, and turned into a documentation entry
 recording **the action, the command, what it does, and why**. One file per
 technology.
 
-Capture works across **Devin CLI, Claude Code, Codex CLI, Copilot CLI, OpenCode
-and Cursor**, on **Windows, macOS and Linux**, all feeding this one knowledge
+Capture works across **Devin CLI, Claude Code CLI and desktop Code, Codex CLI
+and local ChatGPT Work/Codex, Copilot CLI, OpenCode and Cursor**, on
+**Windows, macOS and Linux**, all feeding this one knowledge
 base. By default the writing is done by a **local Ollama model**, so captured
 commands never leave the machine. The engine lives in
 [`tool/`](tool/README.md): pure Python 3 standard library, no dependencies.
+
+The local [write-ahead log](WAL_DESIGN.md) now retains every eligible
+harness-delivered event before deduplication. You can verify it, rebuild a
+fresh knowledge view with a later model, compare and promote a reviewed
+revision, or exchange explicitly selected sanitized candidates with a team.
+Raw events stay local and out of Git; team publication requires review.
 
 ```
 ai_session_skills/
@@ -73,12 +83,109 @@ uninstall, and the per-platform path table.
 
 ## Daily use
 
+### Resolution playback
+
+Playback records a complete, ordered troubleshooting session for teaching and
+review. Start it before giving the agent a problem, then stop it after the fix
+has been verified:
+
+```bash
+python3 tool/bin/playback.py start "Fix authentication timeout"
+# Give the agent the problem and work through it.
+python3 tool/bin/playback.py stop
+python3 tool/bin/playback.py status
+```
+
+Use `py -3` or another Python 3 launcher on Windows. If the harness does not
+provide a session ID in its environment, pass `--session ID` to `start`, each
+`note`, and `stop`. The first tool event can also bind an unbound recording to
+its session. `--harness codex` (or another harness name) restricts recording
+further.
+
+During playback, the agent should explain its intent before a meaningful
+action, evaluate the result afterward, and explain its next decision. It records
+each explanation with `playback.py note intent|observation|decision|outcome
+"text"`. The installed skill gives the agent this workflow. Notes appear
+verbatim beside every command, harness-supplied output, and file/tool action. Missing
+results or reasoning are marked `Not recorded`; the renderer does not fill gaps
+with guesses. If the detached renderer fails, run `playback.py finalize` to
+retry from the local event spool.
+
+Playback events never enter the command knowledge writer and are never
+deduplicated or summarized by a local model. Its raw spool is under `.runtime/`
+and its Markdown files are under `playbacks/`; both are gitignored because
+commands and outputs can contain sensitive material. The normal knowledge
+workflow resumes when playback stops.
+
 Browse the [knowledge index](knowledge/README.md), or search complete entries:
 
 ```powershell
 python tool/bin/search.py git branch
 python tool/bin/search.py "connection" --topic postgresql --full
 ```
+
+### Ask an agent to search commands
+
+The read-only MCP server lets local coding harnesses search documented commands
+and inspect resolution playbacks during a conversation. It exposes
+`search_command_knowledge`, `list_resolution_playbacks`, and
+`read_resolution_playback`. Results include exact recorded steps and source
+locations. Register it once per user
+on each machine, then restart local coding sessions:
+
+```bash
+python tool/install_search.py
+```
+
+Use `--only codex`, `--only claude`, `--only claude-desktop`, `--only copilot`,
+`--only cursor`, or `--only opencode` to select harnesses, and `--dry-run` to
+preview. Registration is global to that user. Claude Code's local desktop Code
+sessions share its MCP configuration; Claude Desktop Chat has a separate local
+configuration. Live app discovery still needs verification. Other MCP clients
+can launch `python tool/bin/search_mcp.py` over stdio. Command search reads
+completed Markdown entries, while playback tools read exact local recordings.
+Neither reads the separate WAL.
+
+For an HTTP-based harness such as Open WebUI, run the same read-only functions
+as an OpenAPI server and connect its `/openapi.json` URL:
+
+```bash
+python tool/bin/search_http.py
+```
+
+The default URL is `http://127.0.0.1:8766/openapi.json`. If the harness
+backend is on another host or in a container, give it a reachable address.
+Binding outside loopback requires `AI_SKILLS_SEARCH_TOKEN` and a matching
+Bearer token in the harness. Keep the service inside a trusted network;
+playback includes raw output.
+
+For any OpenAI-compatible Chat Completions endpoint, use the same client.
+For example, with a local Ollama server:
+
+```bash
+python tool/bin/ask.py --url http://localhost:11434/v1/chat/completions --model qwen3.5:9b "How do I review staged changes?"
+```
+
+To discuss a recorded resolution and ask follow-up questions:
+
+```bash
+python tool/bin/playback_chat.py --url http://localhost:11434/v1/chat/completions --model qwen3.5:9b --interactive
+```
+
+For Open WebUI, use `--url http://HOST:PORT/api/chat/completions --model MODEL`
+with either client.
+`--api-key-env ENV_NAME` reads a Bearer token from the environment.
+
+Use `--id PLAYBACK_ID` to select an older recording; otherwise the current or
+last playback is used. An initial question can follow the options. With no
+question, the model walks through every recorded step. The record remains
+unchanged; explanations cite step numbers. Raw outputs may contain private
+data. A cloud harness that reads playback will receive those raw steps in its
+model context; use a local model when the recording must stay on the machine.
+
+The chat client makes tool calls through the standard protocol and returns local
+results to the model. A model server alone does not capture coding actions;
+its coding harness must deliver tool events. Search needs no separate index or UI.
 
 All keywords must match. Headings and commands rank above matches in prose.
 In VS Code, use **Ctrl+Shift+F** with **Files to include: `knowledge/**/*.md`**.

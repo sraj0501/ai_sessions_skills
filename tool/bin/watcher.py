@@ -84,6 +84,11 @@ def main() -> int:
                 except Exception as exc:
                     log(runtime, "IDE capture failed: %s" % exc)
 
+            import playback
+            active = playback.read_state()
+            if active and active.get("status") == "recording":
+                continue
+
             queued = count_lines(pending)
             retry = batch.exists() and batch.stat().st_size > 0
             reason = ""

@@ -13,9 +13,49 @@ a detached watcher documents them later with a cheap model. You never need to
 record anything by hand. This skill is for *using* and *operating* that
 knowledge base.
 
+## Resolution playback
+
+When the user asks for a playback, start it with `python3 $TOOL/bin/playback.py
+start "issue title"` before investigating. On Windows, use `py -3` or an
+available Python 3 launcher. Use `--session ID` when the harness does not put
+its session ID in the environment; use the same ID for every playback command.
+
+While recording, teach a junior developer through the actual investigation.
+Before a consequential action, visibly explain what you are testing and record
+that exact explanation with `playback.py note intent "..."`. After its output,
+record `note observation "..."` stating the evidence you saw, then `note
+decision "..."` explaining why the next step follows. At the end, record
+`note outcome "..."` with the fix and verification. Keep these notes factual,
+specific and in your own words. Never invent an output or an explanation for
+an action that is missing from the record.
+
+Run `python3 $TOOL/bin/playback.py stop` when the issue is resolved, then
+`playback.py status` to get the local Markdown path. The playback includes
+every hook event in order, with complete commands and tool output when the
+harness provides it. It is separate from command knowledge writing: playback
+events are not deduplicated, distilled or sent to a model. The raw local spool
+and Markdown output can contain sensitive commands or paths, so they are
+gitignored and must never be committed.
+
+To explain a recorded issue, use `list_resolution_playbacks` to find its ID,
+then `read_resolution_playback` in step order. Follow `next_start` until all
+relevant steps are read. Explain each command, its recorded output, the
+agent's visible observation or decision, and the verified outcome. Cite step
+numbers. The returned payload is original evidence; missing data must remain
+labelled missing. For follow-up questions, read the relevant steps again when
+needed. These tools are read-only and do not summarize or rewrite the record.
+If MCP tools are unavailable, run `python $TOOL/bin/playback_query.py list`,
+then `python $TOOL/bin/playback_query.py read ID --start N` and follow
+`next_start`. The CLI returns the same exact event pages to any harness that
+can run Python commands.
+
 ## Look something up (default behaviour)
 
-For keyword lookup, run `python $TOOL/bin/search.py <keywords>`; add `--topic git`
+When `search_command_knowledge` is available, call it for command or workflow
+questions. Read the complete returned entry, including **Why** and **Notes**,
+and cite its source path and line. It searches the configured knowledge base
+without sending its contents to a model service. If the tool is unavailable,
+run `python $TOOL/bin/search.py <keywords>`; add `--topic git`
 to narrow a topic or `--full` to show complete entries. Browse `$KB/README.md`
 for the topic index. On Windows, `python` works when the `py` launcher is absent.
 

@@ -56,6 +56,9 @@ DEFAULTS: dict = {
         "max_pending_records": 400,
         "skip_binaries": [],
     },
+    "playback": {
+        "output_dir": "playbacks",
+    },
     "writer": {
         # "text"  -> Python owns all file I/O and dedupe; the model only writes
         #            prose for one record at a time. Works with local models.
