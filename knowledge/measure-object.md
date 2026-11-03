@@ -8,6 +8,7 @@
 ### Count the number of lines in a file
 <!-- sig: 78ad4b6fefff -->
 <!-- sig: f0d24cccbcf6 -->
+<!-- sig: 7351028db7fb -->
 
 ```bash
 Measure-Object -Line (Get-Content tool/bin/cfg.py)
