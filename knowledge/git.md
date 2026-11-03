@@ -57,6 +57,8 @@
 <!-- sig: 78a6809a037f -->
 <!-- sig: 53d692e5d48d -->
 <!-- sig: f844b6d692fe -->
+<!-- sig: 7f9628d4868f -->
+<!-- sig: 31b4bd747162 -->
 
 ```bash
 git status --short --branch
@@ -153,6 +155,9 @@ git status --short --branch
 <!-- sig: e01c1638df6f -->
 <!-- sig: 804ddfc728cf -->
 <!-- sig: 0e17b8e9da28 -->
+<!-- sig: 2d042f0b0801 -->
+<!-- sig: 04aed6557565 -->
+<!-- sig: c6aca3c52bd5 -->
 
 ```bash
 git --no-pager diff
@@ -313,6 +318,10 @@ git --no-pager diff --staged
 <!-- sig: a5ceaf3e9c2d -->
 <!-- sig: 105d4db9bf59 -->
 <!-- sig: 76d71216d104 -->
+<!-- sig: 0b95c6651be3 -->
+<!-- sig: 68a8b636a637 -->
+<!-- sig: 376e506fb17b -->
+<!-- sig: af7f51a21616 -->
 
 ```bash
 git log --oneline -10
@@ -375,6 +384,7 @@ git log -3 --format='%s%n%b---'
 <!-- sig: 004fc67e157b -->
 <!-- sig: 2d352e05c5e4 -->
 <!-- sig: 285859faaacc -->
+<!-- sig: b4436899ebd9 -->
 
 ```bash
 git branch --show-current
@@ -440,6 +450,8 @@ git remote -v
 <!-- sig: 5fd258aa5e08 -->
 <!-- sig: 154bdf80986a -->
 <!-- sig: 025bc9d66cf9 -->
+<!-- sig: e44e05b464e4 -->
+<!-- sig: 9470f027460c -->
 
 ```bash
 git show --stat <commit>
@@ -493,6 +505,7 @@ git --no-pager rev-list --count upstream/staging -- packages/collectors
 <!-- sig: cdd7065910f0 -->
 <!-- sig: d7ac1dda3000 -->
 <!-- sig: 7add464da3e1 -->
+<!-- sig: d8373c305019 -->
 
 ```bash
 git --no-pager grep -n US-11 docs/rearchitecture-sprint-plan-4546796 -- '*.md'
@@ -549,6 +562,7 @@ git -C ../ei-rd-eff-collectors ls-files
 
 ### View the last twenty reference log entries
 <!-- sig: f974b6ca6c3f -->
+<!-- sig: 88b17124ba97 -->
 
 ```bash
 git --no-pager reflog -20
@@ -766,6 +780,7 @@ git -C D:git_appsai_sessions_skills cat-file -t 94a2544f8c85a630fa8b5d9a94d99381
 
 ### List all files recursively from a specific tree
 <!-- sig: b985742cfdce -->
+<!-- sig: 2af4cb25339f -->
 
 ```bash
 git -C D:git_appsai_sessions_skills ls-tree -r --name-only 94a2544f8c85a630fa8b5d9a94d9938121aef11b tool/tests
@@ -779,6 +794,7 @@ git -C D:git_appsai_sessions_skills ls-tree -r --name-only 94a2544f8c85a630fa8b5
 ### Search for test function definitions across multiple files
 <!-- sig: 87f0e53edb56 -->
 <!-- sig: 7a8eb4211305 -->
+<!-- sig: bbb04a9b58ed -->
 
 ```bash
 git -C D:git_appsai_sessions_skills grep -n -E '^    def test_|^def test_|^class Test' 94a2544f8c85a630fa8b5d9a94d9938121aef11b -- tool/tests/test_portable.py tool/tests/test_ide_capture.py
@@ -1100,6 +1116,7 @@ git branch -r --contains d9bb59e '2>/dev/null'
 - **Notes:** The preceding 'true;' is used to ensure the command executes even if the initial git show command fails.
 ### Check if one commit is an ancestor
 <!-- sig: 7a35792152c9 -->
+<!-- sig: 63410987a67d -->
 
 ```bash
 git merge-base --is-ancestor v3.1.1 5fc3a11
@@ -1213,6 +1230,7 @@ git config user.name T
 <!-- sig: 134d034fd7a8 -->
 <!-- sig: ecbabcbbc244 -->
 <!-- sig: f163e456e628 -->
+<!-- sig: fb31a929dfc2 -->
 
 ```bash
 git rm -q __init__.py
@@ -1348,6 +1366,8 @@ git ls-files .codex_stage
 <!-- sig: f64999b68636 -->
 <!-- sig: 0b9494098bac -->
 <!-- sig: a53eb7dde298 -->
+<!-- sig: afba0c9721c0 -->
+<!-- sig: 90e53521f654 -->
 
 ```bash
 git stash push -m "wip: kpi4 read fallback"
@@ -1372,6 +1392,7 @@ git stash pop
 ### View stashes and switch to staging branch
 <!-- sig: e6877ea67f79 -->
 <!-- sig: 2d1ffe67161e -->
+<!-- sig: 6b60dd3ad50b -->
 
 ```bash
 git stash list >/dev/null;
@@ -1444,6 +1465,7 @@ git status --short
 
 ### Review stash details and compare branch histories
 <!-- sig: bd563a2e8a9f -->
+<!-- sig: 7b9bf3eb1e97 -->
 
 ```bash
 git stash show --stat 'stash@{0};'
