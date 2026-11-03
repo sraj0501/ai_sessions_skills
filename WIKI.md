@@ -148,7 +148,7 @@ signature groups and variants for meaning review; `propose --inbox
 Publish approved Markdown from one central repository workflow. Raw event
 logs and playback are never sent by this tool.
 
-Local WAL files may contain credentials and private output. Protect and back
+Local WAL databases and older JSON files may contain credentials and private output. Protect and back
 them up in an encrypted store according to your retention policy; this tool
 does not prune them. Set `AI_SKILLS_WAL` or `wal_dir` to keep the log outside
 the knowledge-base directory if that directory may be lost. Its export scanner

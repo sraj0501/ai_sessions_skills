@@ -45,8 +45,8 @@ knowledge base should be a rebuildable view of that evidence.
    Candidate normalization and signature calculation can change over time;
    the WAL event cannot. Record which normalizer and writer versions produced
    each candidate and entry.
-3. Use append-only segments or immutable event files with atomic publication,
-   checksums, and recovery from a truncated last write. A hook must acknowledge
+3. Use daily SQLite segments with durable transactions and event checksums.
+   A hook must acknowledge
    capture only after the record is durable. If a harness never dispatches a
    hook, the WAL cannot recover that action; the live harness test remains open.
 4. Keep the local WAL out of Git. It may contain tokens, paths, private output,
@@ -105,8 +105,9 @@ and a documented secret-screening policy before rollout.
 
 ## Implemented now
 
-- `tool/bin/wal.py` atomically publishes checksummed, immutable local event
-  files in `.runtime/wal/events/` before normal capture filtering and dedupe.
+- `tool/bin/wal.py` commits checksummed local events to one SQLite database per
+  UTC day in `.runtime/wal/events/` before normal capture filtering and dedupe.
+  It also reads the earlier per-event JSON layout without a migration.
   `AI_SKILLS_WAL` or `wal_dir` can place the log outside the knowledge base.
   The machine ID is local to `.runtime/wal/machine-id`. `inspect` and `verify`
   read the event log. A failed append returns a nonzero hook status rather than
