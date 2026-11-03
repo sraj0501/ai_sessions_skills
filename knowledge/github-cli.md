@@ -9,6 +9,7 @@
 <!-- sig: 29e01dec9915 -->
 <!-- sig: 76286d2b24a8 -->
 <!-- sig: a610a9252f8c -->
+<!-- sig: 58d174435e22 -->
 
 ```bash
 gh pr create --title "fix: correct KPI-4 denominator" --body "$(cat <<'EOF'
@@ -21,6 +22,8 @@ gh pr create --title "fix: correct KPI-4 denominator" --body "$(cat <<'EOF'
 <!-- sig: c829c53705d8 -->
 <!-- sig: a1878b5611e1 -->
 <!-- sig: 34065926440a -->
+<!-- sig: c57f79705aa5 -->
+<!-- sig: deaa8d503ecf -->
 
 ```bash
 gh pr list --repo philips-internal/ei-rd-eff-deliverymetrics --state open --limit 30 --json number,title,author,headRefName,isDraft '2>&1'
@@ -33,6 +36,7 @@ gh pr list --repo philips-internal/ei-rd-eff-deliverymetrics --state open --limi
 
 ### Update a pull request with labels
 <!-- sig: 9d6986853db1 -->
+<!-- sig: ad1eb9ffcd08 -->
 
 ```bash
 gh pr edit 451 --repo philips-internal/ei-rd-eff-deliverymetrics --add-label chore --add-label needs-review
@@ -46,6 +50,8 @@ gh pr edit 451 --repo philips-internal/ei-rd-eff-deliverymetrics --add-label cho
 ### Fetch detailed review thread information for a pull request
 <!-- sig: 4e5a15cd4426 -->
 <!-- sig: 6b410e4de574 -->
+<!-- sig: 639ec0ef72af -->
+<!-- sig: fc3a68bfbda5 -->
 
 ```bash
 gh api graphql -f 'query=query { repository(owner:"philips-internal", name:"ei-rd-eff-deliverymetrics") { pullRequest(number:451) { reviewThreads(first:100) { nodes { id isResolved isOutdated comments(first:20) { nodes { databaseId author { login } body path originalLine line } } } } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | {id,isResolved,isOutdated,comments:[.comments.nod'
@@ -55,6 +61,20 @@ gh api graphql -f 'query=query { repository(owner:"philips-internal", name:"ei-r
 - **Why:** It allows for granular data extraction from GitHub that is not easily accessible through standard CLI commands, specifically targeting nested review thread and comment details.
 - **Example:** gh api graphql -f 'query=query { repository(owner:"philips-internal", name:"ei-rd-eff-deliverymetrics") { pullRequest(number:451) { reviewThreads(first:100) { nodes { id isResolved isOutdated comments(first:20) { nodes { databaseId author { login } body path originalLine line } } } } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | {id,isResolved,isOutdated,comments:[.comments.nod'
 - **Notes:** The query is highly specific to the repository and PR number; changing these values will target different data.
+
+### Fetch commit status and PR review details
+<!-- sig: 8941865e5076 -->
+<!-- sig: 939e5d35f1d2 -->
+
+```bash
+gh api repos/philips-internal/ei-rd-eff-deliverymetrics/commits/cd6a48284abcdfe53d2177b10c81b6fbb08ad20f/status --jq '.statuses[]|{context:.context,state:.state,desc:.description,target:.target_url};'
+gh pr view 451 --repo philips-internal/ei-rd-eff-deliverymetrics --json mergeStateStatus,reviewDecision,reviews --jq '{merge:.mergeStateStatus,review:.reviewDecision,latest:[.reviews[-1]|{author:.author.login,state:.state,at:.submittedAt}}'
+```
+
+- **What it does:** Retrieves the status checks for a specific commit and then fetches the merge state and review decisions for pull request 451.
+- **Why:** This combines two separate API calls to gather a comprehensive view of a PR's readiness, including CI status and reviewer feedback, in one execution.
+- **Example:** gh api repos/philips-internal/ei-rd-eff-deliverymetrics/commits/cd6a48284abcdfe53d2177b10c81b6fbb08ad20f/status --jq '.statuses[]|{context:.context,state:.state,desc:.description,target:.target_url};' gh pr view 451 --repo philips-internal/ei-rd-eff-deliverymetrics --json mergeStateStatus,reviewDecision,reviews --jq '{merge:.mergeStateStatus,review:.reviewDecision,latest:[.reviews[-1]|{author:.author.login,state:.state,at:.submittedAt}}'
+- **Notes:** The first command uses jq to format the output of the commit status API call. The second command uses jq to structure the PR view data.
 ## Summary
 - what changed and why
 
@@ -72,6 +92,8 @@ EOF
 <!-- sig: 700e35fa7ae4 -->
 <!-- sig: dafa022455d4 -->
 <!-- sig: 5eaf41d75837 -->
+<!-- sig: 5d3d3adf12fe -->
+<!-- sig: 55b37a27cffa -->
 
 ```bash
 gh pr view --json state,mergeable,reviewDecision
@@ -88,6 +110,7 @@ gh pr view --json state,mergeable,reviewDecision
 <!-- sig: dbd0fede2fc9 -->
 <!-- sig: 1b0dcc897ac2 -->
 <!-- sig: 001428228dcd -->
+<!-- sig: e7734a88786a -->
 
 ```bash
 gh pr checks
@@ -118,6 +141,12 @@ gh auth status
 <!-- sig: ed1e2612ebb8 -->
 <!-- sig: 2e7c6bfbbfbf -->
 <!-- sig: 994bf012b7c6 -->
+<!-- sig: 12c703722216 -->
+<!-- sig: a3b20b00167e -->
+<!-- sig: 872cb57ec06d -->
+<!-- sig: 4bcebdd0e6f5 -->
+<!-- sig: fca19dd28e39 -->
+<!-- sig: 558367a189e0 -->
 
 ```bash
 gh run list --limit 5
@@ -180,6 +209,10 @@ gh api repos/$repo/actions/runs/38672295422/jobs?per_page=100 --jq '[.jobs[] | {
 <!-- sig: 6949b58ec830 -->
 <!-- sig: 7c6dbcc0d44f -->
 <!-- sig: 8a20b4459462 -->
+<!-- sig: 783aad6c4719 -->
+<!-- sig: 72d5542b8860 -->
+<!-- sig: 6c6ee756ce0c -->
+<!-- sig: 04246019bde1 -->
 
 ```bash
 gh run view 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --log-failed
@@ -205,6 +238,8 @@ gh api --method POST repos/philips-internal/ei-rd-eff-deliverymetrics/actions/jo
 ### Monitor a specific workflow run and log output
 <!-- sig: d7b775f4d00c -->
 <!-- sig: a9020c78a38a -->
+<!-- sig: b7386e66f002 -->
+<!-- sig: 85d4b5bcd630 -->
 
 ```bash
 gh run watch 38672295422 --repo philips-internal/ei-rd-eff-deliverymetrics --exit-status --interval 30 > /tmp/release-collector-avw-watch.log 2>&1
@@ -285,6 +320,8 @@ gh api repos/sraj-epam/ei-rd-eff-deliverymetrics --jq '{has_actions: .has_action
 <!-- sig: 6a642b1e6ec1 -->
 <!-- sig: 44b6ecb459de -->
 <!-- sig: 1ee2b40f8f8e -->
+<!-- sig: 15054b24cafc -->
+<!-- sig: beb154f50638 -->
 
 ```bash
 gh secret list --repo sraj-epam/ei-rd-eff-deliverymetrics

@@ -6,9 +6,10 @@
     python3 tool/install.py --kb ~/notes/skills
     python3 tool/install.py --dry-run
 
-Works on Windows, macOS and Linux: hook commands point at the .cmd shim on
-Windows and the .sh shim elsewhere, and each harness's config location is
-resolved per platform by cfg.harness_layout().
+Works on Windows, macOS and Linux. Windows hooks use the GUI Python executable
+when available so a console window is not created for every tool event; other
+platforms use the shell shim. Each harness's config location is resolved per
+platform by cfg.harness_layout().
 
 Safe to re-run. Every entry written carries the tool's absolute path as a
 marker; marked entries are purged before re-adding, so re-running never
@@ -44,8 +45,24 @@ DESCRIPTION = (
 # --------------------------------------------------------------------------- #
 def hook_cmd(kind: str, *args: str) -> str:
     """Command string a harness should run, quoted for the local shell."""
-    launcher = cfg.hook_launcher(kind)
-    parts = [str(launcher), *args]
+    if cfg.IS_WINDOWS:
+        # A .cmd file launched by a GUI harness allocates a console before any
+        # child-process flags can hide it. Run the Python script with the GUI
+        # interpreter instead. It still inherits the harness's stdin pipe.
+        base = Path(getattr(sys, "_base_executable", sys.executable))
+        pythonw = base.with_name("pythonw.exe")
+        if pythonw.is_file():
+            script = TOOL / "bin" / ("%s.py" % kind)
+            if kind == "capture":
+                parts = [str(pythonw), str(script), "--harness", *args]
+            else:
+                verb = {"start": "hook-start", "end": "hook-end"}.get(
+                    args[0] if args else "start", args[0] if args else "hook-start")
+                parts = [str(pythonw), str(script), verb, *args[1:]]
+        else:
+            parts = [str(cfg.hook_launcher(kind)), *args]
+    else:
+        parts = [str(cfg.hook_launcher(kind)), *args]
     if cfg.IS_WINDOWS:
         return " ".join('"%s"' % p if " " in p else p for p in parts)
     return " ".join("'%s'" % p if " " in p else p for p in parts)
@@ -157,18 +174,26 @@ def claude_patch() -> dict:
 
 
 def codex_patch() -> dict:
+    hooks = {
+        "SessionStart": [{"hooks": [
+            {"type": "command", "command": hook_cmd("session", "start", "codex"),
+             "timeout": 5}]}],
+        "SessionEnd": [{"hooks": [
+            {"type": "command", "command": hook_cmd("session", "end", "codex"),
+             "timeout": 5}]}],
+    }
+    # Codex's Windows hook host can allocate a visible console for every
+    # command before our windowless child starts. When the read-only Codex
+    # history poller is enabled, use it as the per-command capture source.
+    if not (cfg.IS_WINDOWS and cfg.get("capture.codex_ide", False) is True):
+        hooks["PostToolUse"] = [{
+            "matcher": "Bash|Shell|Grep|Glob|Edit|Write|apply_patch",
+            "hooks": [{"type": "command", "command": hook_cmd("capture", "codex"),
+                       "timeout": 10}],
+        }]
     return {
         "description": "ai-session-skills capture",
-        "hooks": {
-            "SessionStart": [{"hooks": [
-                {"type": "command", "command": hook_cmd("session", "start", "codex"),
-                 "timeout": 5}]}],
-            "PostToolUse": [{"matcher": "Bash|Shell|Grep|Glob|Edit|Write|apply_patch", "hooks": [
-                {"type": "command", "command": hook_cmd("capture", "codex"), "timeout": 10}]}],
-            "SessionEnd": [{"hooks": [
-                {"type": "command", "command": hook_cmd("session", "end", "codex"),
-                 "timeout": 5}]}],
-        },
+        "hooks": hooks,
     }
 
 
@@ -178,12 +203,12 @@ def copilot_patch() -> dict:
     same file works on every OS."""
     def entry(kind: str, *args: str) -> dict:
         posix = str(TOOL / "bin" / ("hook-%s.sh" % kind))
-        win = str(TOOL / "bin" / ("hook-%s.cmd" % kind))
         joined = " ".join(args)
+        win_args = (*args, "copilot") if kind == "session" else ("copilot",)
         return {
             "type": "command",
             "bash": ("'%s' %s" % (posix, joined)).strip(),
-            "powershell": ("& '%s' %s" % (win, joined)).strip(),
+            "powershell": "& " + hook_cmd(kind, *win_args),
             "env": {"AI_SKILLS_HARNESS": "copilot"},
             "timeoutSec": 10,
         }

@@ -38,6 +38,13 @@ class TestIdeCapture(unittest.TestCase):
         self.off = patch.object(ide.cfg, "capture_off", return_value=False)
         self.off.start()
         self.addCleanup(self.off.stop)
+        self.source_config = patch.object(
+            ide.cfg, "get",
+            side_effect=lambda key, default=None: ["vscode"]
+            if key == "capture.codex_sources" else default,
+        )
+        self.source_config.start()
+        self.addCleanup(self.source_config.stop)
         self.enqueue = patch.object(ide.capture, "enqueue")
         self.mock_enqueue = self.enqueue.start()
         self.addCleanup(self.enqueue.stop)
@@ -62,6 +69,13 @@ class TestIdeCapture(unittest.TestCase):
         self.assertEqual(record["harness"], "codex-ide")
         self.assertEqual(self.poll(), 0)
         self.assertEqual(self.mock_enqueue.call_count, 1)
+
+    def test_captures_cli_when_explicitly_enabled(self):
+        self.add("cli", 1, thread="cli")
+        with patch.object(ide.cfg, "get", return_value=["vscode", "cli"]):
+            self.assertEqual(self.poll(), 1)
+        record = self.mock_enqueue.call_args.args[0][0]
+        self.assertEqual(record["harness"], "codex-ide")
 
     def test_in_progress_command_is_collected_when_it_finishes(self):
         self.add("slow", 1, status="inProgress")

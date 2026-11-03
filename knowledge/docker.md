@@ -92,6 +92,30 @@ docker start rollup-test '2>/dev/null'
 - **Example:** docker start rollup-test '2>/dev/null' before running the full setup script.
 - **Notes:** The '2>/dev/null' is crucial here to prevent the script from failing or printing noise if the container is already running or if the name is incorrect.
 
+### Start necessary services in detached mode
+<!-- sig: 181f5fbe3435 -->
+
+```bash
+docker-compose up -d postgres redis
+```
+
+- **What it does:** Starts the services defined for postgres and redis in the docker-compose.yml file in the background (-d).
+- **Why:** This command ensures that the required database and caching services are running reliably in the background before application code attempts to connect to them.
+- **Example:** docker-compose up -d postgres redis to bring up the entire local development environment.
+- **Notes:** The surrounding shell logic handles error checking and piping, but this core command starts the services detached.
+
+### List running services in the current stack
+<!-- sig: e158b49558d8 -->
+
+```bash
+docker compose ps
+```
+
+- **What it does:** Displays the current state of all services defined in the docker-compose.yml file for the active project.
+- **Why:** Provides a quick overview of which containers are running, their status, and their ports without needing to inspect each one individually.
+- **Example:** docker compose ps on the development environment stack.
+- **Notes:** This command only shows services defined in the compose file; it does not list all containers on the host.
+
 ## Diagnosing
 
 ### Watch the logs of running services
@@ -111,6 +135,9 @@ docker compose logs -f
 <!-- sig: b512dcc897c1 -->
 <!-- sig: 8f84cb52b36d -->
 <!-- sig: 6543b719d111 -->
+<!-- sig: 41245aef0116 -->
+<!-- sig: c378547534cf -->
+<!-- sig: 9ec7bdb2536c -->
 
 ```bash
 docker ps -a
@@ -130,6 +157,11 @@ docker ps -a
 <!-- sig: 78ee9a05a5e1 -->
 <!-- sig: 1b62d9f6fd0d -->
 <!-- sig: 1e6903ec2a28 -->
+<!-- sig: 44a1a591287e -->
+<!-- sig: c7f04439cca9 -->
+<!-- sig: 12df4fdf6ecd -->
+<!-- sig: 73e96915d70f -->
+<!-- sig: 3cb59a4a1753 -->
 
 ```bash
 docker exec -it backend bash
@@ -176,6 +208,18 @@ docker inspect rollup-test --format '{{json .Config.Env}}'
 - **Example:** docker inspect rollup-test --format '{{json .Config.Env}}' | tr ',' '\n'
 - **Notes:** The output format string must correctly reference the desired field, in this case, the environment variables within the container's configuration.
 
+### Extract all environment variables from a container
+<!-- sig: 882f28138eea -->
+
+```bash
+docker inspect sys_db_postgres --format '{{range .Config.Env}}{{println .}}{{end}}'
+```
+
+- **What it does:** This command uses docker inspect to query the sys_db_postgres container and formats the output to list every environment variable defined in its configuration.
+- **Why:** It is a precise way to dump the entire set of environment variables set within a running container, which is necessary for debugging configuration issues.
+- **Example:** PW=$(docker inspect sys_db_postgres --format '{{range .Config.Env}}{{println .}}{{end}}')
+- **Notes:** The output is a multi-line string containing each environment variable on a new line, which is then captured into the variable PW.
+
 ## Housekeeping
 
 ### Reclaim disk from unused images
@@ -218,6 +262,7 @@ docker rm -f us09-verify
 
 ### Build and tag a Docker image from the current directory
 <!-- sig: 5b5b2e3b821d -->
+<!-- sig: 86faba8c28ec -->
 
 ```bash
 docker build -t ei-collectors-us31-verify .

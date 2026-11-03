@@ -20,6 +20,7 @@
 
   "capture": {
     "codex_ide": true,
+    "codex_sources": ["vscode", "cli"],
     "max_pending_records": 400,
     "skip_binaries": []
   },

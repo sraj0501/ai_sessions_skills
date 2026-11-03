@@ -50,6 +50,9 @@ aws rds describe-db-instances --region us-east-1 --db-instance-identifier delive
 <!-- sig: ff717f528a01 -->
 <!-- sig: aec3bd69ed0d -->
 <!-- sig: 74559b4a4cbe -->
+<!-- sig: 8b7b27bd1fc0 -->
+<!-- sig: dde09d9ded16 -->
+<!-- sig: e7773fcb018b -->
 
 ```bash
 TASK=$(aws ecs list-tasks --region us-east-1 --cluster delivery-metrics-staging --service-name delivery-metrics-staging-backend --desired-status RUNNING --query 'taskArns[0]' --output 'text')
@@ -71,6 +74,66 @@ aws ecs describe-task-definition --region us-east-1 --task-definition '$TD' --qu
 - **Why:** It provides a structured, concise view of the task definition's components, such as container images, environment variables, and role ARNs, without needing to parse the entire raw response.
 - **Example:** aws ecs describe-task-definition --region us-east-1 --task-definition '$TD' --query 'taskDefinition.{family:family,revision:revision,containers:containerDefinitions[].{name:name,image:image,secrets:secrets[].{name:name,valueFrom:valueFrom},environment:environment[].name},taskRoleArn:taskRoleArn,executionRoleArn:executionRoleArn}' --output json
 - **Notes:** The query filters out sensitive data by only selecting specific fields like 'name', 'image', and 'valueFrom' for secrets, rather than the secret value itself.
+
+### List all ECS clusters in a specific region
+<!-- sig: 179d5f9db31b -->
+
+```bash
+aws ecs list-clusters --region us-east-1 --output json
+```
+
+- **What it does:** Retrieves a list of all Amazon ECS clusters present in the specified region, formatting the output as JSON.
+- **Why:** This provides a structured, machine-readable list of available clusters, which is useful for scripting or programmatic inspection.
+- **Example:** aws ecs list-clusters --region us-east-1 --output json
+- **Notes:** The `--output json` flag ensures the response is easily parsable by other scripts or tools.
+
+### List all services within a specific cluster
+<!-- sig: c68d05344079 -->
+
+```bash
+aws ecs list-services --cluster delivery-metrics-production --region us-east-1 --output json
+```
+
+- **What it does:** Retrieves a list of all ECS services running within the delivery-metrics-production cluster. The output is formatted as JSON.
+- **Why:** This provides a structured, machine-readable inventory of running services in the specified production cluster.
+- **Example:** aws ecs list-services --cluster delivery-metrics-production --region us-east-1 --output json
+- **Notes:** The --output json flag ensures the response is easily parsable by scripts.
+
+### List all services within a specific cluster
+<!-- sig: ab45aaa01b33 -->
+
+```bash
+aws ecs list-services --cluster delivery-metrics-staging --region us-east-1 --output json
+```
+
+- **What it does:** Retrieves a list of all ECS services running within the delivery-metrics-staging cluster. The output is formatted as JSON.
+- **Why:** This provides a structured, machine-readable list of running services, which is easier to parse in scripts than a default text output.
+- **Example:** aws ecs list-services --cluster delivery-metrics-staging --region us-east-1 --output json
+- **Notes:** The --region flag specifies the AWS region where the cluster resides.
+
+### List running tasks in a specific cluster
+<!-- sig: f90ff34373c6 -->
+
+```bash
+aws ecs list-tasks --cluster delivery-metrics-production --region us-east-1 --desired-status RUNNING --output json
+```
+
+- **What it does:** Retrieves a list of tasks running in the delivery-metrics-production cluster within the us-east-1 region. The output is formatted as JSON.
+- **Why:** This allows programmatic inspection of the current operational state of the tasks in the production cluster.
+- **Example:** aws ecs list-tasks --cluster delivery-metrics-production --region us-east-1 --desired-status RUNNING --output json
+- **Notes:** The --output json flag ensures the response is machine-readable for scripting purposes.
+
+### List running tasks in a specific cluster
+<!-- sig: 620f274b7c74 -->
+
+```bash
+aws ecs list-tasks --cluster delivery-metrics-staging --region us-east-1 --desired-status RUNNING --output json
+```
+
+- **What it does:** Retrieves a list of tasks running in the delivery-metrics-staging cluster within the us-east-1 region. The output is formatted as JSON.
+- **Why:** This allows programmatic inspection of the current operational state of the tasks in the staging environment.
+- **Example:** aws ecs list-tasks --cluster delivery-metrics-staging --region us-east-1 --desired-status RUNNING --output json
+- **Notes:** The --output json flag ensures the response is machine-readable for scripting purposes.
 
 ## RDS Snapshots
 
@@ -212,3 +275,28 @@ aws login '2>&1'
 - **Why:** It ensures that any error messages generated during the login process are captured and visible in the standard output stream.
 - **Example:** aws login '2>&1' when running in a script where error capture is necessary.
 - **Notes:** The redirection '2>&1' is used to ensure that any output, including errors, is piped correctly to subsequent commands like 'tail'.
+
+### List available AWS configuration profiles
+<!-- sig: b554f5d7c90c -->
+
+```bash
+aws configure list-profiles
+```
+
+- **What it does:** This command displays all the named profiles that have been configured in the AWS CLI configuration files.
+- **Why:** It allows a user to quickly see which distinct sets of credentials or configurations are available for use with the AWS CLI.
+- **Example:** aws configure list-profiles to see profiles like 'dev' and 'prod'.
+
+## Pricing Information
+
+### Retrieve specific S3 storage pricing details
+<!-- sig: ea697563d342 -->
+
+```bash
+aws pricing get-products --service-code AmazonS3 --region us-east-1 --filters 'Type=TERM_MATCH,Field=location,Value=US East (N. Virginia)' Type=TERM_MATCH,Field=productFamily,Value=Storage Type=TERM_MATCH,Field=volumeType,Value=Standard --max-results 100 --output json > /tmp/s3-standard-storage-prices.json
+```
+
+- **What it does:** This command queries the AWS pricing API for S3 products, filtering by region, product family, and volume type, and saves the resulting JSON to a local file.
+- **Why:** It allows programmatic extraction of current pricing data for specific S3 configurations without needing to navigate the AWS console.
+- **Example:** aws pricing get-products --service-code AmazonS3 --region us-east-1 --filters 'Type=TERM_MATCH,Field=location,Value=US East (N. Virginia)' Type=TERM_MATCH,Field=productFamily,Value=Storage Type=TERM_MATCH,Field=volumeType,Value=Standard --max-results 100 --output json > /tmp/s3-standard-storage-prices.json
+- **Notes:** The output is redirected to a file, which must then be processed by another script or tool.

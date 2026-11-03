@@ -41,6 +41,21 @@ Editing the standards in the terminal UI (`e`) and saving asks a **local model**
 <!-- sig: 0b2c9726b79b -->
 <!-- sig: ece1f0e3b334 -->
 <!-- sig: 8641cdba569c -->
+<!-- sig: 9fe2bb7833c8 -->
+<!-- sig: d6864e189d2f -->
+<!-- sig: d056879e2c1d -->
+<!-- sig: b97694bb73ba -->
+<!-- sig: 9756f3959ad8 -->
+<!-- sig: a16ad0e9c4af -->
+<!-- sig: 728438092736 -->
+<!-- sig: ca807f0bef2e -->
+<!-- sig: d8c026f60579 -->
+<!-- sig: 6c43d46f38cb -->
+<!-- sig: 44936348977f -->
+<!-- sig: b633713c9ce0 -->
+<!-- sig: 26a5367cf4a5 -->
+<!-- sig: f7bd1050005b -->
+<!-- sig: 26f95401fbc1 -->
 
 ```bash
 python3 - <<'EOF'
@@ -157,3 +172,29 @@ s=s.replace("| `BLUEPRINT_JUDGE_MAX_CHUNKS`","| `BLUEPRINT_JUDGE_CONCURRENCY`
 - **Why:** It automates the process of generating performance metrics for different model configurations and parallelism levels directly into documentation.
 - **Example:** python3 - <<'EOF' ... (using the provided script structure)
 - **Notes:** The command uses a here-document (<<'EOF') to pass a multi-line script to python3 for execution.
+
+### Print the installed pytest version
+<!-- sig: 9c82c39870d5 -->
+<!-- sig: 132cad02aa58 -->
+<!-- sig: c8b2aa5be162 -->
+
+```bash
+/opt/homebrew/bin/python3.15 -c 'import sys; sys.path.insert(0,'.venv/lib/python3.14/site-packages'); import pytest; print(pytest.__version__)' '2>&1'
+```
+
+- **What it does:** Executes a Python script inline to dynamically add the virtual environment's site-packages to the path, then imports and prints the pytest version.
+- **Why:** This allows checking the specific version of a library installed within a specific virtual environment without running a full pytest command.
+- **Example:** /opt/homebrew/bin/python3.15 -c 'import sys; sys.path.insert(0,'.venv/lib/python3.14/site-packages'); import pytest; print(pytest.__version__)' '2>&1'
+- **Notes:** The '2>&1' redirects standard error to standard output, ensuring the version number is captured correctly.
+
+### Run unit tests for the Python API
+<!-- sig: 293d8d2a11a1 -->
+
+```bash
+'packages/python-api' .venv/bin/pytest -q
+```
+
+- **What it does:** Executes the pytest test runner located in the virtual environment for the packages/python-api directory.
+- **Why:** This runs the specific test suite for the Python API component, providing a quick, quiet check of its functionality.
+- **Example:** 'packages/python-api' .venv/bin/pytest -q
+- **Notes:** The '-q' flag suppresses output, making the test run quieter.
