@@ -1,0 +1,17 @@
+[project]
+name = "ai-sessions-skills"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Shashank Raj", email = "shashank1_theone@yahoo.co.in" }
+]
+requires-python = ">=3.15"
+dependencies = []
+
+[project.scripts]
+ai-sessions-skills = "ai_sessions_skills:main"
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
