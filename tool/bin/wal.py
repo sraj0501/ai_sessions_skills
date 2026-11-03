@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """Immutable local evidence log for reusable command knowledge.
 
-Each event is one atomically published, checksummed JSON file. The queue and
-Markdown knowledge base are derived views; neither is needed to inspect the log.
+New events live in one durable SQLite file per UTC day. Older checksummed JSON
+events remain readable. The queue and Markdown knowledge base are derived views.
 """
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import hashlib
 import json
 import os
+import sqlite3
 import sys
-import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,9 +28,11 @@ def root() -> Path:
     if override:
         return Path(override).expanduser().resolve()
     setting = cfg.get("wal_dir")
-    if setting:
+    if setting is not None:
+        if not isinstance(setting, str) or not setting.strip():
+            raise ValueError("wal_dir must be a non-empty path string")
         base = cfg.config_path().parent if cfg.config_path() else cfg.TOOL_ROOT
-        return (base / str(setting)).expanduser().resolve()
+        return (base / setting).expanduser().resolve()
     return cfg.runtime_dir() / "wal"
 
 
@@ -88,60 +91,102 @@ def append(payload: dict, harness: str, source: str = "hook") -> dict:
         "payload": payload,
     }
     envelope = {"event": event, "sha256": hashlib.sha256(canonical(event)).hexdigest()}
-    directory = root() / "events" / now.strftime("%Y-%m-%d")
+    directory = root() / "events"
     directory.mkdir(parents=True, exist_ok=True)
     if os.name != "nt":
-        os.chmod(directory.parent, 0o700)
         os.chmod(directory, 0o700)
-    name = now.strftime("%H%M%S.%f") + "-" + event_id + ".json"
-    fd, temporary = tempfile.mkstemp(prefix=".event-", dir=directory)
-    try:
-        if os.name != "nt":
-            os.fchmod(fd, 0o600)
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(canonical(envelope) + b"\n")
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(temporary, directory / name)
-        if os.name != "nt":
-            dir_fd = os.open(directory, os.O_RDONLY)
-            try:
-                os.fsync(dir_fd)
-            finally:
-                os.close(dir_fd)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    database = directory / (now.strftime("%Y-%m-%d") + ".sqlite3")
+    with closing(sqlite3.connect(database, timeout=30)) as db:
+        db.execute("PRAGMA synchronous=FULL")
+        with db:
+            db.execute("CREATE TABLE IF NOT EXISTS events (event_id TEXT PRIMARY KEY, "
+                       "timestamp TEXT NOT NULL, envelope BLOB NOT NULL)")
+            db.execute("INSERT INTO events VALUES (?, ?, ?)",
+                       (event_id, event["timestamp"], canonical(envelope)))
+    if os.name != "nt":
+        os.chmod(database, 0o600)
     return event
 
 
-def read(path: Path) -> dict:
-    envelope = json.loads(path.read_text(encoding="utf-8"))
+def _verified(envelope: dict, location: str) -> dict:
     event = envelope["event"]
     if event.get("schema") != SCHEMA:
         raise ValueError("unsupported WAL schema: " + str(event.get("schema")))
     if hashlib.sha256(canonical(event)).hexdigest() != envelope.get("sha256"):
-        raise ValueError("checksum mismatch: " + str(path))
+        raise ValueError("checksum mismatch: " + location)
     if not event.get("event_id") or not event.get("machine_id"):
-        raise ValueError("missing event identity: " + str(path))
+        raise ValueError("missing event identity: " + location)
     return event
+
+
+def read(path: Path) -> dict:
+    return _verified(json.loads(path.read_text(encoding="utf-8")), str(path))
+
+
+def compact(directory: Path | None = None) -> int:
+    """Move verified legacy JSON events into daily databases, safe to retry."""
+    folder = (directory or root()) / "events"
+    paths = sorted(folder.glob("*/*.json"))
+    records = [(path, read(path)) for path in paths]  # validate before changing anything
+    for path, event in records:
+        database = folder / (path.parent.name + ".sqlite3")
+        raw = canonical({"event": event, "sha256": hashlib.sha256(canonical(event)).hexdigest()})
+        with closing(sqlite3.connect(database, timeout=30)) as db:
+            db.execute("PRAGMA synchronous=FULL")
+            with db:
+                db.execute("CREATE TABLE IF NOT EXISTS events (event_id TEXT PRIMARY KEY, "
+                           "timestamp TEXT NOT NULL, envelope BLOB NOT NULL)")
+                existing = db.execute("SELECT envelope FROM events WHERE event_id = ?",
+                                      (event["event_id"],)).fetchone()
+                if existing is not None and json.loads(existing[0]) != json.loads(raw):
+                    raise ValueError("conflicting WAL event: " + event["event_id"])
+                if existing is None:
+                    db.execute("INSERT INTO events VALUES (?, ?, ?)",
+                               (event["event_id"], event["timestamp"], raw))
+        if os.name != "nt":
+            os.chmod(database, 0o600)
+        path.unlink()
+    for day in sorted({path.parent for path in paths}):
+        if not any(day.iterdir()):
+            day.rmdir()
+    return len(records)
 
 
 def events(directory: Path | None = None):
     base = directory or root()
-    for path in sorted((base / "events").glob("*/*.json")):
-        yield read(path)
+    folder = base / "events"
+    days = sorted({p.stem for p in folder.glob("*.sqlite3")} |
+                  {p.name for p in folder.iterdir() if p.is_dir()}) if folder.exists() else []
+    for day in days:
+        found = []
+        database = folder / (day + ".sqlite3")
+        if database.exists():
+            with closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)) as db:
+                for (raw,) in db.execute("SELECT envelope FROM events ORDER BY timestamp, event_id"):
+                    found.append(_verified(json.loads(raw), str(database)))
+        for path in sorted((folder / day).glob("*.json")):
+            found.append(read(path))
+        unique = {}
+        for item in found:
+            key = (item["machine_id"], item["event_id"])
+            if key in unique and unique[key] != item:
+                raise ValueError("conflicting WAL event: " + item["event_id"])
+            unique[key] = item
+        yield from sorted(unique.values(), key=lambda item: (item["timestamp"], item["event_id"]))
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("verb", choices=("inspect", "verify"))
+    parser.add_argument("verb", choices=("inspect", "verify", "compact"))
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--root", type=Path)
     args = parser.parse_args(argv)
     try:
+        if args.verb == "compact":
+            print("compacted %d legacy WAL event(s)" % compact(args.root))
+            return 0
         found = list(events(args.root))
-    except (ValueError, OSError, json.JSONDecodeError) as exc:
+    except (ValueError, OSError, sqlite3.DatabaseError, json.JSONDecodeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     if args.verb == "verify":

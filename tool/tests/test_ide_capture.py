@@ -72,7 +72,8 @@ class TestIdeCapture(unittest.TestCase):
 
     def test_captures_cli_when_explicitly_enabled(self):
         self.add("cli", 1, thread="cli")
-        with patch.object(ide.cfg, "get", return_value=["vscode", "cli"]):
+        with patch.object(ide.cfg, "get", side_effect=lambda key, default=None:
+                          ["vscode", "cli"] if key == "capture.codex_sources" else default):
             self.assertEqual(self.poll(), 1)
         record = self.mock_enqueue.call_args.args[0][0]
         self.assertEqual(record["harness"], "codex-ide")

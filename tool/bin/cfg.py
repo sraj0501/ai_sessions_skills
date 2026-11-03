@@ -316,16 +316,21 @@ def kb_dir() -> Path:
         return Path(env).expanduser().resolve()
     cfg, path = load(), config_path()
     base = path.parent if path else TOOL_ROOT
-    return (base / str(cfg.get("kb_dir", ".."))).resolve()
+    setting = cfg.get("kb_dir", "..")
+    if not isinstance(setting, str) or not setting.strip():
+        raise ValueError("kb_dir must be a non-empty path string")
+    return (base / setting).resolve()
 
 
 def runtime_dir() -> Path:
     # Explicit KB overrides remain self-contained (tests and alternate KBs).
     if not os.environ.get("AI_SKILLS_KB"):
         setting = get("runtime_dir")
-        if setting:
+        if setting is not None:
+            if not isinstance(setting, str) or not setting.strip():
+                raise ValueError("runtime_dir must be a non-empty path string")
             path = config_path()
-            return ((path.parent if path else TOOL_ROOT) / str(setting)).resolve()
+            return ((path.parent if path else TOOL_ROOT) / setting).resolve()
     return kb_dir() / ".runtime"
 
 

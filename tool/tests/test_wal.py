@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Evidence log and offline replay tests."""
 import io
+from contextlib import closing
 import json
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -10,11 +12,14 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
 import capture
+import cfg
 import distill
 import wal
 import wal_rebuild
 import wal_team
 import wal_review
+
+REAL_RUNTIME_DIR = cfg.runtime_dir
 
 
 class WalTests(unittest.TestCase):
@@ -52,12 +57,61 @@ class WalTests(unittest.TestCase):
 
     def test_checksum_rejects_tampering(self):
         wal.append({"tool_name": "exec", "command": "git status"}, "test")
-        path = next((wal.root() / "events").glob("*/*.json"))
-        envelope = json.loads(path.read_text(encoding="utf-8"))
+        path = next((wal.root() / "events").glob("*.sqlite3"))
+        with closing(sqlite3.connect(path)) as db:
+            envelope = json.loads(db.execute("SELECT envelope FROM events").fetchone()[0])
         envelope["event"]["command"] = "git push"
-        path.write_text(json.dumps(envelope), encoding="utf-8")
+        with closing(sqlite3.connect(path)) as db:
+            with db:
+                db.execute("UPDATE events SET envelope = ?", (json.dumps(envelope),))
         with self.assertRaisesRegex(ValueError, "checksum mismatch"):
             list(wal.events())
+
+    def test_daily_database_and_legacy_json_are_both_readable(self):
+        first = wal.append({"command": "git status"}, "test")
+        second = wal.append({"command": "git log -1"}, "test")
+        self.assertEqual(len(list((wal.root() / "events").glob("*.sqlite3"))), 1)
+        self.assertEqual(list((wal.root() / "events").glob("*/*.json")), [])
+        old = {**first, "event_id": "legacy", "timestamp": "2000-01-01T00:00:00+00:00"}
+        legacy = wal.root() / "events" / "2000-01-01" / "old.json"
+        legacy.parent.mkdir()
+        import hashlib
+        legacy.write_bytes(wal.canonical({"event": old,
+                                         "sha256": hashlib.sha256(wal.canonical(old)).hexdigest()}))
+        self.assertEqual([e["event_id"] for e in wal.events()],
+                         ["legacy", first["event_id"], second["event_id"]])
+        self.assertEqual(wal.compact(), 1)
+        self.assertEqual(wal.compact(), 0)
+        self.assertFalse(legacy.exists())
+        self.assertEqual(len(list((wal.root() / "events").glob("*.sqlite3"))), 2)
+        self.assertEqual([e["event_id"] for e in wal.events()],
+                         ["legacy", first["event_id"], second["event_id"]])
+
+    def test_path_settings_reject_lists(self):
+        with patch("cfg.get", return_value=["vscode", "cli"]):
+            with self.assertRaisesRegex(ValueError, "wal_dir"):
+                wal.root()
+        with patch("cfg.get", return_value=["vscode", "cli"]), \
+             patch.dict("os.environ", {"AI_SKILLS_KB": ""}):
+            self.assertEqual(cfg.get("runtime_dir"), ["vscode", "cli"])
+            with self.assertRaisesRegex(ValueError, "runtime_dir"):
+                REAL_RUNTIME_DIR()
+
+    def test_compact_preserves_legacy_files_if_validation_fails(self):
+        folder = wal.root() / "events" / "2020-01-01"
+        folder.mkdir(parents=True)
+        good = folder / "a.json"
+        bad = folder / "b.json"
+        event = {"schema": wal.SCHEMA, "machine_id": "machine", "event_id": "old",
+                 "timestamp": "2020-01-01T00:00:00+00:00"}
+        import hashlib
+        good.write_bytes(wal.canonical({"event": event,
+                                        "sha256": hashlib.sha256(wal.canonical(event)).hexdigest()}))
+        bad.write_text('{"event": {"schema": 1}, "sha256": "wrong"}', encoding="utf-8")
+        with self.assertRaises(ValueError):
+            wal.compact()
+        self.assertTrue(good.exists())
+        self.assertFalse((wal.root() / "events" / "2020-01-01.sqlite3").exists())
 
     def test_payload_array_logs_each_delivered_event(self):
         self._capture([{"tool_name": "exec", "command": "git status"},

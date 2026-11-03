@@ -107,7 +107,8 @@ and a documented secret-screening policy before rollout.
 
 - `tool/bin/wal.py` commits checksummed local events to one SQLite database per
   UTC day in `.runtime/wal/events/` before normal capture filtering and dedupe.
-  It also reads the earlier per-event JSON layout without a migration.
+  It also reads the earlier per-event JSON layout; `wal.py compact` verifies
+  and moves those files into daily databases, and can be retried.
   `AI_SKILLS_WAL` or `wal_dir` can place the log outside the knowledge base.
   The machine ID is local to `.runtime/wal/machine-id`. `inspect` and `verify`
   read the event log. A failed append returns a nonzero hook status rather than

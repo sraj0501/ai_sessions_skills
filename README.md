@@ -1,5 +1,8 @@
 # ai_session_skills
 
+For the central team sync service and reviewed publication workflow, see
+[Team knowledge sync](TEAM_SYNC.md).
+
 See the [current capabilities wiki](WIKI.md) for what is implemented, what
 remains unverified, and what is planned.
 

@@ -591,7 +591,8 @@ does not prune or upload it, and a machine ID must not be copied to another
 installation. Set `AI_SKILLS_WAL` to an external directory, or configure
 `wal_dir` relative to the config file, if the log must survive loss of the
 knowledge-base directory. New events use one SQLite file per UTC day under
-`events/`; older per-event JSON files remain readable. Path settings such as
+`events/`; older per-event JSON files remain readable and can be consolidated
+with `python tool/bin/wal.py compact`. Path settings such as
 `wal_dir` and `runtime_dir` must be strings. Keep the WAL directory access
 controlled and backed up.
 The [design and limits](../WAL_DESIGN.md) explain the contract.

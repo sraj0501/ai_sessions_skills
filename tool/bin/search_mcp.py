@@ -74,7 +74,7 @@ def lookup(query: str, topic: str = "", limit: int = 5) -> dict:
         raise ValueError("topic must be a string")
     if type(limit) is not int or not 1 <= limit <= 20:
         raise ValueError("limit must be an integer from 1 to 20")
-    matches = search.search(cfg.kb_dir(), query, topic)
+    matches = search.search_with_team(cfg.kb_dir(), query, topic)
     return {
         "query": query,
         "total": len(matches),

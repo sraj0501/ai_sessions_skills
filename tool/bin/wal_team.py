@@ -67,30 +67,66 @@ def export(source: Path, allow_file: Path, output: Path) -> int:
 
 def ingest(bundle: Path, inbox: Path) -> tuple[int, int]:
     data = json.loads(bundle.read_text(encoding="utf-8"))
-    if data.get("schema") != SCHEMA or not isinstance(data.get("candidates"), list):
+    return ingest_data(data, inbox)
+
+
+def validate_bundle(data: dict) -> list[dict]:
+    if not isinstance(data, dict) or data.get("schema") != SCHEMA or not isinstance(data.get("candidates"), list):
         raise ValueError("unsupported bundle")
+    if len(data["candidates"]) > 500:
+        raise ValueError("bundle exceeds 500 candidates")
     validated = []
+    by_id = {}
     for record in data["candidates"]:
+        if not isinstance(record, dict) or set(record) != {"schema", "machine_id", "event_id",
+                "candidate_id", "sig", "kind", "binary", "subcommands", "command",
+                "normalizer_version"}:
+            raise ValueError("invalid candidate fields")
         if record.get("schema") != SCHEMA or not all(record.get(k) for k in
             ("machine_id", "event_id", "candidate_id", "sig", "binary", "command")):
             raise ValueError("invalid candidate")
-        if SENSITIVE.search(record["command"]) or ABS_PATH.search(record["command"]):
+        if any(not isinstance(record[k], str) for k in
+               ("machine_id", "event_id", "candidate_id", "sig", "binary", "kind")) or \
+                not re.fullmatch(r"[0-9a-f]{64}", record["candidate_id"]) or \
+                not re.fullmatch(r"[0-9a-f]{12}", record["sig"]) or \
+                not re.fullmatch(r"[a-z0-9][a-z0-9._+-]*", record["binary"]) or \
+                record["normalizer_version"] != 1:
+            raise ValueError("invalid candidate identity or version")
+        if not isinstance(record["command"], str) or len(record["command"]) > 4096 or \
+                not isinstance(record["subcommands"], list) or \
+                not all(isinstance(s, str) for s in record["subcommands"]):
+            raise ValueError("invalid candidate command")
+        if SENSITIVE.search(record["command"]) or ABS_PATH.search(record["command"]) or \
+                any(SENSITIVE.search(s) or ABS_PATH.search(s) for s in record["subcommands"]):
             raise ValueError("sensitive command rejected")
         expected = hashlib.sha256((record["machine_id"] + ":" + record["event_id"] +
                                    ":" + record["sig"]).encode()).hexdigest()
         if record["candidate_id"] != expected:
             raise ValueError("candidate identity mismatch")
+        previous = by_id.setdefault(record["candidate_id"], record)
+        if previous != record:
+            raise ValueError("conflicting candidate: " + record["candidate_id"])
         validated.append(record)
+    return validated
+
+
+def ingest_data(data: dict, inbox: Path) -> tuple[int, int]:
+    validated = validate_bundle(data)
     inbox.mkdir(parents=True, exist_ok=True)
+    for record in validated:
+        path = inbox / (record["candidate_id"] + ".json")
+        if path.exists() and json.loads(path.read_text(encoding="utf-8")) != record:
+            raise ValueError("conflicting candidate: " + record["candidate_id"])
     added = 0
     for record in validated:
         path = inbox / (record["candidate_id"] + ".json")
         if path.exists():
-            if json.loads(path.read_text(encoding="utf-8")) != record:
-                raise ValueError("conflicting candidate: " + record["candidate_id"])
             continue
-        path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n",
-                        encoding="utf-8")
+        import os
+        with path.open("x", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False, indent=2) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
         added += 1
     return added, len(validated) - added
 
