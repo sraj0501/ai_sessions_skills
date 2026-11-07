@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Read-only command knowledge and playback tools over MCP stdio."""
+"""Command knowledge, playback, and app operations over MCP stdio."""
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -11,6 +12,8 @@ import cfg
 import kb
 import search
 import playback_query
+import playback_index
+import mcp_actions
 
 
 TOOL = {
@@ -43,7 +46,7 @@ PLAYBACK_LIST = {
 }
 PLAYBACK_READ = {
     "name": "read_resolution_playback",
-    "description": ("Read exact ordered playback steps: original tool payloads, command output, "
+    "description": ("Read exact raw ordered playback steps when full evidence is needed: original tool payloads, command output, "
                     "agent observations and decisions. Use next_start to read every step. "
                     "Do not invent missing output or private reasoning."),
     "inputSchema": {"type": "object", "properties": {
@@ -53,7 +56,19 @@ PLAYBACK_READ = {
         "required": ["id"], "additionalProperties": False},
     "annotations": {"readOnlyHint": True, "destructiveHint": False},
 }
-TOOLS = [TOOL, PLAYBACK_LIST, PLAYBACK_READ]
+PLAYBACK_COMPACT = {
+    "name": "read_compact_resolution_playback",
+    "description": ("Preferred playback reader for small local models. Returns at most five compact "
+                    "steps with command, observed result, recorded or reconstructed inference, "
+                    "and next action. Raw output remains in the recording."),
+    "inputSchema": {"type": "object", "properties": {
+        "id": {"type": "string", "description": "Playback ID from list_resolution_playbacks"},
+        "start": {"type": "integer", "minimum": 1, "default": 1},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 5, "default": 5}},
+        "required": ["id"], "additionalProperties": False},
+    "annotations": {"readOnlyHint": True, "destructiveHint": False},
+}
+TOOLS = [TOOL, PLAYBACK_LIST, PLAYBACK_COMPACT, PLAYBACK_READ, *mcp_actions.TOOLS]
 
 
 def call_tool(name: str, args: dict) -> dict:
@@ -65,6 +80,15 @@ def call_tool(name: str, args: dict) -> dict:
         options = dict(args)
         ident = options.pop("id")
         return playback_query.timeline(ident, **options)
+    if name == PLAYBACK_COMPACT["name"]:
+        options = dict(args)
+        ident = options.pop("id")
+        limit = options.get("limit", 5)
+        if type(limit) is not int or not 1 <= limit <= 5:
+            raise ValueError("limit must be an integer from 1 to 5")
+        return playback_index.compact_timeline(ident, **options)
+    if name in {item["name"] for item in mcp_actions.TOOLS}:
+        return mcp_actions.call(name, args)
     raise ValueError("Unknown tool")
 
 
@@ -111,7 +135,8 @@ def dispatch(message: dict) -> dict | None:
             found = call_tool(params["name"], args)
             result = {"content": [{"type": "text", "text": json.dumps(found, ensure_ascii=False)}],
                       "structuredContent": found}
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, RuntimeError, OSError, TimeoutError,
+                subprocess.TimeoutExpired) as exc:
             result = {"content": [{"type": "text", "text": str(exc)}], "isError": True}
     else:
         return {"jsonrpc": "2.0", "id": message["id"], "error":

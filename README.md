@@ -48,7 +48,7 @@ ai_session_skills/
 
 ## Install
 
-Needs Python 3 and git — nothing else. `install.py` detects every agent CLI on
+Needs Python 3.10+ and git. `install.py` detects every agent CLI on
 the machine and wires them all.
 
 ```bash
@@ -79,14 +79,15 @@ Copy [`.env.example`](.env.example) to `.env` next to `config.json` and set
 is ignored by Git. Process environment values take precedence. For a separate
 config file, place `.env` beside it or set `AI_SKILLS_ENV_FILE` to its path.
 
-Re-running the installer is safe and never duplicates entries. See
+Re-run the installer after upgrading to refresh the hooks and installed agent
+skill. It is safe to re-run and never duplicates entries. See
 [`tool/README.md`](tool/README.md) for `--only`, `--kb`, `--dry-run`,
 uninstall, and the per-platform path table.
 
-> **Status:** verified end-to-end on macOS and Fedora 44 (117 unit tests + 55
-> smoke checks). Windows was verified on September 9, 2026: 119 unit tests
-> and a real Windows-hook → watcher → Ollama → documentation smoke check passed.
-> Run `doctor.py` after installing.
+> **Status:** capture and writing have end-to-end checks on macOS, Fedora 44,
+> and Windows. The current unit suite passed 196 tests on Windows in November
+> 2026. Live playback capture fidelity across harnesses remains open; run
+> `doctor.py` after installing.
 
 ---
 
@@ -162,11 +163,15 @@ python tool/bin/search.py "connection" --topic postgresql --full
 
 ### Ask an agent to search commands
 
-The read-only MCP server lets local coding harnesses search documented commands
-and inspect resolution playbacks during a conversation. It exposes
-`search_command_knowledge`, `list_resolution_playbacks`, and
-`read_resolution_playback`. Results include exact recorded steps and source
-locations. Register it once per user
+The MCP server lets local harnesses search documented commands, inspect
+playbacks, and operate the capture and backup workflows during a conversation.
+It exposes `search_command_knowledge`, `list_resolution_playbacks`,
+`read_compact_resolution_playback` for small models, and
+`read_resolution_playback` for exact raw evidence, plus bounded management tools for capture control,
+playback notes and finalization, later reasoning, backups, knowledge routing
+and reviewed topic consolidation,
+team sync, and proposal review. Long tasks return a job ID to poll with
+`session_skills_job_status`. Register it once per user
 on each machine, then restart local coding sessions:
 
 ```bash
@@ -180,7 +185,9 @@ sessions share its MCP configuration; Claude Desktop Chat has a separate local
 configuration. Live app discovery still needs verification. Other MCP clients
 can launch `python tool/bin/search_mcp.py` over stdio. Command search reads
 completed Markdown entries, while playback tools read exact local recordings.
-Neither reads the separate WAL.
+Management tools invoke fixed app commands with validated arguments; they do
+not accept arbitrary script names or shell commands. Read tools do not read
+the separate WAL. The optional HTTP OpenAPI endpoint remains read-only.
 Set `AI_SKILLS_EMBED_MODEL` in private `.env` to a locally installed Ollama
 embedding model (for example, `nomic-embed-text:latest`). Knowledge search and
 playback questions require that model; an unavailable model produces an error.
@@ -248,7 +255,7 @@ The client builds incremental SQLite text and embedding indexes under the local
 playback runtime on first use. It refreshes changed events and keeps exact JSON
 events and full raw output as the source of truth. Embeddings come from the required local Ollama
 model, even when the answer model is in the cloud. Each model
-request receives at most five compact step excerpts and a bounded prompt; long
+request receives five compact step excerpts by default and a bounded prompt; long
 outputs stay in the recording. Use `--max-evidence-steps 2` for smaller models.
 Questions need enough matching evidence; if necessary, inspect the exact step
 with `playback_query.py read ID --start N`.
@@ -363,16 +370,16 @@ touched.
 | [`ollama.md`](knowledge/ollama.md) | Ollama |
 | [`agent-tools.md`](knowledge/agent-tools.md) | Agent-native tools and their CLI equivalents |
 
-191 actions documented so far. `_skipped.md` records anything the writer judged
+The entry count changes as actions are captured. `_skipped.md` records anything the writer judged
 not worth documenting, with a reason. `python3 tool/bin/doctor.py` prints the
 current counts.
 
-**There is no list of known commands.** A binary is filed by looking at what
-the knowledge base already documents — once `git status` lives in `git.md`,
-every git command follows it — then at `.routes.json` for earlier decisions,
-and only then by asking the model, once. A fixed table always lags what you
-actually run: `grep.md` and `timeout.md` used to exist here for exactly that
-reason.
+**There is no fixed command-to-topic table.** For each new action the writer
+checks for an exact action match across the knowledge base, retrieves a short
+list of relevant topics with local embeddings, then asks the text model to
+choose a destination. Existing binary routes are hints, not permanent rules.
+If routing is unavailable or uncertain, the WAL record stays queued for retry
+instead of creating another one-command topic.
 
 If something lands in the wrong place, the correction sticks:
 
@@ -381,6 +388,20 @@ python3 tool/bin/kb.py routes                      # where each binary is filed
 python3 tool/bin/kb.py route psql postgresql.md    # fix future entries
 python3 tool/bin/kb.py merge psql.md postgresql.md # move existing ones, sigs intact
 ```
+
+To consolidate older small topic files, generate a model-guided proposal and
+review its source-to-destination moves before applying it:
+
+```bash
+python3 tool/bin/knowledge_organize.py propose --proposal .runtime/knowledge-organize.json
+python3 tool/bin/knowledge_organize.py select --proposal .runtime/knowledge-organize.json --output .runtime/knowledge-reviewed.json --source date.md --source kill.md
+python3 tool/bin/knowledge_organize.py apply --proposal .runtime/knowledge-reviewed.json --approved-sha SHA_FROM_REVIEWED_PROPOSAL
+```
+
+The model decides whether tools such as `lsof`, `grep`, `sed`, or `awk` fit an
+existing shell topic. Apply checks the proposal digest and source file hashes,
+then makes a compressed local backup. No fixed list of shell commands is used.
+Review the moves first; small local models can suggest an unrelated topic.
 
 ### Entry format
 

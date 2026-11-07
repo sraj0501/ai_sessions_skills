@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,6 +20,8 @@ sys.path.insert(0, str(BIN))
 import ask
 from chat_backend import ChatBackend
 import search_mcp
+import mcp_actions
+import playback_index
 sys.path.insert(0, str(BIN.parent))
 import install_search
 import search_http
@@ -116,6 +119,90 @@ class TestSearchTools(unittest.TestCase):
             "method": "tools/call", "params": {"name": "search_command_knowledge",
             "arguments": {"query": ""}}})
         self.assertTrue(reply["result"]["isError"])
+
+    def test_management_tools_are_advertised_and_reject_extra_arguments(self):
+        names = {tool["name"] for tool in search_mcp.TOOLS}
+        self.assertIn("control_capture_pipeline", names)
+        self.assertIn("read_compact_resolution_playback", names)
+        self.assertIn("generate_playback_reasoning", names)
+        self.assertIn("manage_runtime_backup", names)
+        self.assertIn("review_knowledge_proposal", names)
+        reply = search_mcp.dispatch({"jsonrpc": "2.0", "id": 7,
+            "method": "tools/call", "params": {"name": "control_capture_pipeline",
+            "arguments": {"action": "status", "script": "anything.py"}}})
+        self.assertTrue(reply["result"]["isError"])
+
+    def test_compact_playback_reader_limits_page_size(self):
+        with patch.object(playback_index, "compact_timeline", return_value={"steps": []}) as read:
+            self.assertEqual(search_mcp.call_tool("read_compact_resolution_playback",
+                                                  {"id": "example", "limit": 3}), {"steps": []})
+            read.assert_called_once_with("example", limit=3)
+        with self.assertRaises(ValueError):
+            search_mcp.call_tool("read_compact_resolution_playback", {"id": "example", "limit": 20})
+
+    def test_management_dispatch_maps_to_fixed_scripts(self):
+        with patch.object(mcp_actions, "_run", return_value={"ok": True}) as run:
+            result = search_mcp.call_tool("record_resolution_playback",
+                                          {"action": "note", "kind": "observation",
+                                           "text": "The command failed."})
+            self.assertTrue(result["ok"])
+            run.assert_called_once_with("playback.py", "note", "observation",
+                                        "The command failed.", background=False)
+        with self.assertRaises(ValueError):
+            mcp_actions.call("record_resolution_playback",
+                             {"action": "note", "kind": "invented", "text": "x"})
+
+    def test_knowledge_organization_is_available_as_reviewed_mcp_job(self):
+        with patch.object(mcp_actions, "_run", return_value={"job_id": "test"}) as run:
+            proposal = str(Path(self.temp.name) / "plan.json")
+            mcp_actions.call("manage_command_knowledge",
+                             {"action": "organize_propose", "proposal": proposal})
+            run.assert_called_with("knowledge_organize.py", "propose", "--proposal",
+                                   str(Path(proposal).resolve()), "--max-entries", "5",
+                                   background=True)
+            mcp_actions.call("manage_command_knowledge",
+                             {"action": "organize_apply", "proposal": proposal,
+                              "approved_sha": "a" * 64})
+            self.assertEqual(run.call_args.args[0:2], ("knowledge_organize.py", "apply"))
+            mcp_actions.call("manage_command_knowledge",
+                             {"action": "organize_select", "proposal": proposal,
+                              "output": str(Path(self.temp.name) / "approved.json"),
+                              "sources": ["date.md", "kill.md"]})
+            self.assertIn("--source", run.call_args.args)
+        with self.assertRaises(ValueError):
+            mcp_actions.call("manage_command_knowledge",
+                             {"action": "organize_apply", "proposal": proposal,
+                              "approved_sha": "bad"})
+
+    def test_management_status_round_trip_over_mcp(self):
+        reply = search_mcp.dispatch({"jsonrpc": "2.0", "id": 8,
+            "method": "tools/call", "params": {"name": "control_capture_pipeline",
+            "arguments": {"action": "status"}}})
+        result = reply["result"]["structuredContent"]
+        self.assertTrue(result["ok"])
+        self.assertIn("capture", result["output"])
+        self.assertLessEqual(len(result["output"]), mcp_actions.MAX_OUTPUT)
+
+    def test_background_job_reports_bounded_result(self):
+        with patch.object(mcp_actions.cfg, "runtime_dir", return_value=Path(self.temp.name)):
+            with patch.object(mcp_actions.procs, "spawn_detached", return_value=123):
+                launched = mcp_actions.call("generate_playback_reasoning",
+                    {"id": "playback-id", "model": "local-model", "start": 1, "end": 2})
+            self.assertEqual(launched["status"], "running")
+            self.assertEqual(mcp_actions.job_status(launched["job_id"])["status"], "running")
+            self.assertEqual(len(launched["job_id"]), 32)
+
+    def test_background_job_finishes_and_hides_argv(self):
+        launched = mcp_actions._job(mcp_actions.procs.python_argv(BIN / "kb.py", "routes"))
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            state = mcp_actions.job_status(launched["job_id"])
+            if state["status"] != "running":
+                break
+            time.sleep(0.05)
+        self.assertEqual(state["status"], "complete")
+        self.assertEqual(state["exit_code"], 0)
+        self.assertNotIn("argv", state)
 
     def test_chat_tool_call_uses_same_search(self):
         first = {"role": "assistant", "content": "", "tool_calls": [{"id": "call_1",

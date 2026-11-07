@@ -28,6 +28,8 @@ class RuntimeBackupTests(unittest.TestCase):
             (runtime / "knowledge-vectors.sqlite3").write_bytes(b"rebuildable")
             (recording / "vector-index.sqlite3").write_bytes(b"rebuildable")
             (runtime / "watcher.log").write_text("transient")
+            (runtime / "mcp_jobs").mkdir()
+            (runtime / "mcp_jobs" / "job.json").write_text('{"argv":["private"]}')
             archive = runtime_backup.backup(runtime, base / "backups")
             manifest = runtime_backup.verify(archive)
             self.assertEqual(len(manifest["files"]), 6)
@@ -40,6 +42,7 @@ class RuntimeBackupTests(unittest.TestCase):
                              ["output"], str(restored / "playback" / "recording-1" / "playback.md"))
             self.assertFalse((restored / "knowledge-vectors.sqlite3").exists())
             self.assertFalse((restored / "watcher.log").exists())
+            self.assertFalse((restored / "mcp_jobs").exists())
             with self.assertRaises(ValueError):
                 runtime_backup.restore(archive, restored)
             with self.assertRaises(ValueError):

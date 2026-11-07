@@ -37,10 +37,7 @@ and set **Files to include** to `knowledge/**/*.md`.
 | [`pdf-tools.md`](pdf-tools.md) | PDF Generation |
 | [`edge-browser.md`](edge-browser.md) | Edge Browser |
 | [`pdftotext.md`](pdftotext.md) | Pdftotext |
-| [`kill.md`](kill.md) | Kill |
 | [`cloudflared.md`](cloudflared.md) | Cloudflare Tunnel |
-| [`lsof.md`](lsof.md) | Lsof |
-| [`date.md`](date.md) | Date |
 | [`aws.md`](aws.md) | AWS CLI |
 | [`aws-ecs.md`](aws-ecs.md) | AWS ECS |
 | [`docker-buildx.md`](docker-buildx.md) | Docker Buildx |
@@ -78,7 +75,6 @@ and set **Files to include** to `knowledge/**/*.md`.
 | [`discovery-rules.md`](discovery-rules.md) | Discovery Rules |
 | [`functions.md`](functions.md) | Functions Tool |
 | [`modules.md`](modules.md) | Modules Tool |
-| [`mypy.md`](mypy.md) | Type Checking |
 | [`how.md`](how.md) | How |
 | [`model-calls.md`](model-calls.md) | Model Calls |
 | [`10-collectors.md`](10-collectors.md) | `10-collectors.md` |
@@ -93,13 +89,15 @@ and set **Files to include** to `knowledge/**/*.md`.
 | [`uv.md`](uv.md) | Uv |
 | [`get-childitem.md`](get-childitem.md) | Get Childitem |
 | [`select-object.md`](select-object.md) | Select Object |
-| [`godot.md`](godot.md) | Godot Engine |
 | [`godot-engine.md`](godot-engine.md) | Godot Engine |
 | [`foreach-object.md`](foreach-object.md) | Foreach Object |
 | [`godot-tools.md`](godot-tools.md) | Godot Tools |
 | [`codex.md`](codex.md) | Codex |
-| [`python.exe.md`](python.exe.md) | Python.Exe |
 | [`test-path.md`](test-path.md) | Test Path |
+| [`get-ciminstance.md`](get-ciminstance.md) | Get Ciminstance |
+| [`get-process.md`](get-process.md) | Get-Process |
+| [`measure-object.md`](measure-object.md) | Measure Object |
+| [`get-command.md`](get-command.md) | Get Command |
 
 `_skipped.md` records actions the writer judged unsuitable for documentation.
 `.routes.json` stores routing decisions. Capture logs and pending actions are

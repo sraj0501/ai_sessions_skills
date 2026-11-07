@@ -100,14 +100,16 @@ def write_skill(dest: Path, style: str, kb: Path, dry: bool) -> str:
     return "wrote %s" % dest
 
 
-IGNORE_LINES = (".runtime/", ".DS_Store", "__pycache__/", "*.pyc")
+IGNORE_LINES = (".runtime/", "backups/", "playbacks/", ".env", ".env.*",
+                "!.env.example", ".DS_Store", "__pycache__/", "*.pyc")
 
 
 def ensure_gitignore(kb: Path) -> None:
-    """Keep the capture queue out of git.
+    """Keep private runtime data, backups, and environment files out of git.
 
-    `.runtime/pending.jsonl` holds raw command lines, which can contain
-    credentials, so a knowledge base created from scratch must not track it.
+    `.runtime/pending.jsonl` and playback hold raw evidence that can contain
+    credentials. A separate knowledge base must not track these or private
+    environment files and backup archives.
     Only missing lines are appended; an existing file is left otherwise alone.
     """
     path = kb / ".gitignore"

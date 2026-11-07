@@ -53,7 +53,8 @@ Options (identical on every platform):
 --dry-run               show what it would change
 ```
 
-Re-running is safe. Every entry written carries the tool's absolute path as a
+Re-run after an upgrade to refresh hooks and the installed agent skill. Re-running
+is safe. Every entry written carries the tool's absolute path as a
 marker; existing marked entries are purged before re-adding, so you never get
 duplicates, and unrelated settings in those files are preserved (a
 `*.ai-skills.bak` copy is kept). Uninstall with `tool/uninstall.py`.
@@ -62,7 +63,7 @@ duplicates, and unrelated settings in those files are preserved (a
 startup. **Codex additionally requires trusting the hooks**: run `/hooks`
 inside Codex once and approve them.
 
-Requirements: Python 3.8+ and git. No pip installs, no node dependencies, no
+Requirements: Python 3.10+ and git. No pip installs, no node dependencies, no
 bash requirement on Windows. Note that minimal Fedora containers do not ship
 Python — `sudo dnf install python3` first (a Fedora Workstation already has it).
 
@@ -122,10 +123,9 @@ from one source, `tool/skill/BODY.md`, with harness-appropriate frontmatter.
         │            - a session ended (session-end hook drops a flush marker)
         ▼
  bin/distill.py    locks and batches, then per record (writer.mode: text):
-        │            1. bin/kb.py routes it -- from what the KB already
-        │               documents, then .routes.json, then the model, once
-        │            2. already documented? merge the signature, no model call
-        │            3. otherwise ask the model to describe the one command
+        │            1. already documented anywhere? merge the signature
+        │            2. retrieve related topics; ask the model to place it
+        │            3. ask the model to describe the one command
         │               (prompts/ENTRY_PROMPT.md, JSON in / JSON out)
         │            4. bin/kb.py renders and inserts the entry
         │          Default backend is a local Ollama model over HTTP; the
@@ -316,8 +316,7 @@ python3 tool/tests/eval_writer.py --verbose        # show every entry
 
 Measured on this machine, local `gemma4` and cloud `swe-1-7-medium` both score
 48/48; the local run takes ~50s against the cloud run's ~95s (the local number
-includes classifying every unseen binary in a throwaway knowledge base, which a
-real run does once per binary and then remembers). Re-run it after
+includes the older classify-once routing design). Re-run it after
 touching `prompts/ENTRY_PROMPT.md` — prompt changes that read like
 improvements are not reliably improvements.
 
@@ -328,24 +327,16 @@ actually run — `grep.md` and `timeout.md` existed in this repo because those
 binaries were captured before anyone added them to the list, and once a file
 exists the split is self-perpetuating.
 
-Instead a command finds its home in three steps, and only the last costs a
-model call:
-
-1. **The knowledge base is the routing table.** `kb.binary_index()` reads which
-   file already documents each binary from the entries themselves. Once
-   `git status` lives in `git.md`, every other git command follows it.
-2. **Remembered decisions.** `.routes.json` holds any binary decided earlier,
-   so it is classified at most once. It is committed, not gitignored.
-3. **Ask the model.** For a genuinely new binary, the classifier is shown the
-   existing files *and the commands each already documents*, and commits to a
-   category before choosing: `same-ecosystem`, `generic-plumbing` or
-   `new-technology`. Python then holds it to that answer — claiming a new
-   technology and then filing it in the general shell bucket is overridden,
-   because that is the mistake small models make.
-
-Python always sanitises the result, so a proposed filename can never traverse
-out of the knowledge base. If the model is unreachable, the command gets a
-file of its own rather than blocking documentation.
+For every new action, Python first checks for an existing action across all
+topic files. If it finds one, it adds the signature without a model call.
+Otherwise local embeddings retrieve a short list of related topics, including
+the previous binary route where available. The text model decides whether the
+action belongs in an existing ecosystem, general shell topic, or new topic.
+`.routes.json` records choices as hints for future retrieval, not permanent
+filing rules. The model sees only a small topic shortlist rather than the full
+knowledge base. Python validates and sanitises the result. An unavailable or
+uncertain routing answer keeps the WAL record for retry; it does not create a
+binary-named file as a fallback.
 
 **Correcting it is a one-liner, and it sticks:**
 
@@ -358,7 +349,19 @@ python3 tool/bin/kb.py merge dnf.md package-managers.md  # move existing ones
 `merge` carries the `sig` comments across, so nothing is re-documented and the
 routing table repoints itself.
 
-Measured on `gemma4` over 14 unseen binaries against a five-file base: 12
+For existing small files, `knowledge_organize.py propose --proposal
+.runtime/knowledge-organize.json` asks the model to place each entry in an
+existing topic and proposes a whole-file move only when all entries agree.
+Review the JSON and use `knowledge_organize.py select --proposal
+.runtime/knowledge-organize.json --output .runtime/knowledge-reviewed.json
+--source <approved-topic.md>` for accepted moves. Then run
+`knowledge_organize.py apply --proposal .runtime/knowledge-reviewed.json
+--approved-sha SHA_FROM_REVIEWED_PROPOSAL`. Apply checks
+file hashes, preserves signatures, and writes a compressed backup under the
+private runtime directory. Review is necessary: a small model can suggest an
+unrelated topic. No shell-tool list is hardcoded.
+
+An earlier routing design measured on `gemma4` over 14 unseen binaries against a five-file base: 12
 filed as intended, including `pnpm`/`yarn` joining Node, `poetry`/`ruff`
 joining Python, `jq`/`xargs`/`chmod` joining the shell file, and `psql`,
 `systemctl`, `journalctl` and `terraform` each earning a family file. The two
@@ -513,11 +516,19 @@ is no separate search index to rebuild.
 
 ### Agent-callable search
 
-`python tool/install_search.py` registers the read-only search and playback
+`python tool/install_search.py` registers the search, playback, and management
 MCP server at user scope in detected Codex, Claude Code, Claude Desktop Chat,
 Copilot CLI, Cursor, and OpenCode installations. It exposes
-`search_command_knowledge`, `list_resolution_playbacks`, and
-`read_resolution_playback`. Use `--only`
+`search_command_knowledge`, `list_resolution_playbacks`,
+`read_compact_resolution_playback`, and `read_resolution_playback`, plus `inspect_session_skills`,
+`control_capture_pipeline`, `record_resolution_playback`,
+`generate_playback_reasoning`, `manage_runtime_backup`,
+`manage_command_knowledge`, `manage_shared_knowledge`,
+`review_knowledge_proposal`, `manage_team_server`, `manage_team_bundle`, and
+`session_skills_job_status`. The management
+tools map typed inputs to fixed Python entry points. Long tasks return a job
+ID and save only a bounded result under ignored `.runtime/mcp_jobs/`.
+Those temporary job records are excluded from runtime backups. Use `--only`
 or `--dry-run` as needed. Restart the harness and ask it to search a command;
 Claude Code can also show the connection with `/mcp`, and Codex with
 `codex mcp list`. The stdio server is `tool/bin/search_mcp.py` and uses only
@@ -562,7 +573,7 @@ the model context. Use `--page-size 2` for a smaller context, or
 matching steps from local SQLite text and vector indexes. A quoted question makes one
 bounded question-answer request; `--ask` is also accepted. Use `--walkthrough`
 to explain every step when a question is supplied. Adjust retrieval with
-`--max-evidence-steps 2`. The index is built without a model and refreshed when
+`--max-evidence-steps 2`. The text index is built locally and refreshed when
 events change. It stores readable text in the playback runtime, while exact JSON
 events remain authoritative. The local embedding model indexes changed steps in
 short batches, and exact-text ranking helps preserve command matches. Long
@@ -663,16 +674,16 @@ the next watcher — stop the running one if you need them immediately.
 ## Tests
 
 ```bash
-python3 tool/tests/test_portable.py   # 117 unit tests, ~2s, no side effects
-sh tool/tests/smoke.sh                # 55 checks: install/capture/write/stop/uninstall
-python3 tool/tests/eval_writer.py     # writer output quality, needs a model
+python3 -m unittest discover -s tool/tests -q  # complete unit suite
+sh tool/tests/smoke.sh                         # install/capture/write/stop/uninstall
+python3 tool/tests/eval_writer.py              # writer output quality, needs a model
 ```
 
 Windows verification (use `python` if `py -3` is unavailable):
 
 ```powershell
-python tool/tests/test_portable.py
-python tool/tests/smoke_windows.py
+py -3 -m unittest discover -s tool/tests -q
+py -3 tool/tests/smoke_windows.py
 ```
 
 The Windows smoke check uses the real `.cmd` hooks, detached watcher and
@@ -713,9 +724,9 @@ Be aware of what has actually been exercised:
 
 | | Status |
 |---|---|
-| **macOS** (darwin, Python 3.14) | Verified: 117 unit tests + 55 smoke checks, plus real captures, local-model writer runs and the quality eval |
-| **Linux** (Fedora 44, Python 3.14) | Verified: same unit and smoke suites, including the detached watcher and git commit |
-| **Windows** | Verified September 9, 2026: 119 unit tests plus real `.cmd` capture/session hooks, detached watcher, Ollama `gemma4:latest` writing and deduplication. Live Codex hook dispatch still requires a restarted session and trusted hooks. |
+| **macOS** (darwin, Python 3.14) | Capture and writing verified with unit and smoke checks, real captures, local-model writer runs and the quality eval |
+| **Linux** (Fedora 44, Python 3.14) | Capture and writing verified with unit and smoke checks, including the detached watcher and git commit |
+| **Windows** | Capture and writing verified with real `.cmd` hooks, detached watcher, Ollama writing and deduplication. The full unit suite passed 196 tests in November 2026. Live Codex hook dispatch and playback fidelity still need end-to-end verification. |
 | Capture for all six harness payload shapes | Verified (unit tests + live hooks) |
 | Writer: **devin**, **opencode** | Verified end-to-end |
 | Writer: **claude**, **copilot** | Invocation verified; runs could not complete on the test machine (not logged in / quota exhausted) |

@@ -208,6 +208,18 @@ def find_match(entries: list[Entry], binary: str, subcmds: list[str]) -> Entry |
     return None
 
 
+def find_action(kb: Path, binary: str, subcmds: list[str]) -> tuple[Path, Entry] | None:
+    """Find an already documented action even if an earlier route was wrong."""
+    for path in sorted(kb.glob("*.md")):
+        if path.name in (SKIPPED_FILE, "README.md"):
+            continue
+        match = find_match(parse(path.read_text(encoding="utf-8", errors="replace")),
+                           binary, subcmds)
+        if match:
+            return path, match
+    return None
+
+
 def canonical_section(name: str, existing: list[str]) -> str:
     """Snap a proposed section onto an existing one when it means the same.
 

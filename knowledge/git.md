@@ -59,6 +59,10 @@
 <!-- sig: f844b6d692fe -->
 <!-- sig: 7f9628d4868f -->
 <!-- sig: 31b4bd747162 -->
+<!-- sig: 5ee2119f9e77 -->
+<!-- sig: d09c1a9082b7 -->
+<!-- sig: 72caf217848e -->
+<!-- sig: fb458490d571 -->
 
 ```bash
 git status --short --branch
@@ -158,6 +162,10 @@ git status --short --branch
 <!-- sig: 2d042f0b0801 -->
 <!-- sig: 04aed6557565 -->
 <!-- sig: c6aca3c52bd5 -->
+<!-- sig: ea6512a7e856 -->
+<!-- sig: f6508e78c10e -->
+<!-- sig: 55ba4fb5693d -->
+<!-- sig: 0980925e5298 -->
 
 ```bash
 git --no-pager diff
@@ -322,6 +330,9 @@ git --no-pager diff --staged
 <!-- sig: 68a8b636a637 -->
 <!-- sig: 376e506fb17b -->
 <!-- sig: af7f51a21616 -->
+<!-- sig: b096bf5345ed -->
+<!-- sig: 17e1d55d43f6 -->
+<!-- sig: b3c63b1bbd04 -->
 
 ```bash
 git log --oneline -10
@@ -804,6 +815,18 @@ git -C D:git_appsai_sessions_skills grep -n -E '^    def test_|^def test_|^class
 - **Why:** This allows searching for code patterns related to tests across multiple files without needing to check out or modify the repository state first.
 - **Example:** git -C D:git_appsai_sessions_skills grep -n -E '^ def test_|^def test_|^class Test' 94a2544f8c85a630fa8b5d9a94d9938121aef11b -- tool/tests/test_portable.py tool/tests/test_ide_capture.py
 - **Notes:** The -C flag changes the directory for the operation, and the pattern searches for lines starting with ' def test_', 'def test_', or 'class Test'.
+
+### Identify files with potential secrets in ahead commits
+<!-- sig: d047ebd2d921 -->
+
+```bash
+git diff origin/main..HEAD --unified=0
+```
+
+- **What it does:** Compares the current HEAD against the origin/main branch using a zero-line unified diff format to show only the changed lines.
+- **Why:** The unified=0 flag removes context lines, making it easier to parse only the specific lines added or removed for secret scanning.
+- **Example:** git diff origin/main..HEAD --unified=0
+- **Notes:** This command is being piped into a PowerShell script to regex-match for patterns like API keys or tokens.
 
 ## Remotes and syncing
 
@@ -1357,6 +1380,19 @@ git ls-files .codex_stage
 - **Why:** This allows inspection of the exact contents of the index for a specific set of files without needing to check out or commit them.
 - **Example:** git ls-files .codex_stage to verify which files are staged for the next commit.
 - **Notes:** This command only shows files known to Git; it does not list untracked files.
+
+### Identify staged lines that might contain secrets
+<!-- sig: 4bd6b00de8e0 -->
+
+```bash
+$lines = git diff --cached --unified=0 -- . ':!*.md;'
+$hits = @($lines | Where-Object { $_ -match '^\[+[^\+]' -and $_ -match '(?i)(sk-[A-Za-z0-9_-]{20,}|ollama[_ -]?api[_ -]?key\s*[=:]\s*[^#\s]{8,}|password\s*[=:]\s*[^#\s]{8,}|bearer\s+[A-Za-z0-9._-]{20,})' })
+```
+
+- **What it does:** Captures the staged diff as a collection of lines, excluding Markdown files, and filters for lines starting with a plus sign that match patterns for API keys, passwords, or bearer tokens.
+- **Why:** Prevents accidental commits of sensitive credentials by scanning the staged area before the commit is finalized.
+- **Example:** $lines = git diff --cached --unified=0 -- . ':!*.md;' ...
+- **Notes:** The ':!*.md' pathspec ensures that documentation files are ignored during the secret scan.
 
 ## Shelving work
 

@@ -911,6 +911,45 @@ ls .venv venv 2>/dev/null
 - **Example:** cd packages/collectors && (ls .venv venv 2>/dev/null | head -2; which python3; python3 -m pytest -q -x tests/test_mirrored_database_manager.py 2>&1 | tail -5)
 - **Notes:** The outer parentheses group the commands, and the redirection handles potential non-existence of the directory.
 
+### Display object properties in a vertical list format
+<!-- sig: 446c3a372179 -->
+
+```bash
+Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM,DriverVersion | Format-List
+```
+
+- **What it does:** Takes the selected properties of the Win32_VideoController objects and prints them in a list format where each property name and value appears on a new line.
+- **Why:** Easier to read than the default table view when dealing with long strings or many properties that would otherwise be truncated or wrapped.
+- **Example:** Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM,DriverVersion | Format-List
+- **Notes:** Format-List is a formatting cmdlet and its output is typically not passed to another command; it is intended for the final step of a pipeline.
+
+### Display process properties in a perfectly sized table
+<!-- sig: ea7fb2cf5291 -->
+
+```bash
+Get-Process ollama* -ErrorAction SilentlyContinue | Select-Object ProcessName,CPU,WorkingSet,StartTime | Format-Table -AutoSize
+```
+
+- **What it does:** Filters for processes starting with 'ollama', selects specific performance metrics, and outputs them in a table where column widths automatically adjust to fit the content.
+- **Why:** Prevents the output from being truncated or wrapped awkwardly when viewing long property names or large memory values.
+- **Example:** Get-Process ollama* -ErrorAction SilentlyContinue | Select-Object ProcessName,CPU,WorkingSet,StartTime | Format-Table -AutoSize
+- **Notes:** -ErrorAction SilentlyContinue prevents the command from failing if no processes matching the glob are found.
+
+### Extract specific line ranges from a file
+<!-- sig: 071e7276ed0d -->
+
+```bash
+$c=Get-Content tool/README.md;
+$c[0..110];
+$c[420..595];
+$c[655..725]
+```
+
+- **What it does:** Loads the contents of tool/README.md into an array and prints three specific index ranges of lines.
+- **Why:** Allows for quick inspection of specific sections of a long file without scrolling or using a full text editor.
+- **Example:** $c=Get-Content tool/README.md; $c[0..110]; $c[420..595]; $c[655..725]
+- **Notes:** PowerShell's Get-Content returns an array of strings when the file has multiple lines, allowing for direct index slicing.
+
 ## Path and command availability
 
 ### Check whether a command is installed on PATH
@@ -1006,6 +1045,7 @@ where.exe godot
 
 ### Check existence and retrieve details of a file
 <!-- sig: 30709d8c5756 -->
+<!-- sig: b809381003cd -->
 
 ```bash
 $path = 'C:\Users\sraj\.codex\visualizations\2026\09\10\01a08c95-8193-7763-aaa7-3156f1c8763b\circuit-clash-concept.html'; Write-Output 'exists=$(Test-Path -LiteralPath $path)'; if '(Test-Path' -LiteralPath '$path)' '{' Get-Item -LiteralPath '$path'`],
@@ -1021,6 +1061,7 @@ This script first assigns the full path to the variable $path, then outputs a bo
 ### Retrieve metadata for multiple files
 <!-- sig: 3ec4563bf4f7 -->
 <!-- sig: e3b61c377491 -->
+<!-- sig: 3005d960c354 -->
 
 ```bash
 Get-Item -LiteralPath '$doc,$image'
@@ -1191,6 +1232,13 @@ Get-Item -LiteralPath '$doc,$image'
 <!-- sig: 01add8a7b723 -->
 <!-- sig: 68bed290e21e -->
 <!-- sig: ae5218129dcb -->
+<!-- sig: 4eb77e4bf771 -->
+<!-- sig: f73438a80050 -->
+<!-- sig: 5c03f0a3d424 -->
+<!-- sig: 85ffbe223e18 -->
+<!-- sig: 529576d0c3ad -->
+<!-- sig: 0f790ff6b333 -->
+<!-- sig: 6ff19f276b91 -->
 
 ```bash
 rg -l -e 'ENTRA_REFRESH_TOKEN'
@@ -1645,6 +1693,11 @@ cat; grep -n 'async \(upsert\|insert\|record\|save\|replace\[A-Za-z]*(' packages
 <!-- sig: f10d31c96434 -->
 <!-- sig: 425b190db584 -->
 <!-- sig: ac4e54c52278 -->
+<!-- sig: 88ab555c0a86 -->
+<!-- sig: 5c50440ede16 -->
+<!-- sig: 5b2708537b01 -->
+<!-- sig: d5dacf99b6cf -->
+<!-- sig: 4eb4aa032466 -->
 
 ```bash
 Where-Object Name -Match Godot
@@ -1840,6 +1893,7 @@ sort -rn
 <!-- sig: ac5752fc7662 -->
 <!-- sig: d579cb775220 -->
 <!-- sig: 3a49e3015a2b -->
+<!-- sig: b263de417dc4 -->
 
 ```bash
 sort-object
@@ -2045,6 +2099,9 @@ nl -ba .github/workflows/ci-cd.yml
 <!-- sig: d75e64617e68 -->
 <!-- sig: e2a0c2eb09b6 -->
 <!-- sig: acff56557f5e -->
+<!-- sig: a085508f460a -->
+<!-- sig: e5eea2e17a04 -->
+<!-- sig: f544816ed122 -->
 
 ```bash
 sed -i '' 's/(change log: 2026-09-28 to 2026-10-16)/(change log: 2026-09-28 to 2026-10-21)/' architecture/00-overview.md
@@ -2084,6 +2141,7 @@ Copy-Item -LiteralPath 'D:\git_apps\Devtrack_\.codex_stage\NeonBlocks\project.go
 
 ### Delete a specific application directory
 <!-- sig: b1cd33d79854 -->
+<!-- sig: 29be379e4ded -->
 
 ```bash
 Remove-Item -LiteralPath 'D:\git_apps\games\tetris'
@@ -2096,6 +2154,7 @@ Remove-Item -LiteralPath 'D:\git_apps\games\tetris'
 
 ### Copy a file only if the destination does not exist
 <!-- sig: d15bd7e83b36 -->
+<!-- sig: 6217209852a0 -->
 
 ```bash
 Out-Null if '(Test-Path -LiteralPath '$destinationImage') {' throw 'Destination already exists; refusing to overwrite it.' '} Copy-Item -LiteralPath '$sourceImage' -Destination '$destinationImage' Get-Item -LiteralPath '$destinationImage'
@@ -2117,6 +2176,51 @@ del /f /q D:git_appsDevtrack_.codexhooks.json
 - **Why:** This is used to clean up a specific, potentially problematic hook file in a development repository without interactive confirmation.
 - **Example:** del /f /q D:git_appsDevtrack_.codexhooks.json before re-running setup scripts.
 - **Notes:** The /f flag forces deletion even if the file is read-only, and /q suppresses prompts for confirmation.
+
+### Verify that source and target paths are inside the workspace
+<!-- sig: 8604478d4025 -->
+
+```bash
+$workspace = (Resolve-Path -LiteralPath .).Path;
+$source = (Resolve-Path -LiteralPath "['vscode', 'cli']").Path;
+$target = (Resolve-Path -LiteralPath '.runtime\wal').Path;
+if (-not $source.StartsWith($workspace + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or -not $target.StartsWith($workspace + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Path outside workspace' }
+```
+
+- **What it does:** Resolves the absolute paths for the current directory, a specific source folder, and a target folder, then checks if both source and target reside within the workspace root.
+- **Why:** Prevents scripts from accidentally modifying or accessing files outside of the intended project directory, acting as a safety guardrail.
+- **Example:** Use this logic at the start of a build or deployment script to ensure the environment is correctly scoped.
+- **Notes:** Uses -LiteralPath to ensure paths containing brackets or special characters are handled correctly by Resolve-Path.
+
+### Move a file and delete source if machine IDs match
+<!-- sig: ca29ec52a449 -->
+
+```bash
+Move-Item -LiteralPath '$files[0].FullName' -Destination '$destination'
+if ((Get-Content -Raw -LiteralPath '$idSource').Trim() -eq (Get-Content -Raw -LiteralPath '$idTarget').Trim()) { Remove-Item -LiteralPath '$idSource' }
+```
+
+- **What it does:** Moves a specific file from a source path to a destination and checks if the content of a machine-id file matches between source and target. If they match, it deletes the source machine-id file.
+- **Why:** Ensures that files are only moved when the underlying machine identity is consistent, preventing data corruption or identity mismatches during migration.
+- **Example:** Move a JSON event file and remove the source machine-id if the IDs are identical.
+- **Notes:** Uses -LiteralPath to ensure that special characters in the file paths are not interpreted as wildcards.
+
+### Delete specific failed batch files within a workspace
+<!-- sig: ac16d5535fa3 -->
+
+```bash
+$failedDir = (Resolve-Path -LiteralPath '.runtime/failed').Path;
+$workspace = (Resolve-Path -LiteralPath '.').Path;
+if (-not $failedDir.StartsWith($workspace + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Failed directory is outside workspace' };
+$files = @(Get-ChildItem -LiteralPath $failedDir -File -Filter 'batch-*.jsonl');
+if ($files.Count -ne 6) { throw "Expected 6 failed batches, found $($files.Count)" };
+foreach ($file in $files) { Remove-Item -LiteralPath $file.FullName -Force };
+```
+
+- **What it does:** Resolves the paths for the workspace and a failed directory, validates that the failed directory is inside the workspace, and deletes exactly 6 files matching 'batch-*.jsonl' from the failed directory.
+- **Why:** Ensures safety by verifying the directory path before performing a bulk deletion of specific batch files.
+- **Example:** $failedDir = (Resolve-Path -LiteralPath '.runtime/failed').Path; $workspace = (Resolve-Path -LiteralPath '.').Path; if (-not $failedDir.StartsWith($workspace + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Failed directory is outside workspace' }; $files = @(Get-ChildItem -LiteralPath $failedDir -File -Filter 'batch-*.jsonl'); if ($files.Count -ne 6) { throw "Expected 6 failed batches, found $($files.Count)" }; foreach ($file in $files) { Remove-Item -LiteralPath $file.FullName -Force };
+- **Notes:** Uses -LiteralPath to ensure paths with special characters are handled correctly. The script will throw an error if the count of files found is not exactly 6.
 
 ## Processes
 
@@ -2383,6 +2487,7 @@ EOF
 <!-- sig: 636faf764251 -->
 ### Check for local admin artifacts existence
 <!-- sig: 402a31973b52 -->
+<!-- sig: dc544962b055 -->
 
 ```bash
 if exist .codex-cache '(dir' /s /b '.codex-cache)' else '(echo' 'NO_LOCAL_ADMIN_E2E_ARTIFACTS)'
@@ -4278,6 +4383,31 @@ docker rm $cid >/dev/null if [[ -z $hits ]]; then echo 'RESULT NO_DOTENV_FILES' 
 - **Example:** 'true)' docker rm '$cid' '>/dev/null' if '[[' -z '$hits' ']];' then echo 'RESULT NO_DOTENV_FILES' else echo 'RESULT DOTENV_PATHS_FOUND' printf '%s ' '$hits' fi done
 - **Notes:** The structure suggests this is part of a larger shell loop where $cid and $hits are set in preceding iterations.
 
+### Count files grouped by their file extension
+<!-- sig: f1f54d1b7c7f -->
+
+```bash
+Get-ChildItem -LiteralPath "['vscode', 'cli']\events" -Recurse -File | Group-Object Extension | Select-Object Name,Count
+Get-ChildItem -LiteralPath ".runtime\wal\events" -Recurse -File -ErrorAction SilentlyContinue | Group-Object Extension | Select-Object Name,Count
+```
+
+- **What it does:** Retrieves all files in specified paths recursively and groups them by their file extension property to count occurrences.
+- **Why:** Provides a quick summary of file types within a directory structure, which is useful for identifying unexpected file types or auditing log growth.
+- **Example:** Get-ChildItem -LiteralPath "['vscode', 'cli']\events" -Recurse -File | Group-Object Extension | Select-Object Name,Count
+- **Notes:** -ErrorAction SilentlyContinue is used to ignore permission errors on system-protected folders.
+
+### Check existence of multiple files in a loop
+<!-- sig: 1321f37ba0f7 -->
+
+```bash
+'$names' = '@(lsof.md,date.md,kill.md,py.md,python.exe.md,godot.md);' '$names'
+```
+
+- **What it does:** Initializes an array of filenames and prepares to iterate over them to check for existence on the filesystem.
+- **Why:** Allows for batch processing of multiple files in a single script block rather than writing individual test-path commands for each file.
+- **Example:** $names = @('lsof.md','date.md','kill.md','py.md','python.exe.md','godot.md'); $names | ForEach-Object { "$_ exists=" + (Test-Path (Join-Path knowledge $_)) }
+- **Notes:** The command as provided is a partial snippet of a larger loop used to verify the presence of specific documentation files.
+
 ## Running scripts
 
 ### Execute a smoke test script with specific environment settings
@@ -5507,3 +5637,53 @@ set 'GIT_NO_DEVTRACK=1&&' git log --oneline '-20&&' type README.md
 - **Why:** It combines viewing recent commit history with immediately displaying the contents of a key documentation file in one sequence.
 - **Example:** set 'GIT_NO_DEVTRACK=1&&' git log --oneline '-20&&' type README.md to check recent changes and documentation simultaneously.
 - **Notes:** The use of '&&' ensures the subsequent command only runs if the preceding one succeeds. The 'set' command is used here to conditionally set an environment variable for the git operation.
+
+## Network inspection
+
+### List processes listening on a specific port
+<!-- sig: ebf9f087c112 -->
+<!-- sig: 088be0b68957 -->
+<!-- sig: 1f53457bd780 -->
+<!-- sig: 28324e911510 -->
+<!-- sig: ae8c1a3e59a5 -->
+
+```bash
+lsof -nP -iTCP:8000 -sTCP:LISTEN
+```
+
+- **What it does:** Lists open files and network connections using lsof, specifically filtering for TCP connections listening on port 8000 and showing process IDs numerically.
+- **Why:** This provides a direct, process-centric view of which application is occupying a specific network port, which is more detailed than netstat.
+- **Example:** lsof -nP -iTCP:8000 -sTCP:LISTEN to check which process is using port 8000.
+- **Notes:** The command failed because lsof requires root privileges (sudo) to see all processes' open files and network sockets.
+
+## Process monitoring
+
+### Check if a specific process is currently running
+<!-- sig: 12600199bfc5 -->
+<!-- sig: b0e4af03f137 -->
+
+```bash
+date '+%T;'
+pgrep -f 'm main' '>/dev/null'
+```
+
+- **What it does:** The first part prints the current time, and the second part searches for processes containing 'm main' in their full command line, suppressing any output.
+- **Why:** This pattern is used to timestamp the check and then conditionally execute subsequent commands based on the exit status of pgrep.
+- **Example:** date '+%T;' pgrep -f 'm main' '>/dev/null' to see the time and confirm the process status.
+- **Notes:** The use of '>/dev/null' redirects standard output, ensuring the command runs silently unless an error occurs.
+
+## Process management
+
+### Gracefully terminate a specific process
+<!-- sig: 765f7a6fbd4b -->
+<!-- sig: 786e5925b544 -->
+<!-- sig: 94a4ab5d1928 -->
+
+```bash
+kill -TERM 21665
+```
+
+- **What it does:** Sends the TERM signal to the process ID 21665, requesting it to shut down cleanly.
+- **Why:** Using TERM allows the process to catch the signal and perform necessary cleanup, unlike SIGKILL which forces an immediate termination.
+- **Example:** kill -TERM 21665 to stop a background worker process gracefully.
+- **Notes:** The process must be running for this command to affect it. If the process ignores SIGTERM, you may need to use SIGKILL (-9).

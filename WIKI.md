@@ -46,11 +46,15 @@ writer, normalize commands, deduplicate events, or distill the session.
   The default preferred backend is local Ollama. An `agent` writer mode is
   available through configuration. Unavailable models cause retries; failed
   batches can be parked for inspection.
-- Routes entries into technology files under `knowledge/`, learns binary to
-  file choices in `knowledge/.routes.json`, and merges variants under one
-  reusable action. `kb.py routes`, `route`, and `merge` inspect or correct
-  routing. A writer can commit completed batches locally when `auto_commit`
+- Finds exact actions across topic files, retrieves a small topic shortlist
+  with local embeddings, and asks the model to place each new action.
+  `knowledge/.routes.json` holds prior choices as hints; `kb.py routes`,
+  `route`, and `merge` inspect or correct routing. A writer can commit completed batches locally when `auto_commit`
   is enabled; `auto_push` is off by default.
+- `knowledge_organize.py propose` reviews older small files with the model.
+  `select` keeps only reviewed moves. `apply` requires that proposal's digest,
+  verifies file hashes, and creates a
+  compressed runtime backup before merging approved topics.
 - Searches existing Markdown entries with the keyword CLI `search.py` or with
   semantic plus exact-text ranking through MCP, HTTP, and `ask.py`. Semantic
   search requires a local Ollama embedding model named by
@@ -58,15 +62,22 @@ writer, normalize commands, deduplicate events, or distill the session.
   files under `.runtime/`. Signature comments are excluded from embedded text.
   `knowledge/README.md` is the topic index. `sync_seen.py` rebuilds the
   separate signature cache from Markdown markers.
-- Exposes the same documented-command search as a read-only MCP tool for local
+- Exposes documented-command search and bounded app operations over MCP for local
   coding harnesses. `install_search.py` registers it globally with detected
   Codex, Claude Code, Claude Desktop Chat, Copilot CLI, Cursor, and OpenCode
   installations. `ask.py` offers the search function through the
   OpenAI-compatible Chat Completions API. `search_http.py` exposes the same read-only
   functions over OpenAPI for HTTP-based harnesses such as Open WebUI. Search reads completed knowledge
   entries, not private WAL or playback data.
+- MCP management tools control capture, record and annotate playbacks, generate
+  later reasoning, back up or restore runtime data, maintain knowledge routes,
+  and run reviewed team knowledge operations. Each maps typed arguments to a
+  fixed app command. Long tasks return a job ID; temporary bounded results
+  live under ignored `.runtime/mcp_jobs/` and are excluded from backups.
+  The HTTP OpenAPI service still exposes only read operations.
 - The MCP server also lists and reads locally recorded resolution playbacks,
-  one exact event page at a time. `playback_chat.py` lets a compatible chat
+  using compact five-step pages by default or exact raw event pages when needed.
+  `playback_chat.py` lets a compatible chat
   endpoint walk through a recording in small pages or answer a question using
   retrieved compact steps. Local text and vector indexes select evidence;
   the required local Ollama embedding model indexes changed steps. Raw output

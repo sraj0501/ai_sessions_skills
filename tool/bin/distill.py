@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cfg      # noqa: E402
 import kb       # noqa: E402
 import procs    # noqa: E402
+import vector_cache  # noqa: E402
 
 SIG_RE = re.compile(r"<!--\s*sig:\s*([0-9a-f]{6,40})\s*-->")
 WRITER_VERSION = 1
@@ -195,13 +196,14 @@ ROUTE_SCHEMA = {
         "kind": {"type": "string", "enum": list(ROUTE_KINDS)},
         "file": {"type": "string"},
         "title": {"type": "string"},
+        "confidence": {"type": "string", "enum": ["clear", "uncertain"]},
     },
-    "required": ["kind", "file", "title"],
+    "required": ["kind", "file", "title", "confidence"],
 }
 
 
 def route_prompt(record: dict, choices: list[tuple[str, str, list[str]]]) -> str:
-    """Ask which file a never-before-seen command belongs in.
+    """Ask where a new action belongs using a small set of relevant topics.
 
     Each candidate is shown with the commands it already documents: concrete
     evidence beats a title, and it is what makes `pnpm` land beside `npm`.
@@ -213,7 +215,7 @@ def route_prompt(record: dict, choices: list[tuple[str, str, list[str]]]) -> str
     return (
         "You organise a personal command reference. Each file covers one "
         "technology or family of tools.\n\n"
-        "A command was run that the reference does not cover yet:\n\n"
+        "A command action was run that the reference does not cover yet:\n\n"
         "    binary:  %s\n    command: %s\n\n"
         "%s\n\n"
         "First decide what kind of tool this is:\n\n"
@@ -224,32 +226,69 @@ def route_prompt(record: dict, choices: list[tuple[str, str, list[str]]]) -> str
         "similar tools from other ecosystems.\n"
         "- `generic-plumbing` — general-purpose Unix work that is tied to no "
         "particular technology: searching, editing, archiving, piping, "
-        "permissions, process and file management.\n"
+        "permissions, process and file management. Prefer a broad shell or "
+        "utilities topic over a narrow file about a similar command on a "
+        "different operating-system ecosystem.\n"
         "- `new-technology` — a specific technology the reference does not "
         "cover yet. A database client, an operating-system package manager, "
         "an init or service system, or an infrastructure tool is always this, "
         "never `generic-plumbing`, even when no listed file fits.\n\n"
-        "Then choose `file`:\n\n"
+        "Then choose `file`. Prefer an existing topic when its scope fits, "
+        "even if the command's binary differs from the binaries listed. "
+        "If the evidence is insufficient, set confidence to `uncertain`.\n\n"
         "- `same-ecosystem` -> the existing file for that ecosystem.\n"
         "- `generic-plumbing` -> the listed general shell/utilities file.\n"
         "- `new-technology` -> a NEW filename, named for the family rather "
         "than this one binary, so related tools can join it later.\n\n"
         "Reply with JSON: {\"kind\": \"...\", \"file\": \"<name>.md\", "
-        "\"title\": \"<Heading>\"}. `file` is short and lowercase; `title` is "
+        "\"title\": \"<Heading>\", \"confidence\": \"clear|uncertain\"}. "
+        "`file` is short and lowercase; `title` is "
         "a human heading of one to three words, never a command line.\n"
         % (record.get("binary", ""), record.get("command", ""),
            ("Existing files:\n" + listing) if listing else "The reference is empty."))
 
 
-def classify(record: dict, kb_dir: Path, backend: dict, timeout: int,
-             runtime: Path) -> tuple[str, str] | None:
-    """Decide a home for an unknown binary. Returns None if the model cannot."""
+def route_choices(record: dict, kb_dir: Path, runtime: Path,
+                  excluded: set[str] | None = None) -> list[tuple[str, str, list[str]]]:
+    """Use local embeddings to keep the routing question short."""
     by_file: dict[str, list[str]] = {}
     for known_binary, filename in sorted(kb.binary_index(kb_dir).items()):
         by_file.setdefault(filename, []).append(known_binary)
-    choices = sorted((name, kb.title_of(kb_dir, name), by_file.get(name, []))
-                     for name in (p.name for p in kb_dir.glob("*.md"))
-                     if name not in (kb.SKIPPED_FILE, "README.md"))
+    summaries = []
+    breadth = {}
+    for path in sorted(kb_dir.glob("*.md")):
+        if path.name in (kb.SKIPPED_FILE, "README.md") or path.name in (excluded or set()):
+            continue
+        entries = kb.parse(path.read_text(encoding="utf-8", errors="replace"))
+        breadth[path.name] = len(entries)
+        sections = list(dict.fromkeys(entry.section for entry in entries))[:12]
+        samples = [entry.heading + " " + " ".join(entry.commands[:1])
+                   for entry in entries[:4]]
+        summaries.append((path.name, "\n".join([kb.title_of(kb_dir, path.name),
+                                                   *sections, *by_file.get(path.name, []),
+                                                   *samples])))
+    if not summaries:
+        return []
+    query = " ".join([str(record.get("binary") or ""),
+                      str(record.get("command") or "")])
+    ranked = vector_cache.rank(runtime / "routing-vectors.sqlite3", summaries,
+                               query, min(7, len(summaries)))
+    # Broad files cover many tools and can be missed when a narrow file has a
+    # closer title. Include a few broad topics, selected from the KB itself.
+    for name in sorted(breadth, key=lambda item: (-breadth[item], item))[:3]:
+        if name not in ranked:
+            ranked.append(name)
+    prior = kb.known_route(record, kb_dir)
+    if prior and prior[0] not in ranked and prior[0] not in (excluded or set()):
+        ranked = [prior[0], *ranked]
+    return [(name, kb.title_of(kb_dir, name), by_file.get(name, []))
+            for name in ranked]
+
+
+def classify(record: dict, kb_dir: Path, backend: dict, timeout: int,
+             runtime: Path, excluded: set[str] | None = None) -> tuple[str, str] | None:
+    """Ask the model to place an action; None means retry or human review."""
+    choices = route_choices(record, kb_dir, runtime, excluded)
     raw = run_text(backend, route_prompt(record, choices), timeout, runtime, ROUTE_SCHEMA)
     if not raw:
         return None
@@ -259,6 +298,8 @@ def classify(record: dict, kb_dir: Path, backend: dict, timeout: int,
     try:
         reply = json.loads(found.group(0))
     except Exception:
+        return None
+    if reply.get("confidence") != "clear" or reply.get("kind") not in ROUTE_KINDS:
         return None
     # The model suggests; Python decides the actual path.
     if not str(reply.get("file") or "").strip():
@@ -278,6 +319,8 @@ def classify(record: dict, kb_dir: Path, backend: dict, timeout: int,
         if not (kb_dir / derived).exists():
             filename = derived
 
+    if filename in (excluded or set()):
+        return None
     if (kb_dir / filename).exists():
         # An existing file keeps its own heading: this is choosing a
         # destination, not renaming one.
@@ -419,15 +462,19 @@ def document_record(kb_dir: Path, runtime: Path, record: dict, backend: dict,
     binary = str(record.get("binary") or "").lower()
     subcmds = list(record.get("subcommands") or [])
 
-    # Where does this belong? What the knowledge base already documents wins;
-    # only a genuinely new binary costs a classification call, and the answer
-    # is remembered so it is never asked twice.
-    target = kb.known_route(record, kb_dir)
+    existing = kb.find_action(kb_dir, binary, subcmds)
+    if existing:
+        kb.add_sig(existing[0], sig, existing[1].heading)
+        return "merged"
+
+    # The old binary route is only a candidate. A new action may belong to a
+    # different topic; do not let one earlier classification decide forever.
+    target = classify(record, kb_dir, backend, timeout, runtime)
     if target is None:
-        target = classify(record, kb_dir, backend, timeout, runtime) \
-            or kb.fallback_route(record)
-        kb.remember_route(kb_dir, binary, target[0])
-        cfg.session_log("routed", sig, binary, "-> %s" % target[0], "writer")
+        log(runtime, "routing needs review or model retry for signature %s" % sig)
+        return "failed"
+    kb.remember_route(kb_dir, binary, target[0])
+    cfg.session_log("routed", sig, binary, "-> %s" % target[0], "writer")
     filename, title = target
 
     path = kb_dir / filename

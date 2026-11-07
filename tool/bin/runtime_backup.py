@@ -28,6 +28,8 @@ def _durable_files(runtime: Path) -> list[tuple[Path, str]]:
         raise ValueError(f"runtime directory does not exist: {runtime}")
     files = []
     for path in sorted(runtime.rglob("*")):
+        if "mcp_jobs" in path.relative_to(runtime).parts:
+            continue
         if path.is_symlink():
             raise ValueError(f"runtime contains a symbolic link: {path}")
         if (not path.is_file() or path.name in SKIP_FILES or path.name.endswith(SKIP_SUFFIXES)

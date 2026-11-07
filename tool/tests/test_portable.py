@@ -27,6 +27,7 @@ import cfg         # noqa: E402
 import distill     # noqa: E402
 import json_merge  # noqa: E402
 import kb          # noqa: E402
+import knowledge_organize  # noqa: E402
 import procs       # noqa: E402
 import search as knowledge_search
 
@@ -657,6 +658,96 @@ class TestRouting(unittest.TestCase):
         self.assertEqual(kb.known_route({"binary": "dnf"}, self.kb)[0],
                          "package-managers.md")
 
+    def test_exact_action_is_found_across_topic_files(self):
+        self.document("utilities.md", "Utilities", "grep -rn foo .")
+        found = kb.find_action(self.kb, "grep", [])
+        self.assertEqual(found[0].name, "utilities.md")
+
+    def test_new_action_asks_model_even_when_binary_has_route(self):
+        self.document("old.md", "Old", "grep -rn foo .")
+        record = {"binary": "grep", "subcommands": [], "command": "grep -n bar .",
+                  "sig": "bbbbbbbbbbbb"}
+        with patch.object(distill, "classify", return_value=("shell.md", "Shell")) as route, \
+             patch.object(distill, "run_text", return_value=json.dumps({
+                 "worth_documenting": True, "heading": "Find lines", "what": "Finds text",
+                 "why": "Inspect a file", "section": "Searching"})):
+            result = distill.document_record(self.kb, self.kb, record,
+                                            {"name": "test"}, 1)
+        self.assertEqual(result, "merged")  # same binary and subcommands across files
+        route.assert_not_called()
+
+    def test_route_failure_does_not_create_a_binary_file(self):
+        record = {"binary": "raretool", "subcommands": ["run"],
+                  "command": "raretool run", "sig": "bbbbbbbbbbbb"}
+        with patch.object(distill, "classify", return_value=None):
+            self.assertEqual(distill.document_record(self.kb, self.kb, record,
+                                                    {"name": "test"}, 1), "failed")
+        self.assertFalse((self.kb / "raretool.md").exists())
+
+    def test_model_can_change_prior_route_for_new_action(self):
+        self.document("old.md", "Old", "grep -rn foo .")
+        record = {"binary": "grep", "subcommands": ["special"],
+                  "command": "grep special bar", "sig": "bbbbbbbbbbbb"}
+        answer = {"worth_documenting": True, "heading": "Special search",
+                  "what": "Searches", "why": "Inspect text", "section": "Searching"}
+        with patch.object(distill, "classify", return_value=("shell.md", "Shell")) as route, \
+             patch.object(distill, "run_text", return_value=json.dumps(answer)):
+            result = distill.document_record(self.kb, self.kb, record,
+                                            {"name": "test"}, 1)
+        self.assertEqual(result, "new")
+        route.assert_called_once()
+        self.assertTrue((self.kb / "shell.md").exists())
+
+    def test_consolidation_apply_preserves_signatures_and_backs_up(self):
+        self.document("shell.md", "Shell", "rg foo", sig="111111111111")
+        self.document("grep.md", "Grep", "grep foo", sig="222222222222")
+        runtime = self.kb / ".runtime"
+        runtime.mkdir()
+        data = {"schema": 1, "moves": [{"source": "grep.md", "destination": "shell.md",
+                "entries": 1, "source_sha256": knowledge_organize.file_hash(self.kb / "grep.md"),
+                "destination_sha256": knowledge_organize.file_hash(self.kb / "shell.md")}],
+                "index_sha256": "", "routes_sha256": ""}
+        data["sha256"] = knowledge_organize.proposal_hash(data)
+        with patch.object(knowledge_organize.sync_seen, "main", return_value=0):
+            count, backup = knowledge_organize.apply(self.kb, runtime, data, data["sha256"])
+        self.assertEqual(count, 1)
+        self.assertTrue(backup.exists())
+        self.assertIn("222222222222", (self.kb / "shell.md").read_text())
+        self.assertFalse((self.kb / "grep.md").exists())
+
+    def test_consolidation_proposal_uses_model_choice(self):
+        self.document("shell.md", "Shell", "rg foo", sig="111111111111")
+        self.document("tool-a.md", "Tool A", "tool-a foo", sig="222222222222")
+        runtime = self.kb / ".runtime"
+        runtime.mkdir()
+        with patch.object(distill, "classify", return_value=("shell.md", "Shell")) as choose:
+            proposal = knowledge_organize.propose(self.kb, runtime, {"name": "test"})
+        self.assertEqual(proposal["moves"][0]["source"], "tool-a.md")
+        self.assertEqual(proposal["moves"][0]["destination"], "shell.md")
+        self.assertEqual(proposal["moves"][0]["examples"], ["tool-a foo"])
+        self.assertEqual(choose.call_args.kwargs["excluded"], {"tool-a.md"})
+
+    def test_consolidation_rejects_changed_source(self):
+        self.document("shell.md", "Shell", "rg foo", sig="111111111111")
+        self.document("tool-a.md", "Tool A", "tool-a foo", sig="222222222222")
+        runtime = self.kb / ".runtime"
+        runtime.mkdir()
+        with patch.object(distill, "classify", return_value=("shell.md", "Shell")):
+            proposal = knowledge_organize.propose(self.kb, runtime, {"name": "test"})
+        (self.kb / "tool-a.md").write_text("changed", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "knowledge changed"):
+            knowledge_organize.apply(self.kb, runtime, proposal, proposal["sha256"])
+
+    def test_consolidation_select_rehashes_reviewed_subset(self):
+        data = {"schema": 1, "moves": [{"source": "a.md"}, {"source": "b.md"}],
+                "index_sha256": "x", "routes_sha256": "y"}
+        data["sha256"] = knowledge_organize.proposal_hash(data)
+        selected = knowledge_organize.select(data, {"b.md"})
+        self.assertEqual([move["source"] for move in selected["moves"]], ["b.md"])
+        self.assertNotEqual(selected["sha256"], data["sha256"])
+        with self.assertRaises(ValueError):
+            knowledge_organize.select(data, {"missing.md"})
+
 
 class TestEntryParsing(unittest.TestCase):
     def test_parses_heading_sigs_and_commands(self):
@@ -917,13 +1008,15 @@ class TestPauseSwitchAndLog(unittest.TestCase):
         self.assertIn("new", text)
         self.assertIn("known", text)
 
-    def test_new_knowledge_base_never_tracks_the_queue(self):
-        """pending.jsonl holds raw commands, so git must not pick it up."""
+    def test_new_knowledge_base_ignores_private_runtime_files(self):
+        """A separate KB must protect raw evidence, archives, and .env files."""
         sys.path.insert(0, str(BIN.parent))
         import install
         install.ensure_gitignore(self.kb)
         body = (self.kb / ".gitignore").read_text()
-        self.assertIn(".runtime/", body)
+        for line in (".runtime/", "backups/", "playbacks/", ".env", ".env.*",
+                     "!.env.example"):
+            self.assertIn(line, body.splitlines())
 
     def test_existing_gitignore_is_extended_not_replaced(self):
         sys.path.insert(0, str(BIN.parent))
@@ -1098,6 +1191,10 @@ class TestTextModeDistillation(unittest.TestCase):
         self.runtime = self.dir / ".runtime"
         self.runtime.mkdir()
         self.real_run = distill.run_text
+        self.real_choices = distill.route_choices
+        distill.route_choices = lambda record, root, runtime, excluded=None: [
+            (filename, kb.title_of(root, filename), []) for filename in
+            ([kb.known_route(record, root)[0]] if kb.known_route(record, root) else [])]
         self.calls = []
         # Routing is a separate concern with its own tests; pin it here so
         # these tests count only the calls that write entries.
@@ -1106,11 +1203,16 @@ class TestTextModeDistillation(unittest.TestCase):
 
     def tearDown(self):
         distill.run_text = self.real_run
+        distill.route_choices = self.real_choices
         self.tmp.cleanup()
 
     def stub(self, reply):
         def fake(_backend, prompt, _timeout, _runtime, _schema=None):
             self.calls.append(prompt)
+            if "organise a personal command reference" in prompt:
+                filename = "git.md" if "binary:  git" in prompt else "shell.md"
+                return json.dumps({"kind": "same-ecosystem", "file": filename,
+                                   "title": filename[:-3].title(), "confidence": "clear"})
             return reply
         distill.run_text = fake
 
@@ -1130,9 +1232,9 @@ class TestTextModeDistillation(unittest.TestCase):
         first = self.record("b1b1b1b1b1b1", "git", ["log"], "git log --oneline")
         second = self.record("c1c1c1c1c1c1", "git", ["log"], "git log --oneline -20 --graph")
         distill.distill_text(self.dir, self.runtime, [first], {"name": "stub"}, 10)
-        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(self.calls), 2)
         distill.distill_text(self.dir, self.runtime, [second], {"name": "stub"}, 10)
-        self.assertEqual(len(self.calls), 1, "merge must not consult the model")
+        self.assertEqual(len(self.calls), 2, "merge must not consult the model")
         text = (self.dir / "git.md").read_text()
         self.assertIn("c1c1c1c1c1c1", text)
         self.assertEqual(len(kb.parse(text)), 1, "a variant must not create a second entry")
@@ -1169,15 +1271,18 @@ class TestTextModeDistillation(unittest.TestCase):
 
         def fake(_backend, _prompt, _timeout, _runtime, schema=None):
             attempts.append(schema)
+            if "organise a personal command reference" in _prompt:
+                return json.dumps({"kind": "same-ecosystem", "file": "git.md",
+                                   "title": "Git", "confidence": "clear"})
             return "sorry, no idea" if schema is None else self.RESPONSE
         distill.run_text = fake
 
         rec = self.record("9a9a9a9a9a9a", "git", ["log"], "git log")
         distill.distill_text(self.dir, self.runtime, [rec],
                              {"name": "stub", "url": "http://x"}, 10)
-        self.assertEqual(len(attempts), 2, "should retry once")
-        self.assertIsNone(attempts[0], "first attempt is unconstrained")
-        self.assertIsNotNone(attempts[1], "retry supplies the schema")
+        self.assertEqual(len(attempts), 3, "route, then entry and one retry")
+        self.assertIsNone(attempts[1], "first entry attempt is unconstrained")
+        self.assertIsNotNone(attempts[2], "retry supplies the schema")
         self.assertIn("9a9a9a9a9a9a", (self.dir / "git.md").read_text())
 
     def test_skip_verdict_is_not_retried(self):
@@ -1185,23 +1290,26 @@ class TestTextModeDistillation(unittest.TestCase):
 
         def fake(_backend, _prompt, _timeout, _runtime, schema=None):
             attempts.append(schema)
+            if "organise a personal command reference" in _prompt:
+                return json.dumps({"kind": "same-ecosystem", "file": "shell.md",
+                                   "title": "Shell", "confidence": "clear"})
             return json.dumps({"worth_documenting": False, "skip_reason": "trivial"})
         distill.run_text = fake
 
         rec = self.record("8b8b8b8b8b8b", "date", [], "date")
         distill.distill_text(self.dir, self.runtime, [rec],
                              {"name": "stub", "url": "http://x"}, 10)
-        self.assertEqual(len(attempts), 1, "a verdict must not trigger a retry")
+        self.assertEqual(len(attempts), 2, "a verdict must not trigger a retry")
 
-    def test_unknown_binary_is_classified_once_then_remembered(self):
-        """The point of dropping the hardcoded table: ask, then never re-ask."""
+    def test_unknown_binary_is_classified_for_each_new_action(self):
         prompts = []
 
         def fake(_backend, prompt, _timeout, _runtime, _schema=None):
             prompts.append(prompt)
             if "organise a personal command reference" in prompt:
                 return json.dumps({"file": "package-managers.md",
-                                   "title": "Package managers"})
+                                   "title": "Package managers", "kind": "new-technology",
+                                   "confidence": "clear"})
             return self.RESPONSE
         distill.run_text = fake
 
@@ -1215,14 +1323,15 @@ class TestTextModeDistillation(unittest.TestCase):
         second = self.record("d0d0d0d0d0d0", "dnf", ["remove"], "dnf remove -y rg")
         distill.distill_text(self.dir, self.runtime, [second], {"name": "stub"}, 10)
         routing = [p for p in prompts if "organise a personal" in p]
-        self.assertEqual(len(routing), 1, "a known binary must not be re-classified")
+        self.assertEqual(len(routing), 2, "a new action gets a fresh routing decision")
         self.assertIn("d0d0d0d0d0d0", (self.dir / "package-managers.md").read_text())
 
     def test_classifier_choice_is_sanitised(self):
         """A proposed path must not escape the knowledge base."""
         def fake(_backend, prompt, _timeout, _runtime, _schema=None):
             if "organise a personal command reference" in prompt:
-                return json.dumps({"file": "../../etc/passwd", "title": "Nope"})
+                return json.dumps({"file": "../../etc/passwd", "title": "Nope",
+                                   "kind": "new-technology", "confidence": "clear"})
             return self.RESPONSE
         distill.run_text = fake
 
@@ -1234,7 +1343,7 @@ class TestTextModeDistillation(unittest.TestCase):
             self.assertNotIn("/", name)
         self.assertFalse((self.dir.parent / "etc").exists())
 
-    def test_unreachable_classifier_falls_back_to_its_own_file(self):
+    def test_unreachable_classifier_keeps_record_for_retry(self):
         def fake(_backend, prompt, _timeout, _runtime, _schema=None):
             if "organise a personal command reference" in prompt:
                 return None          # classifier unavailable
@@ -1242,9 +1351,10 @@ class TestTextModeDistillation(unittest.TestCase):
         distill.run_text = fake
 
         rec = self.record("f0f0f0f0f0f0", "cargo", ["build"], "cargo build --release")
-        distill.distill_text(self.dir, self.runtime, [rec], {"name": "stub"}, 10)
-        self.assertTrue((self.dir / "cargo.md").exists(),
-                        "routing must never block documentation")
+        _done, failed = distill.distill_text(self.dir, self.runtime, [rec],
+                                             {"name": "stub"}, 10)
+        self.assertEqual(failed, [rec])
+        self.assertFalse((self.dir / "cargo.md").exists())
 
     def test_existing_sections_are_offered_to_the_model(self):
         self.stub(self.RESPONSE)

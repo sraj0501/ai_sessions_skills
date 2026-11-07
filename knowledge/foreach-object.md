@@ -8,6 +8,11 @@
 ### List all executable files within a directory structure
 <!-- sig: a8612d644f39 -->
 <!-- sig: e21834639f85 -->
+<!-- sig: 5261d6186b8b -->
+<!-- sig: d14a88d50e3d -->
+<!-- sig: a275b11b9241 -->
+<!-- sig: 6bcb6668878b -->
+<!-- sig: 16aec417d296 -->
 
 ```bash
 ForEach-Object '{' Write-Output 'Directory: $($_.FullName)' Get-ChildItem -LiteralPath '$_.FullName' -Recurse -File -Filter '*.exe''

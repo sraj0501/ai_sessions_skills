@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Register read-only knowledge and playback tools with local MCP harnesses."""
+"""Register knowledge, playback, and management tools with local MCP harnesses."""
 from __future__ import annotations
 
 import argparse

@@ -13,6 +13,12 @@ a detached watcher documents them later with a cheap model. You never need to
 record anything by hand. This skill is for *using* and *operating* that
 knowledge base.
 
+When MCP management tools are available, use them for capture status and control,
+playback recording and notes, later reasoning, backups, and knowledge routing.
+Long operations return a job ID; poll `session_skills_job_status` until complete.
+Use the CLI examples below when MCP is unavailable. Management tools accept
+specific app actions, never arbitrary shell commands.
+
 ## Resolution playback
 
 When the user asks for a playback, start it with `python3 $TOOL/bin/playback.py
@@ -34,11 +40,14 @@ Run `python3 $TOOL/bin/playback.py stop` when the issue is resolved, then
 every hook event in order, with complete commands and tool output when the
 harness provides it. It is separate from command knowledge writing: playback
 events are not deduplicated, distilled or sent to a model. The raw local spool
-and Markdown output can contain sensitive commands or paths, so they are
-gitignored and must never be committed.
+and Markdown output live together under `$RUNTIME/playback/ID/`. They can
+contain sensitive commands or paths, so they are gitignored and must never be
+committed. Run `playback.py migrate` for older top-level `playbacks/` files.
 
 To explain a recorded issue, use `list_resolution_playbacks` to find its ID,
-then `read_resolution_playback` in step order. Follow `next_start` until all
+then prefer `read_compact_resolution_playback` in step order, at most five
+steps at a time. Use `read_resolution_playback` only when an exact raw result
+is needed. Follow `next_start` until all
 relevant steps are read. Explain each command, its recorded output, the
 agent's visible observation or decision, and the verified outcome. Cite step
 numbers. The returned payload is original evidence; missing data must remain
@@ -49,12 +58,33 @@ then `python $TOOL/bin/playback_query.py read ID --start N` and follow
 `next_start`. The CLI returns the same exact event pages to any harness that
 can run Python commands.
 
+For a small local model, use `python $TOOL/bin/playback_chat.py --id ID
+"What fixed the issue?"`. A question retrieves five compact steps by default
+through local text and embedding indexes, then makes one answer request. For
+an ordered walkthrough, omit the question; use `--page-size 2` to reduce the
+steps per model call. `--ollama-cloud --model MODEL` uses Ollama cloud and sends
+selected evidence there. The local Ollama embedding model specified by
+`AI_SKILLS_EMBED_MODEL` is required for question retrieval even with a cloud
+answer model. Raw output stays in the recording; the answer model sees brief
+observations, recorded or reconstructed inference, and the next action.
+
+For older playbacks without notes, `playback_reason.py --id ID --model MODEL`
+can add clearly labelled later inferences, one step at a time. It skips steps
+with existing reasoning and warns before replacing it; `--overwrite` explicitly
+replaces reasoning in prompts while preserving original events. For local
+runtime backup, run `runtime_backup.py backup`, then `verify ARCHIVE.zip`.
+`restore ARCHIVE.zip --target NEW_RUNTIME_DIR` requires a new directory.
+Archives are unencrypted and private; keep them outside Git and team sync.
+
 ## Look something up (default behaviour)
 
 When `search_command_knowledge` is available, call it for command or workflow
 questions. Read the complete returned entry, including **Why** and **Notes**,
 and cite its source path and line. It searches the configured knowledge base
-without sending its contents to a model service. If the tool is unavailable,
+using a local Ollama embedding model plus exact-text ranking. Set
+`AI_SKILLS_EMBED_MODEL` in the private `.env`; the first search builds an
+ignored SQLite cache and later searches update changed entries. Signature
+comments are excluded from embedded text. If the tool is unavailable,
 run `python $TOOL/bin/search.py <keywords>`; add `--topic git`
 to narrow a topic or `--full` to show complete entries. Browse `$KB/README.md`
 for the topic index. On Windows, `python` works when the `py` launcher is absent.
@@ -97,6 +127,8 @@ Everything is Python, so the same commands work on macOS, Linux and Windows
 | Where is each command filed? | `python3 $TOOL/bin/kb.py routes` |
 | Refile a command, permanently | `python3 $TOOL/bin/kb.py route <binary> <file.md>` |
 | Merge two files, sigs intact | `python3 $TOOL/bin/kb.py merge <from.md> <to.md>` |
+| Propose older topic consolidation | `python3 $TOOL/bin/knowledge_organize.py propose --proposal <runtime>/knowledge-organize.json` |
+| Select reviewed topic moves | `python3 $TOOL/bin/knowledge_organize.py select --proposal <runtime>/knowledge-organize.json --output <runtime>/knowledge-reviewed.json --source <file.md>` |
 | Rebuild the dedupe cache | `python3 $TOOL/bin/sync_seen.py` |
 | Re-wire hooks after an upgrade | `python3 $TOOL/install.py` |
 | Failed batches | `ls $RUNTIME/failed/` |
@@ -121,10 +153,11 @@ to take effect immediately.
 
 ## Which file does a command go in?
 
-There is no list of known commands. A binary is filed by looking at what the
-knowledge base already documents (`git status` in `git.md` pulls every git
-command there), then at `.routes.json` for earlier decisions, and only then by
-asking the model — once, after which the answer is remembered.
+There is no fixed command-to-topic table. For a new action, the writer first
+checks for an exact action in any topic file. Otherwise local embeddings find
+a small set of relevant topics and the model chooses where it belongs.
+`.routes.json` supplies prior choices as hints. An uncertain or unavailable
+route keeps the record for retry instead of creating another topic file.
 
 If something is filed badly, correct it and the correction sticks:
 

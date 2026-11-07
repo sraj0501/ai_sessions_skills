@@ -7,6 +7,7 @@
 
 ### List installed Ollama models
 <!-- sig: e732c0ef236c -->
+<!-- sig: df5317b18749 -->
 
 ```bash
 ollama list 2>/dev/null
