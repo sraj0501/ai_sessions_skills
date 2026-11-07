@@ -338,16 +338,17 @@ knowledge base. Python validates and sanitises the result. An unavailable or
 uncertain routing answer keeps the WAL record for retry; it does not create a
 binary-named file as a fallback.
 
-**Correcting it is a one-liner, and it sticks:**
+To correct an existing placement, move the entries and update the route hint:
 
 ```bash
 python3 tool/bin/kb.py routes                     # where each binary is filed
-python3 tool/bin/kb.py route dnf package-managers.md   # future entries
+python3 tool/bin/kb.py route dnf package-managers.md   # future shortlist hint
 python3 tool/bin/kb.py merge dnf.md package-managers.md  # move existing ones
 ```
 
 `merge` carries the `sig` comments across, so nothing is re-documented and the
-routing table repoints itself.
+routing table repoints itself. New actions still go through the model; the
+route is a candidate, not a forced destination.
 
 For existing small files, `knowledge_organize.py propose --proposal
 .runtime/knowledge-organize.json` asks the model to place each entry in an
@@ -366,7 +367,8 @@ filed as intended, including `pnpm`/`yarn` joining Node, `poetry`/`ruff`
 joining Python, `jq`/`xargs`/`chmod` joining the shell file, and `psql`,
 `systemctl`, `journalctl` and `terraform` each earning a family file. The two
 misses were `podman` (its own container file rather than joining Docker) and
-`dnf` (filed as shell). Both are one `kb.py route` away from fixed, forever.
+`dnf` (filed as shell). This measured the older routing design; current
+placement also uses local embeddings and per-action model decisions.
 
 ### The output contract
 
@@ -726,7 +728,7 @@ Be aware of what has actually been exercised:
 |---|---|
 | **macOS** (darwin, Python 3.14) | Capture and writing verified with unit and smoke checks, real captures, local-model writer runs and the quality eval |
 | **Linux** (Fedora 44, Python 3.14) | Capture and writing verified with unit and smoke checks, including the detached watcher and git commit |
-| **Windows** | Capture and writing verified with real `.cmd` hooks, detached watcher, Ollama writing and deduplication. The full unit suite passed 196 tests in November 2026. Live Codex hook dispatch and playback fidelity still need end-to-end verification. |
+| **Windows** | Capture and writing verified with real `.cmd` hooks, detached watcher, Ollama writing and deduplication. The full unit suite passed 211 tests in November 2026. Live Codex hook dispatch and playback fidelity still need end-to-end verification. |
 | Capture for all six harness payload shapes | Verified (unit tests + live hooks) |
 | Writer: **devin**, **opencode** | Verified end-to-end |
 | Writer: **claude**, **copilot** | Invocation verified; runs could not complete on the test machine (not logged in / quota exhausted) |

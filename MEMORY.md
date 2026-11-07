@@ -1,4 +1,4 @@
-# Project Memory: Resolution Playback
+# Project Memory: Command Knowledge and Resolution Playback
 
 ## Purpose
 
@@ -54,6 +54,9 @@ distillation. The normal knowledge workflow operates when playback is inactive.
 - `tool/bin/knowledge_organize.py`: proposes model-guided moves for older small
   topic files. Reviewed selections require an exact digest and file hashes;
   apply creates a compressed local backup and preserves signature markers.
+  It proposes whole-file moves only when every entry agrees on an existing
+  destination. The agent or user must review each proposed move; a small local
+  model has suggested unrelated destinations in a broad batch.
 - `tool/bin/chat_backend.py`, `ask.py`, and `playback_chat.py`: use
   OpenAI-compatible Chat Completions endpoints. Configuration comes from the
   process environment or a private `.env` beside `config.json`. The playback
@@ -66,6 +69,15 @@ Each recording keeps its raw event spool, rendered `playback.md`, optional
 reconstructed reasoning, and indexes under `.runtime/playback/<id>/`. The
 runtime, private `.env`, and default `backups/` are gitignored because they may
 contain private data. Never commit them or share raw archives through team sync.
+
+The current reviewed consolidation placed `lsof`, `date`, and `kill` in
+`knowledge/shell.md`; `py` and `python.exe` in `knowledge/python.md`; and
+`godot` in `knowledge/godot-engine.md`. `grep`, `sed`, and `awk` were already
+represented in the shell topic. This is knowledge content, not a hardcoded
+command-to-topic rule. The writer checks for an exact action across all files,
+then asks the model to route each new action using a short list of candidates
+from local embeddings. Previous routes are hints. An unavailable or uncertain
+answer leaves the WAL record for retry.
 
 ## Fidelity rules
 
@@ -104,7 +116,9 @@ contain private data. Never commit them or share raw archives through team sync.
   the calling harness to deliver capture events. Local coding harnesses can
   use MCP or HTTP OpenAPI to query playback.
 
-Tests: `tool/tests/test_playback.py` and `tool/tests/test_portable.py`.
+Tests: `tool/tests/test_playback.py`, `tool/tests/test_portable.py`, and
+`tool/tests/test_search_tools.py`. The full unit suite passed 211 tests on
+Windows in November 2026.
 The protocol-based playback client has a real Ollama tool-calling smoke check in
 `tool/tests/smoke_chat_playback.py`; it passed with `qwen3.5:9b` on this
 machine. That verifies reading and explaining a synthetic recording, not

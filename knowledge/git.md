@@ -1394,6 +1394,19 @@ $hits = @($lines | Where-Object { $_ -match '^\[+[^\+]' -and $_ -match '(?i)(sk-
 - **Example:** $lines = git diff --cached --unified=0 -- . ':!*.md;' ...
 - **Notes:** The ':!*.md' pathspec ensures that documentation files are ignored during the secret scan.
 
+### Extract a raw diff of staged changes without context lines
+<!-- sig: 3322b0164b88 -->
+
+```bash
+$patch = git diff --cached --unified=0;
+$added = $patch
+```
+
+- **What it does:** Retrieves the differences of files currently in the index using a unified format with zero lines of context. It stores this output into a variable for further processing.
+- **Why:** Setting unified to 0 isolates the exact lines being added or removed, which is useful for programmatic analysis or scanning for secrets without noise from surrounding code.
+- **Example:** $patch = git diff --cached --unified=0; $added = $patch
+- **Notes:** The --cached flag ensures only staged changes are captured, not the current working directory state.
+
 ## Shelving work
 
 ### Park uncommitted work with a label
