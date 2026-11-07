@@ -2,6 +2,11 @@
 
 ## Purpose
 
+Command knowledge captures eligible actions in a local WAL and maintains a
+searchable Markdown view. Topic placement is decided per new action by a text
+model using a short, locally embedded candidate list. Older small topics can
+be consolidated through a reviewed proposal.
+
 Playback is a manually activated teaching record of one issue resolution. It
 preserves every observed command and tool action in execution order, their
 outputs when supplied by the harness, and the primary agent's recorded visible

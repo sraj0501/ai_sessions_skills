@@ -53,8 +53,9 @@ writer, normalize commands, deduplicate events, or distill the session.
   is enabled; `auto_push` is off by default.
 - `knowledge_organize.py propose` reviews older small files with the model.
   `select` keeps only reviewed moves. `apply` requires that proposal's digest,
-  verifies file hashes, and creates a
-  compressed runtime backup before merging approved topics.
+  verifies file hashes, and creates a compressed runtime backup before merging
+  approved topics. Proposals can be wrong, so inspect each source, destination,
+  and command example before selecting it. Only whole-file moves are proposed.
 - Searches existing Markdown entries with the keyword CLI `search.py` or with
   semantic plus exact-text ranking through MCP, HTTP, and `ask.py`. Semantic
   search requires a local Ollama embedding model named by
@@ -159,13 +160,14 @@ so keep an external protected copy and do not commit or share the raw archive.
 | `tool/bin/session.py stop` / `start` / `restart` | Pause all capture and writing, resume, or reload watcher settings |
 | `tool/bin/distill.py` | Process queued knowledge records now |
 | `tool/bin/search.py` | Search generated knowledge entries |
-| `tool/bin/search_mcp.py` / `tool/install_search.py` | Serve and register read-only agent search |
+| `tool/bin/search_mcp.py` / `tool/install_search.py` | Serve and register command search, playback, and bounded management tools over MCP |
 | `tool/bin/search_http.py` | Serve the same read-only tools over HTTP OpenAPI |
 | `tool/bin/ask.py` | Ask a chat endpoint with the command search tool |
 | `tool/bin/playback_chat.py` | Discuss a recorded resolution through a chat endpoint |
 | `tool/bin/playback_reason.py` | Add clearly labelled later inferences to a playback, locally or through Ollama cloud |
 | `tool/bin/runtime_backup.py backup` / `verify` / `restore` | Compress, validate, and recover local runtime evidence |
 | `tool/bin/kb.py routes` | Show learned command routing |
+| `tool/bin/knowledge_organize.py propose` / `select` / `apply` | Review and consolidate small topic files with a model, digest check, and backup |
 | `tool/bin/wal.py inspect` / `verify` | Inspect local event identities and validate checksums |
 | `tool/bin/wal_rebuild.py --output PATH --writer stub\|model` | Rebuild into a fresh directory; model mode uses the configured text backend |
 | `tool/bin/wal_review.py diff` / `promote` | Compare a proposal, then explicitly promote a reviewed digest with backup |

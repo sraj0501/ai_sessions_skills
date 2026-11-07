@@ -85,7 +85,7 @@ skill. It is safe to re-run and never duplicates entries. See
 uninstall, and the per-platform path table.
 
 > **Status:** capture and writing have end-to-end checks on macOS, Fedora 44,
-> and Windows. The current unit suite passed 196 tests on Windows in November
+> and Windows. The current unit suite passed 211 tests on Windows in November
 > 2026. Live playback capture fidelity across harnesses remains open; run
 > `doctor.py` after installing.
 
@@ -196,6 +196,22 @@ ignored SQLite cache. Later searches embed only new or changed entries. The
 cache is omitted from backups and rebuilds on the next semantic search after
 restore. Signature comments are removed from text before embedding. Direct
 `search.py` queries still read Markdown and use keyword matching.
+
+After registering the MCP server and restarting Codex, these requests use the
+tools without a Python command from the user:
+
+> Find the command I used to inspect a listening port.
+>
+> Show the latest resolution playback in five-step pages and explain the fix.
+>
+> Propose consolidation of small knowledge topics. Show me the proposed moves
+> and their examples before applying any of them.
+
+For consolidation, the agent should call `manage_command_knowledge` with
+`organize_propose`, inspect the returned proposal, use `organize_select` for
+only the approved source files, then use `organize_apply` with the selected
+proposal's SHA256. Long operations return a job ID for
+`session_skills_job_status`. A proposal does not change the knowledge base.
 
 For an HTTP-based harness such as Open WebUI, run the same read-only functions
 as an OpenAPI server and connect its `/openapi.json` URL:
@@ -381,11 +397,12 @@ choose a destination. Existing binary routes are hints, not permanent rules.
 If routing is unavailable or uncertain, the WAL record stays queued for retry
 instead of creating another one-command topic.
 
-If something lands in the wrong place, the correction sticks:
+If something lands in the wrong place, move the existing entries and update
+the route hint:
 
 ```bash
 python3 tool/bin/kb.py routes                      # where each binary is filed
-python3 tool/bin/kb.py route psql postgresql.md    # fix future entries
+python3 tool/bin/kb.py route psql postgresql.md    # hint for future entries
 python3 tool/bin/kb.py merge psql.md postgresql.md # move existing ones, sigs intact
 ```
 
@@ -402,6 +419,10 @@ The model decides whether tools such as `lsof`, `grep`, `sed`, or `awk` fit an
 existing shell topic. Apply checks the proposal digest and source file hashes,
 then makes a compressed local backup. No fixed list of shell commands is used.
 Review the moves first; small local models can suggest an unrelated topic.
+The current knowledge base has `lsof`, `date`, and `kill` in `shell.md`, `py`
+and `python.exe` in `python.md`, and `godot` in `godot-engine.md`. `grep`,
+`sed`, and `awk` were already represented in `shell.md`. Future placement is
+still decided per action by the model.
 
 ### Entry format
 
