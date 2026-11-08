@@ -1239,6 +1239,7 @@ Get-Item -LiteralPath '$doc,$image'
 <!-- sig: 529576d0c3ad -->
 <!-- sig: 0f790ff6b333 -->
 <!-- sig: 6ff19f276b91 -->
+<!-- sig: ee82c16a6901 -->
 
 ```bash
 rg -l -e 'ENTRA_REFRESH_TOKEN'

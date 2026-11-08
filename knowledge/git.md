@@ -333,6 +333,7 @@ git --no-pager diff --staged
 <!-- sig: b096bf5345ed -->
 <!-- sig: 17e1d55d43f6 -->
 <!-- sig: b3c63b1bbd04 -->
+<!-- sig: 936b2d202bd3 -->
 
 ```bash
 git log --oneline -10
@@ -463,6 +464,7 @@ git remote -v
 <!-- sig: 025bc9d66cf9 -->
 <!-- sig: e44e05b464e4 -->
 <!-- sig: 9470f027460c -->
+<!-- sig: 3d1699ba3daf -->
 
 ```bash
 git show --stat <commit>
