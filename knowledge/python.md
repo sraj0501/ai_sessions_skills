@@ -1021,6 +1021,19 @@ rg --files -g AGENTS.md -g '!**/.git/**' -g 'README*' -g pyproject.toml -g packa
 - **Example:** rg --files -g AGENTS.md -g '!**/.git/**' -g 'README*' -g pyproject.toml -g package.json -g Cargo.toml -g '*.rs' -g '*.py' -g '*.ts' -g '*.tsx'
 - **Notes:** The -g flag allows for multiple inclusion and exclusion patterns. The '!**/.git/**' pattern ensures internal git metadata is not included in the results.
 
+### List subdirectories within a specific knowledge runtime path
+<!-- sig: 2c4f53651724 -->
+
+```bash
+$p=Join-Path (Get-Location) 'knowledge\.runtime\playback';
+if(Test-Path $p){ Get-ChildItem -LiteralPath $p -Directory }
+```
+
+- **What it does:** Constructs an absolute path to the playback directory relative to the current location and lists its subdirectories if the path exists.
+- **Why:** Uses -LiteralPath to ensure that special characters in the path (like dots or brackets) are not interpreted as wildcards by the shell.
+- **Example:** $p=Join-Path (Get-Location) 'knowledge\.runtime\playback'; if(Test-Path $p){ Get-ChildItem -LiteralPath $p -Directory }
+- **Notes:** The use of -LiteralPath is critical when paths contain characters that might be misinterpreted by standard path expansion.
+
 ## Tooling and Debugging
 
 ### Identify stray event IDs in the wal module

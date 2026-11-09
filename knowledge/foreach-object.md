@@ -13,6 +13,7 @@
 <!-- sig: a275b11b9241 -->
 <!-- sig: 6bcb6668878b -->
 <!-- sig: 16aec417d296 -->
+<!-- sig: 3bc5333f7390 -->
 
 ```bash
 ForEach-Object '{' Write-Output 'Directory: $($_.FullName)' Get-ChildItem -LiteralPath '$_.FullName' -Recurse -File -Filter '*.exe''
