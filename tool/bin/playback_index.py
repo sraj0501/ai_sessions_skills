@@ -85,25 +85,34 @@ def evidence_digest(event: dict, next_action: str) -> str:
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
-def tool_steps(ident: str) -> list[dict]:
+def tool_steps(ident: str, paths: list[Path] | None = None,
+               events: list[dict] | None = None) -> list[dict]:
     """Return compact tool evidence with recorded/generated reasoning status."""
     _, folder = playback_query._recording(ident)
-    paths = sorted((folder / "events").glob("*.json"))
-    events = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+    if paths is None:
+        paths = sorted((folder / "events").glob("*.json"))
+    if events is None:
+        events = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
     generated = load_reasoning(folder)
     result = []
+    next_tools: list[int | None] = [None] * len(events)
+    next_tool = None
+    for index in range(len(events) - 1, -1, -1):
+        next_tools[index] = next_tool
+        if events[index].get("type") == "tool":
+            next_tool = index
     for number, (path, event) in enumerate(zip(paths, events), 1):
         if event.get("type") != "tool":
             continue
-        following = events[number:]
-        next_tool = next((item for item in following if item.get("type") == "tool"), None)
-        next_action = _short(_command(next_tool.get("payload") or {}), 220) if next_tool else ""
-        until_next = following[:following.index(next_tool) if next_tool else len(following)]
-        notes = [item for item in until_next if item.get("type") == "note"
-                 and item.get("kind") in ("observation", "decision")]
-        note_numbers = [number + offset + 1 for offset, item in enumerate(until_next)
-                        if item in notes]
-        recorded = "; ".join(_short(str(item.get("text", "")), 280) for item in notes)
+        following_tool = next_tools[number - 1]
+        next_action = (_short(_command(events[following_tool].get("payload") or {}), 220)
+                       if following_tool is not None else "")
+        stop = following_tool if following_tool is not None else len(events)
+        notes = [(index + 1, events[index]) for index in range(number, stop)
+                 if events[index].get("type") == "note"
+                 and events[index].get("kind") in ("observation", "decision")]
+        note_numbers = [index for index, _ in notes]
+        recorded = "; ".join(_short(str(item.get("text", "")), 280) for _, item in notes)
         digest = evidence_digest(event, next_action)
         saved = generated.get(path.name, {})
         reconstructed = (saved.get("text", "") if isinstance(saved, dict)
@@ -141,7 +150,7 @@ def indexed_steps(ident: str) -> list[tuple[int, str]]:
         db.execute("CREATE TABLE IF NOT EXISTS steps (number INTEGER PRIMARY KEY, source TEXT NOT NULL, "
                    "mtime_ns INTEGER NOT NULL, size INTEGER NOT NULL, version INTEGER NOT NULL, text TEXT NOT NULL)")
         events = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
-        by_number = {item["number"]: item for item in tool_steps(ident)}
+        by_number = {item["number"]: item for item in tool_steps(ident, paths, events)}
         superseded = {note: item["number"] for item in by_number.values()
                       if item["generated"] for note in item["note_numbers"]}
         for number, (path, event) in enumerate(zip(paths, events), 1):

@@ -537,6 +537,15 @@ Claude Code can also show the connection with `/mcp`, and Codex with
 Python's standard library. It returns full completed entries with source
 paths and line numbers. Command search does not read the WAL. Playback tools
 return exact raw recorded events and output, which may contain private data.
+Raw MCP playback pages are limited to about 40 KB per response. A requested
+page may contain fewer steps than `limit`; follow `next_start` until it is
+`null`. If one event alone exceeds the limit, the tool returns an error with
+the equivalent local `playback_query.py read` command. The compact reader is
+the preferred way to feed a small local model, while the CLI can retrieve
+the complete oversized event.
+`read_compact_resolution_playback` accepts no `id` and then opens the most
+recent recording. Its response includes the chosen ID and title, so subsequent
+pages can use the same ID. Recordings are ordered by their full start timestamp.
 Command search and playback questions require the local Ollama embedding model
 named by `AI_SKILLS_EMBED_MODEL` in private `.env`. Changed entries and steps are
 re-embedded into ignored SQLite caches under `.runtime/`. The first knowledge
@@ -575,7 +584,13 @@ the model context. Use `--page-size 2` for a smaller context, or
 matching steps from local SQLite text and vector indexes. A quoted question makes one
 bounded question-answer request; `--ask` is also accepted. Use `--walkthrough`
 to explain every step when a question is supplied. Adjust retrieval with
-`--max-evidence-steps 2`. The text index is built locally and refreshed when
+`--max-evidence-steps 2`. For a cumulative overview of every step, run
+`python tool/bin/playback_chat.py --id ID --compact --page-size 5 --summary-chars 1800`.
+The client sends the previous bounded summary and the next page of steps to the
+model, then replaces the summary with the result. Raise `--page-size` for a model
+with a larger context or reduce it for a smaller one. The summary can omit detail;
+use `playback_query.py read ID --start N` to inspect exact recorded events.
+The text index is built locally and refreshed when
 events change. It stores readable text in the playback runtime, while exact JSON
 events remain authoritative. The local embedding model indexes changed steps in
 short batches, and exact-text ranking helps preserve command matches. Long

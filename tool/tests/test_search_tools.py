@@ -133,9 +133,12 @@ class TestSearchTools(unittest.TestCase):
         self.assertTrue(reply["result"]["isError"])
 
     def test_compact_playback_reader_limits_page_size(self):
-        with patch.object(playback_index, "compact_timeline", return_value={"steps": []}) as read:
+        with patch.object(playback_index, "compact_timeline", return_value={"steps": []}) as read, \
+                patch("search_mcp.playback_query._recording",
+                      return_value=({"title": "Example", "status": "complete"}, None)):
             self.assertEqual(search_mcp.call_tool("read_compact_resolution_playback",
-                                                  {"id": "example", "limit": 3}), {"steps": []})
+                                                  {"id": "example", "limit": 3}),
+                             {"id": "example", "title": "Example", "status": "complete", "steps": []})
             read.assert_called_once_with("example", limit=3)
         with self.assertRaises(ValueError):
             search_mcp.call_tool("read_compact_resolution_playback", {"id": "example", "limit": 20})

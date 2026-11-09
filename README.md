@@ -267,6 +267,17 @@ without a walkthrough, use:
 python tool/bin/playback_chat.py --id PLAYBACK_ID "What fixed the issue?"
 ```
 
+For one cumulative summary that reads every recorded step in bounded requests,
+use `--compact`. Each request receives the previous short summary and the next
+page of exact steps; the program verifies that every selected step is visited.
+Increase `--page-size` for a larger model or lower it for a smaller context.
+`--summary-chars` sets the carried summary budget. The summary is lossy; exact
+events remain available by step number for detailed follow-up questions.
+
+```bash
+python tool/bin/playback_chat.py --id PLAYBACK_ID --compact --page-size 5 --summary-chars 1800
+```
+
 The client builds incremental SQLite text and embedding indexes under the local
 playback runtime on first use. It refreshes changed events and keeps exact JSON
 events and full raw output as the source of truth. Embeddings come from the required local Ollama

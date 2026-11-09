@@ -31,7 +31,7 @@ def recordings(limit: int = 20) -> dict:
     if type(limit) is not int or not 1 <= limit <= 100:
         raise ValueError("limit must be an integer from 1 to 100")
     found = []
-    for folder in sorted(playback.root().glob("*/state.json"), reverse=True):
+    for folder in playback.root().glob("*/state.json"):
         try:
             state = json.loads(folder.read_text(encoding="utf-8"))
             found.append({key: state.get(key) for key in
@@ -42,10 +42,13 @@ def recordings(limit: int = 20) -> dict:
     if active and active.get("id") not in {item["id"] for item in found}:
         found.insert(0, {key: active.get(key) for key in
                          ("id", "title", "status", "started", "stopped", "harness", "session")})
+    found.sort(key=lambda item: (item.get("started") or "", item.get("id") or ""),
+               reverse=True)
     return {"total": len(found), "recordings": found[:limit]}
 
 
-def timeline(ident: str, start: int = 1, limit: int = 10) -> dict:
+def timeline(ident: str, start: int = 1, limit: int = 10,
+             max_response_bytes: int | None = None) -> dict:
     if type(start) is not int or start < 1:
         raise ValueError("start must be a positive step number")
     if type(limit) is not int or not 1 <= limit <= 20:
@@ -55,7 +58,21 @@ def timeline(ident: str, start: int = 1, limit: int = 10) -> dict:
     steps = []
     for number, path in enumerate(paths[start - 1:start - 1 + limit], start):
         event = json.loads(path.read_text(encoding="utf-8"))
-        steps.append({"step": number, "event_id": path.stem, **event})
+        candidate = {"step": number, "event_id": path.stem, **event}
+        if max_response_bytes is not None:
+            proposed = {"id": ident, "title": state.get("title"),
+                        "status": state.get("status"), "total_steps": len(paths),
+                        "start": start, "steps": [*steps, candidate],
+                        "next_start": number + 1 if number < len(paths) else None}
+            content = json.dumps(proposed, ensure_ascii=False)
+            response = {"content": [{"type": "text", "text": content}]}
+            if len(json.dumps(response, ensure_ascii=False).encode("utf-8")) > max_response_bytes:
+                if not steps:
+                    raise ValueError(
+                        f"step {number} exceeds the MCP response limit; "
+                        f"read it with playback_query.py read {ident} --start {number} --limit 1")
+                break
+        steps.append(candidate)
     return {"id": ident, "title": state.get("title"), "status": state.get("status"),
             "total_steps": len(paths), "start": start, "steps": steps,
             "next_start": start + len(steps) if start + len(steps) <= len(paths) else None}

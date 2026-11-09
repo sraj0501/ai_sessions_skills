@@ -2,6 +2,8 @@
 """Playback preserves the investigation without involving the KB writer."""
 import io
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import threading
@@ -132,10 +134,76 @@ class PlaybackTests(unittest.TestCase):
         via_mcp = search_mcp.dispatch({"jsonrpc": "2.0", "id": 9,
             "method": "tools/call", "params": {"name": "read_resolution_playback",
             "arguments": {"id": first["id"], "start": 1, "limit": 2}}})
-        self.assertEqual(via_mcp["result"]["structuredContent"]["total_steps"], 2)
+        self.assertEqual(json.loads(via_mcp["result"]["content"][0]["text"])["total_steps"], 2)
         self.assertIn("echo one", via_mcp["result"]["content"][0]["text"])
         with self.assertRaises(ValueError):
             playback_query.timeline("../other")
+
+    def test_raw_mcp_playback_pages_large_events_without_dropping_steps(self):
+        state = playback.start("Large output", "thread-1", "codex")
+        for number, size in enumerate((500, 500, 30000, 500, 20000), 1):
+            playback.spool({"type": "tool", "payload": {"tool_name": "exec",
+                            "tool_input": {"command": f"check {number}"},
+                            "stdout": "x" * size}}, state)
+        seen = []
+        start = 1
+        while start is not None:
+            reply = search_mcp.dispatch({"jsonrpc": "2.0", "id": start,
+                "method": "tools/call", "params": {"name": "read_resolution_playback",
+                "arguments": {"id": state["id"], "start": start, "limit": 5}}})
+            self.assertNotIn("structuredContent", reply["result"])
+            self.assertLess(len(json.dumps(reply, ensure_ascii=False)), 45000)
+            page = json.loads(reply["result"]["content"][0]["text"])
+            seen.extend(step["step"] for step in page["steps"])
+            start = page["next_start"]
+        self.assertEqual(seen, [1, 2, 3, 4, 5])
+
+    def test_raw_mcp_reports_single_oversized_event_as_tool_error(self):
+        state = playback.start("Huge output", "thread-1", "codex")
+        playback.spool({"type": "tool", "payload": {"stdout": "x" * 50000}}, state)
+        reply = search_mcp.dispatch({"jsonrpc": "2.0", "id": 1,
+            "method": "tools/call", "params": {"name": "read_resolution_playback",
+            "arguments": {"id": state["id"]}}})
+        self.assertTrue(reply["result"]["isError"])
+        self.assertIn("exceeds the MCP response limit", reply["result"]["content"][0]["text"])
+        self.assertEqual(search_mcp.dispatch({"jsonrpc": "2.0", "id": 2,
+            "method": "ping"})["result"], {})
+
+    def test_mcp_stdio_survives_unicode_playback_with_legacy_windows_encoding(self):
+        base = Path(self.temp.name)
+        ident = "2026-11-03_22-56-23_399f07f5"
+        folder = base / ".runtime" / "playback" / ident
+        events = folder / "events"
+        events.mkdir(parents=True)
+        (folder / "state.json").write_text(json.dumps({"id": ident,
+            "title": "Unicode playback", "status": "complete"}), encoding="utf-8")
+        (events / "000001.json").write_text(json.dumps({"type": "note",
+            "kind": "observation", "text": "next → done"}), encoding="utf-8")
+        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                   "params": {"name": "read_compact_resolution_playback",
+                              "arguments": {"id": ident}}}
+        env = {**os.environ, "AI_SKILLS_KB": str(base), "PYTHONIOENCODING": "cp1252"}
+        done = subprocess.run([sys.executable, str(Path(search_mcp.__file__))],
+                              input=(json.dumps(request) + "\n").encode("ascii"),
+                              capture_output=True, env=env, timeout=10)
+        self.assertEqual(done.returncode, 0, done.stderr.decode("utf-8", "replace"))
+        response = json.loads(done.stdout.decode("utf-8"))
+        self.assertIn("next → done", response["result"]["content"][0]["text"])
+
+    def test_compact_mcp_read_defaults_to_latest_recording(self):
+        older = playback.start("Older issue", "thread-1", "codex")
+        playback.note("outcome", "Old result", "thread-1")
+        with patch("playback.procs.spawn_detached", return_value=123):
+            playback.stop("thread-1")
+        playback_worker.run(older["id"])
+        latest = playback.start("Latest issue", "thread-2", "codex")
+        playback.note("outcome", "New result", "thread-2")
+        self.assertNotEqual(older["id"], latest["id"])
+        result = search_mcp.call_tool("read_compact_resolution_playback", {})
+        self.assertEqual(result["id"], latest["id"])
+        self.assertEqual(result["title"], "Latest issue")
+        self.assertIn("New result", result["steps"][0]["text"])
+        self.assertIsNone(result["next_start"])
 
     def test_chat_playback_calls_exact_timeline_and_keeps_history(self):
         state = playback.start("Debug issue", "thread-1", "codex")
@@ -209,6 +277,51 @@ class PlaybackTests(unittest.TestCase):
                 state["id"], "Explain", backend, page_size=2, start=3, end=6))
         self.assertEqual([(a, b) for a, b, _, _ in pages], [(3, 4), (5, 6)])
         self.assertEqual(mocked.call_count, 2)
+
+    def test_compact_walkthrough_carries_summary_across_configurable_pages(self):
+        state = playback.start("Long investigation", "thread-1", "codex")
+        for number in range(11):
+            playback.note("observation", f"finding {number}", "thread-1")
+        backend = ChatBackend("http://local", "local")
+        prompts = []
+        progress = []
+
+        def summarize(messages, tools):
+            self.assertEqual(tools, [])
+            self.assertEqual(len(messages), 2)
+            prompt = messages[1]["content"]
+            prompts.append(prompt)
+            return {"content": f"Summary {len(prompts)} [steps 1-{min(len(prompts) * 4, 11)}]"}
+
+        with patch.object(backend, "complete", side_effect=summarize):
+            result = playback_chat.compact_walkthrough(
+                state["id"], "Explain the investigation", backend,
+                page_size=4, summary_chars=400,
+                on_page=lambda *values: progress.append(values))
+        self.assertEqual(progress, [(1, 4, 11), (5, 8, 11), (9, 11, 11)])
+        self.assertEqual(len(prompts), 3)
+        self.assertIn("finding 0", prompts[0])
+        self.assertIn("finding 4", prompts[1])
+        self.assertIn("Summary 1", prompts[1])
+        self.assertIn("finding 10", prompts[2])
+        self.assertIn("Summary 2", prompts[2])
+        self.assertNotIn("finding 0", prompts[1])
+        self.assertIn("steps 1-11", result)
+
+    def test_compact_walkthrough_reduces_oversized_summary_without_silent_truncation(self):
+        state = playback.start("Short investigation", "thread-1", "codex")
+        playback.note("outcome", "The service recovered.", "thread-1")
+        backend = ChatBackend("http://local", "local")
+        with patch.object(backend, "complete", side_effect=[
+                {"content": "x" * 401}, {"content": "The service recovered [step 1]."}]):
+            result = playback_chat.compact_walkthrough(
+                state["id"], "What happened?", backend, summary_chars=400)
+        self.assertIn("The service recovered", result)
+        with patch.object(backend, "complete", side_effect=[
+                {"content": "x" * 401}, {"content": "y" * 401}]):
+            with self.assertRaisesRegex(RuntimeError, "exceeded"):
+                playback_chat.compact_walkthrough(
+                    state["id"], "What happened?", backend, summary_chars=400)
 
     def test_local_walkthrough_shrinks_pages_with_large_recorded_output(self):
         state = playback.start("Large output", "thread-1", "codex")

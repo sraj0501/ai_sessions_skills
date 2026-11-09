@@ -58,14 +58,13 @@ PLAYBACK_READ = {
 }
 PLAYBACK_COMPACT = {
     "name": "read_compact_resolution_playback",
-    "description": ("Preferred playback reader for small local models. Returns at most five compact "
-                    "steps with command, observed result, recorded or reconstructed inference, "
-                    "and next action. Raw output remains in the recording."),
+    "description": ("Read a compact page of a recorded issue resolution. Defaults to the latest "
+                    "recording when id is omitted. Returns step evidence and next_start for pagination."),
     "inputSchema": {"type": "object", "properties": {
-        "id": {"type": "string", "description": "Playback ID from list_resolution_playbacks"},
+        "id": {"type": "string", "description": "Optional playback ID; omit for the latest recording"},
         "start": {"type": "integer", "minimum": 1, "default": 1},
         "limit": {"type": "integer", "minimum": 1, "maximum": 5, "default": 5}},
-        "required": ["id"], "additionalProperties": False},
+        "additionalProperties": False},
     "annotations": {"readOnlyHint": True, "destructiveHint": False},
 }
 TOOLS = [TOOL, PLAYBACK_LIST, PLAYBACK_COMPACT, PLAYBACK_READ, *mcp_actions.TOOLS]
@@ -79,14 +78,22 @@ def call_tool(name: str, args: dict) -> dict:
     if name == PLAYBACK_READ["name"]:
         options = dict(args)
         ident = options.pop("id")
-        return playback_query.timeline(ident, **options)
+        return playback_query.timeline(ident, max_response_bytes=40000, **options)
     if name == PLAYBACK_COMPACT["name"]:
         options = dict(args)
-        ident = options.pop("id")
+        ident = options.pop("id", "")
+        if not ident:
+            latest = playback_query.recordings(limit=1)["recordings"]
+            if not latest:
+                raise ValueError("no resolution playback is recorded")
+            ident = latest[0]["id"]
         limit = options.get("limit", 5)
         if type(limit) is not int or not 1 <= limit <= 5:
             raise ValueError("limit must be an integer from 1 to 5")
-        return playback_index.compact_timeline(ident, **options)
+        result = playback_index.compact_timeline(ident, **options)
+        state, _ = playback_query._recording(ident)
+        return {"id": ident, "title": state.get("title"),
+                "status": state.get("status"), **result}
     if name in {item["name"] for item in mcp_actions.TOOLS}:
         return mcp_actions.call(name, args)
     raise ValueError("Unknown tool")
@@ -133,8 +140,9 @@ def dispatch(message: dict) -> dict | None:
         try:
             args = params.get("arguments") or {}
             found = call_tool(params["name"], args)
-            result = {"content": [{"type": "text", "text": json.dumps(found, ensure_ascii=False)}],
-                      "structuredContent": found}
+            result = {"content": [{"type": "text", "text": json.dumps(found, ensure_ascii=False)}]}
+            if params["name"] != PLAYBACK_READ["name"]:
+                result["structuredContent"] = found
         except (TypeError, ValueError, RuntimeError, OSError, TimeoutError,
                 subprocess.TimeoutExpired) as exc:
             result = {"content": [{"type": "text", "text": str(exc)}], "isError": True}
@@ -145,6 +153,11 @@ def dispatch(message: dict) -> dict | None:
 
 
 def main() -> None:
+    # MCP stdio is UTF-8 even when Windows starts Python with a legacy console
+    # code page. A non-ASCII playback event must not kill the server process.
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     for line in sys.stdin:
         try:
             message = json.loads(line)
