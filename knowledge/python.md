@@ -1039,6 +1039,7 @@ if(Test-Path $p){ Get-ChildItem -LiteralPath $p -Directory }
 
 ### Identify stray event IDs in the wal module
 <!-- sig: a8977e178c23 -->
+<!-- sig: 0bd9cff4f927 -->
 
 ```bash
 python.exe -c "import sys,pathlib; sys.path.insert(0,'tool/bin'); import wal; p=pathlib.Path("['vscode', 'cli']"); e=list(wal.events(p)); normal={x['event_id'] for x in wal.events()}; print('stray_events',len(e)); print('event_ids',[x['event_id'] for x in e]); print('normal_has_stray',all(x['event_id'] in normal for x in e))"
