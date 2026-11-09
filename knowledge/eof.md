@@ -49,6 +49,7 @@ grep -rn "'dashboard-owned' staging/production 'loaders\|dashboard-owned' 'loade
 ### Extract specific environment variables from a file
 <!-- sig: ee3ac8982e36 -->
 <!-- sig: 004522d4efcd -->
+<!-- sig: fbc04907ca2e -->
 
 ```bash
 Select-String -LiteralPath .env -Pattern '^AI_SKILLS_EMBED_(MODEL|URL)='

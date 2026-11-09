@@ -1008,6 +1008,19 @@ py -3 -c 'import sys; sys.path.insert(0, "tool/bin"); import playback_index; s=p
 - **Example:** Run against .runtime/knowledge-organization-proposal.json to see source and destination mappings.
 - **Notes:** Requires the -Raw flag on Get-Content to ensure the entire file is passed as a single string to the JSON converter.
 
+### Find project files matching specific patterns while excluding git directory
+<!-- sig: dd2991002f16 -->
+<!-- sig: 65d58335458e -->
+
+```bash
+rg --files -g AGENTS.md -g '!**/.git/**' -g 'README*' -g pyproject.toml -g package.json -g Cargo.toml -g '*.rs' -g '*.py' -g '*.ts' -g '*.tsx'
+```
+
+- **What it does:** Uses ripgrep to list all files in the current directory that match a specific set of glob patterns, while explicitly ignoring the .git directory.
+- **Why:** Provides a fast, filtered list of relevant source and configuration files across multiple languages (Rust, Python, TypeScript) for project-wide analysis.
+- **Example:** rg --files -g AGENTS.md -g '!**/.git/**' -g 'README*' -g pyproject.toml -g package.json -g Cargo.toml -g '*.rs' -g '*.py' -g '*.ts' -g '*.tsx'
+- **Notes:** The -g flag allows for multiple inclusion and exclusion patterns. The '!**/.git/**' pattern ensures internal git metadata is not included in the results.
+
 ## Tooling and Debugging
 
 ### Identify stray event IDs in the wal module
